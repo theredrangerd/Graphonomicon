@@ -1,9 +1,9 @@
 import { defineConfig } from 'vitest/config';
 
-// Served as a GitHub Pages project site (https://theredrangerd.github.io/econ-tools/),
+// Served as a GitHub Pages project site (https://theredrangerd.github.io/Graphonomicon/),
 // not from the domain root, so production asset/script URLs need the repo name prefixed.
 // Only applied to `vite build`; dev/test keep the default root base.
-const base = process.env.GITHUB_PAGES ? '/econ-tools/' : '/';
+const base = process.env.GITHUB_PAGES ? '/Graphonomicon/' : '/';
 
 export default defineConfig({
   base,
