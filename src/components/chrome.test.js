@@ -30,9 +30,9 @@ describe('renderMiniHeader', () => {
 
   it('honors an explicit base path, so the home link still works under a GitHub Pages project subpath', () => {
     const container = document.createElement('div');
-    renderMiniHeader(container, { title: 'Microeconomics', base: '/econ-tools/' });
+    renderMiniHeader(container, { title: 'Microeconomics', base: '/Graphonomicon/' });
     const link = container.querySelector('.mini-header__home');
-    expect(link.getAttribute('href')).toBe('/econ-tools/index.html');
+    expect(link.getAttribute('href')).toBe('/Graphonomicon/index.html');
   });
 
   it('renders no back link when backHref is not given', () => {

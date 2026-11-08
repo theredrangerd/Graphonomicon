@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { initHomePage } from './home.js';
 
 function bodyOf(html) {
-  const match = html.match(/<body>([\s\S]*)<\/body>/);
+  const match = html.match(/<body[^>]*>([\s\S]*)<\/body>/);
   return match[1];
 }
 

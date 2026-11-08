@@ -105,7 +105,7 @@ describe('renderMarketChart', () => {
 
   it('runs both price lines from the axis to Q when the subsidy box is not drawn', () => {
     const result = computeMarket({ ...base, intervention: { type: 'subsidy', amount: 20 } });
-    renderMarketChart(svg, result, { focus: 'cs' });
+    renderMarketChart(svg, result, { focus: 'ps' });
     const lines = [...svg.querySelectorAll('line.wedge-line')];
     expect(lines.map((l) => l.getAttribute('stroke'))).toEqual(['var(--demand)', 'var(--supply)']);
     const x2s = lines.map((l) => +l.getAttribute('x2'));
@@ -262,26 +262,6 @@ describe('renderMarketChart', () => {
   it('skips a wedge chip when the band is too thin to hold it', () => {
     renderMarketChart(svg, computeMarket({ ...base, intervention: { type: 'tax', mode: 'specific', amount: 2 } }), { showSurplusLabels: true });
     expect(svg.querySelector('.region-badge--tax-consumer')).toBeNull();
-  });
-
-  it('layers a hidden full-CS and full-PS pop over the subsidy stripes, sharing the surplus regions', () => {
-    const r = computeMarket({ ...base, intervention: { type: 'subsidy', amount: 20 } });
-    renderMarketChart(svg, r);
-    const fills = [...svg.querySelector('g.fills').children];
-    const stripes = fills.findIndex((g) => g.dataset.region === 'subsidy-overlap');
-    for (const id of ['cs', 'ps']) {
-      const pop = svg.querySelector(`g.region-pop--${id}`);
-      expect(pop.dataset.region).toBe(id);
-      expect(fills.indexOf(pop)).toBeGreaterThan(stripes);
-      expect(pop.querySelector(`polygon.${id}-pop-fill`).getAttribute('points'))
-        .toBe(svg.querySelector(`polygon.${id}-fill`).getAttribute('points'));
-    }
-  });
-
-  it('draws no pop layers outside a subsidy', () => {
-    const r = computeMarket({ ...base, intervention: { type: 'tax', amount: 20 } });
-    renderMarketChart(svg, r);
-    expect(svg.querySelector('.region-pop')).toBeNull();
   });
 
   it('keeps a ceiling/floor name inside the plot when its line sits on the bottom edge', () => {
@@ -639,9 +619,77 @@ describe('focus', () => {
   beforeEach(() => { svg = makeSvg(); });
   const r = (amount = 20) => computeMarket({ ...base, intervention: { type: amount ? 'subsidy' : 'none', amount } });
   it('removes every other shaded area', () => {
-    renderMarketChart(svg, r(), { detail: 'ib', focus: 'cs' });
+    renderMarketChart(svg, r(0), { detail: 'ib', focus: 'cs' });
     const regions = [...svg.querySelectorAll('.fills [data-region]')].map((g) => g.dataset.region);
     expect(new Set(regions)).toEqual(new Set(['cs']));
+  });
+  it('splits a subsidised CS/PS into its free-market triangle and marginal band', () => {
+    for (const [focus, parts] of [['cs', ['cs-original', 'marginal-cs']], ['ps', ['ps-original', 'marginal-ps']]]) {
+      renderMarketChart(svg, r(), { detail: 'ib', focus });
+      const regions = [...svg.querySelectorAll('.fills [data-region]')].map((g) => g.dataset.region);
+      expect(new Set(regions)).toEqual(new Set(parts));
+    }
+  });
+  it('chips a subsidised CS/PS focus and its marginal band separately', () => {
+    const result = r();
+    for (const [focus, total, band, bandValue] of [['cs', 'CS', 'mCS', result.marginalCS], ['ps', 'PS', 'mPS', result.marginalPS]]) {
+      renderMarketChart(svg, result, { detail: 'ib', focus });
+      const chips = [...svg.querySelectorAll('.chart-focus-chip .region-badge')].map((b) => b.textContent);
+      expect(chips).toHaveLength(2);
+      expect(chips[0]).toMatch(new RegExp(`^${total} `));
+      expect(chips[1]).toBe(`${band} $${Math.round(bandValue).toLocaleString('en-US')}`);
+    }
+  });
+  it('draws the per-unit subsidy arrow from e2 up to S1 in the producer surplus and overlap focuses only', () => {
+    const result = r();
+    renderMarketChart(svg, result, { detail: 'ib', focus: 'ps' });
+    const arrow = svg.querySelector('.subsidy-arrow');
+    expect(arrow).not.toBeNull();
+    expect(arrow.querySelector('.region-badge__text').textContent).toBe(`$${Math.round(result.Pp - result.Pc)}`);
+    expect(arrow.querySelector('polygon')).not.toBeNull();
+    for (const focus of ['cs', 'gov', 'dwl', null]) {
+      renderMarketChart(svg, result, { detail: 'ib', focus });
+      expect(svg.querySelector('.subsidy-arrow')).toBeNull();
+    }
+    renderMarketChart(svg, r(0), { detail: 'ib', focus: 'ps' });
+    expect(svg.querySelector('.subsidy-arrow')).toBeNull();
+  });
+  it('can hold back the Pp line and symbol while keeping the Pc line that tracks e2', () => {
+    const result = r();
+    const layers = ['demand', 'supply', 'supply2', 'eq1', 'eq2', 'pricesCOnly', 'psTriangle'];
+    renderMarketChart(svg, result, { detail: 'ib', focus: 'ps', layers });
+    expect(svg.querySelectorAll('line.wedge-line')).toHaveLength(1);
+    const symbols = [...svg.querySelectorAll('.axis-symbol, text')].map((n) => n.textContent.replace(/\s/g, ''));
+    expect(symbols).toContain('Pc');
+    expect(symbols).not.toContain('Pp');
+  });
+  it('draws no producer-price line or Pp symbol in the CS focus', () => {
+    renderMarketChart(svg, r(), { detail: 'ib', focus: 'cs' });
+    expect(svg.querySelectorAll('line.wedge-line')).toHaveLength(1);
+    const symbols = [...svg.querySelectorAll('text')].map((n) => n.textContent.replace(/\s/g, ''));
+    expect(symbols).toContain('Pc');
+    expect(symbols).not.toContain('Pp');
+  });
+  it('draws the overlap focus as labelled CS/PS, then both marginal bands and the stripes under a subsidy', () => {
+    renderMarketChart(svg, r(0), { detail: 'ib', focus: 'overlap' });
+    expect(new Set([...svg.querySelectorAll('.fills [data-region]')].map((g) => g.dataset.region))).toEqual(new Set(['cs', 'ps']));
+    expect([...svg.querySelectorAll('.chart-focus-chip .region-badge')].map((b) => b.textContent.split(' ')[0])).toEqual(['CS', 'PS']);
+    renderMarketChart(svg, r(), { detail: 'ib', focus: 'overlap' });
+    expect(new Set([...svg.querySelectorAll('.fills [data-region]')].map((g) => g.dataset.region)))
+      .toEqual(new Set(['cs-original', 'ps-original', 'marginal-cs', 'marginal-ps', 'subsidy-overlap']));
+    expect(svg.querySelectorAll('polygon.overlap-fill').length).toBeGreaterThan(0);
+    expect(svg.querySelector('.subsidy-arrow')).not.toBeNull();
+  });
+  it('puts a subsidised CS chip inside the free-market triangle, still showing total CS', () => {
+    const result = r();
+    renderMarketChart(svg, result, { detail: 'ib', focus: 'cs' });
+    const [, tx, ty] = svg.querySelector('.chart-focus-chip .region-badge').getAttribute('transform').match(/translate\(([-\d.]+), ([-\d.]+)\)/).map(Number);
+    const tri = svg.querySelector('[data-region="cs-original"] polygon').getAttribute('points').split(' ').map((p) => p.split(',').map(Number));
+    const ys = tri.map(([, y]) => y);
+    expect(ty).toBeLessThan(Math.max(...ys));
+    expect(ty).toBeGreaterThan(Math.min(...ys));
+    expect(tx).toBeGreaterThan(Math.min(...tri.map(([x]) => x)));
+    expect(svg.textContent).toContain(`CS $${Math.round(result.CS).toLocaleString('en-US')}`);
   });
   it('fades S1 and enlarges e2', () => {
     renderMarketChart(svg, r(), { detail: 'ib', focus: 'cs' });

@@ -99,14 +99,13 @@ function drawGridAndAxes(svg) {
   pattern.appendChild(el('line', { x1: 0, y1: 0, x2: 0, y2: 6, stroke: 'var(--dwl-hatch)', 'stroke-width': 1.4 }));
   defs.appendChild(pattern);
   // Subsidy CS/PS overlap: alternating demand-blue and supply-orange stripes, so the band
-  // reads as belonging to both surpluses rather than as a third, blended one. Above Pe the
-  // stripes run the opposite way to below it, marking the pre-subsidy price as a boundary.
+  // reads as belonging to both surpluses rather than as a third, blended one.
   // Opaque base first, so the stripes aren't tinted by the CS/PS fills underneath.
   for (const [id, angle] of [['overlapStripesBelow', 45], ['overlapStripesAbove', -45]]) {
     const stripes = el('pattern', { id, width: 10, height: 10, patternTransform: `rotate(${angle})`, patternUnits: 'userSpaceOnUse' });
     stripes.appendChild(el('rect', { width: 10, height: 10, fill: 'var(--surface)' }));
-    stripes.appendChild(el('rect', { width: 5, height: 10, fill: 'var(--demand)', 'fill-opacity': STRIPE_OPACITY }));
-    stripes.appendChild(el('rect', { x: 5, width: 5, height: 10, fill: 'var(--supply)', 'fill-opacity': STRIPE_OPACITY }));
+    stripes.appendChild(el('rect', { width: 5, height: 10, fill: 'var(--demand)', 'fill-opacity': STRIPE_OPACITY }, 'overlap-stripe overlap-stripe--cs'));
+    stripes.appendChild(el('rect', { x: 5, width: 5, height: 10, fill: 'var(--supply)', 'fill-opacity': STRIPE_OPACITY }, 'overlap-stripe overlap-stripe--ps'));
     defs.appendChild(stripes);
   }
   const clip = el('clipPath', { id: 'plotClip' });
@@ -153,14 +152,16 @@ function hasOpenWedge(result) {
   return (result.mode === 'tax' && !result.closed) || result.mode === 'subsidy';
 }
 
+// 'pricesCOnly' is 'prices' minus the producer price: just the Pc line (the one that tracks e2)
+// and its axis symbol, for a caller that holds the Pp line back.
 // Named layers: every mark the renderer draws belongs to exactly one, so a caller (the
 // subsidy page's Explain steps) can build the diagram up piece by piece. With no `layers`
 // option, resolveLayers returns exactly what the chart has always drawn for that result.
 export const LAYERS = Object.freeze([
-  'demand', 'supply', 'supply2', 'eq1', 'eq2', 'prices', 'control', 'wedgeBox',
+  'demand', 'supply', 'supply2', 'eq1', 'eq2', 'prices', 'pricesCOnly', 'control', 'wedgeBox',
   'cs', 'ps', 'overlap', 'taxWedges', 'dwl',
   'csTriangle', 'psTriangle', 'marginalCs', 'marginalPs', 'govFill',
-  'subsidyBracket', 'badges', 'areaNames', 'focusChip',
+  'subsidyBracket', 'subsidyArrow', 'badges', 'areaNames', 'focusChip',
 ]);
 
 // The Explorer view's single highlighted area (subsidy page).
@@ -168,11 +169,13 @@ export const FOCUS_IDS = Object.freeze(['cs', 'ps', 'overlap', 'gov', 'dwl']);
 
 // What a focus draws: its polygon, chip label/value, and chip colour. Overlap, gov and DWL
 // only exist when the result has them, so on a free market they yield no fill and no chip.
+// Under a subsidy the CS/PS chip sits in the free-market triangle (`chipPoly`), since the
+// marginal band beside it is drawn as its own area.
 function focusSpec(result, focus) {
   const isSubsidy = result.mode === 'subsidy';
   const specs = {
-    cs: { poly: result.csPoly, label: 'CS', value: result.CS, colorVar: 'demand' },
-    ps: { poly: result.psPoly, label: 'PS', value: result.PS, colorVar: 'supply' },
+    cs: { poly: result.csPoly, chipPoly: isSubsidy ? result.csTrianglePoly : null, label: 'CS', value: result.CS, colorVar: 'demand' },
+    ps: { poly: result.psPoly, chipPoly: isSubsidy ? result.psTrianglePoly : null, label: 'PS', value: result.PS, colorVar: 'supply' },
     overlap: { poly: isSubsidy ? result.overlapPoly : null, label: 'Overlap', value: result.overlapArea, colorVar: 'ink' },
     gov: { poly: isSubsidy ? result.wedgePoly : null, label: 'Gov', value: result.govCost, colorVar: 'gov' },
     dwl: { poly: result.dwlPoly, label: 'DWL', value: result.DWL, colorVar: 'dwl-line' },
@@ -185,9 +188,28 @@ export function resolveLayers(result, { detail = 'full', layers, focus = null, s
   if (focus && FOCUS_IDS.includes(focus)) {
     const on = new Set(['demand', 'supply', 'eq1']);
     if (shiftedSupplyParams(result)) on.add('supply2');
-    if (hasOpenWedge(result)) { on.add('eq2'); on.add('prices'); }
+    // The CS view has no use for the producer price, so it keeps only the Pc line.
+    if (hasOpenWedge(result)) { on.add('eq2'); on.add(focus === 'cs' ? 'pricesCOnly' : 'prices'); }
+    if (focus === 'overlap') {
+      // The overlap view starts as the plain labelled diagram, then shows CS and PS each growing
+      // into the other's area: the free-market triangles, both marginal bands, the stripes.
+      for (const name of result.mode === 'subsidy' ? ['csTriangle', 'psTriangle', 'marginalCs', 'marginalPs', 'overlap'] : ['cs', 'ps']) on.add(name);
+      if (hasOpenWedge(result)) on.add('subsidyArrow');
+      on.add('focusChip');
+      return on;
+    }
     const hasPoly = focusSpec(result, focus)?.poly?.length >= 3;
-    if (hasPoly) {
+    // Producer surplus only: the arrow from e2 up to S1 that shows where the subsidy lifts PS.
+    if (focus === 'ps' && hasOpenWedge(result)) on.add('subsidyArrow');
+    // A subsidised CS/PS is split as IB perfect draws it: the free-market triangle plus its
+    // marginal band in that band's own colour, so the band visibly grows as the subsidy does.
+    const split = result.mode === 'subsidy' && {
+      cs: ['csTriangle', 'marginalCs'], ps: ['psTriangle', 'marginalPs'],
+    }[focus];
+    if (hasPoly && split) {
+      for (const name of split) on.add(name);
+      if (focusSpec(result, focus).value > 0.005) on.add('focusChip');
+    } else if (hasPoly) {
       on.add(focus === 'gov' ? 'govFill' : focus);
       if (focus === 'gov') on.add('wedgeBox');
       const spec = focusSpec(result, focus);
@@ -222,6 +244,7 @@ export function resolveLayers(result, { detail = 'full', layers, focus = null, s
 let layerOn = new Set();
 let layerEnter = new Set();
 let layerGrow = new Set();
+let layerExit = new Set();
 
 // Tags an element with its layer, plus the entry-animation classes this render asked for.
 // A shaded region's own transform is its hover scale (pages.css .region--fill), so a fill
@@ -229,6 +252,7 @@ let layerGrow = new Set();
 function tag(node, name) {
   node.setAttribute('data-layer', name);
   if (layerEnter.has(name)) node.classList.add('layer-enter');
+  if (layerExit.has(name)) node.classList.add('layer-exit');
   if (layerGrow.has(name)) {
     const isFill = node.classList.contains('region--fill');
     const targets = isFill ? [...node.children] : [node];
@@ -267,7 +291,7 @@ function axisSymbols(result) {
     y.push({ base: 'P', sub: result.mode === 'ceiling' ? 'max' : 'min', v: result.Pc, layer: 'control' });
     x.push({ base: 'Q', sub: 's', v: result.qs, layer: 'control' }, { base: 'Q', sub: 'd', v: result.qd, layer: 'control' });
   } else if (hasOpenWedge(result)) {
-    y.push({ base: 'P', sub: 'c', v: result.Pc, layer: 'prices' }, { base: 'P', sub: 'p', v: result.Pp, layer: 'prices' });
+    y.push({ base: 'P', sub: 'c', v: result.Pc, layer: 'pricesC' }, { base: 'P', sub: 'p', v: result.Pp, layer: 'prices' });
     // A subsidy's traded quantity is Q_subsidy (teacher's request); a tax keeps Q1.
     x.push({ base: 'Q', sub: result.mode === 'subsidy' ? 'subsidy' : '1', v: result.Q, layer: 'eq2' });
   }
@@ -284,7 +308,7 @@ function axisSymbols(result) {
   };
   // Positions are worked out with every symbol present, then the ones whose layer is off
   // are dropped, so a symbol doesn't jump when an Explain step brings its neighbour in.
-  const drawn = (s) => layerOn.has(s.layer);
+  const drawn = (s) => (s.layer === 'pricesC' ? layerOn.has('prices') || layerOn.has('pricesCOnly') : layerOn.has(s.layer));
   return {
     y: spreadY(y.map((s) => ({ ...s, pos: sy(s.v) }))).filter(drawn),
     x: place(x.filter((s) => s.v >= 0 && s.v <= QMAX), sx, X_GAP).filter(drawn),
@@ -500,16 +524,23 @@ function drawWedgeLines(svg, result) {
     // burden/benefit, which is the shaded band between each line and Pe.
     const yc = sy(result.Pc), yp = sy(result.Pp);
     const xQ = sx(result.Q);
-    if (layerOn.has('prices') && !layerOn.has('wedgeBox')) {
+    const drawPc = layerOn.has('prices') || layerOn.has('pricesCOnly');
+    if (drawPc && !layerOn.has('wedgeBox')) {
       // No box (Explorer foci, early Explain steps): nothing else ties the Pc/Pp axis
       // symbols to the diagram, so each price runs from the axis to where it meets Q.
       svg.appendChild(tag(el('line', { x1: M.left, y1: yc, x2: xQ, y2: yc, stroke: 'var(--demand)', 'stroke-width': 1.6, 'stroke-dasharray': '6,3' }, 'wedge-line'), 'prices'));
-      svg.appendChild(tag(el('line', { x1: M.left, y1: yp, x2: xQ, y2: yp, stroke: 'var(--supply)', 'stroke-width': 1.6, 'stroke-dasharray': '6,3' }, 'wedge-line'), 'prices'));
-    } else if (layerOn.has('prices')) {
+      if (layerOn.has('prices')) {
+        // The Pp line can be drawn out from the axis on its own (the overlap view), without the
+        // Pc line beside it redrawing, so it takes `producerPrice` as a grow name of its own.
+        const ppLine = el('line', { x1: M.left, y1: yp, x2: xQ, y2: yp, stroke: 'var(--supply)', 'stroke-width': 1.6, 'stroke-dasharray': '6,3' }, 'wedge-line');
+        if (layerGrow.has('producerPrice')) ppLine.classList.add('layer-grow');
+        svg.appendChild(tag(ppLine, 'prices'));
+      }
+    } else if (drawPc) {
       svg.appendChild(tag(el('line', { x1: xQ, y1: yc, x2: M.left + plotW, y2: yc, stroke: 'var(--demand)', 'stroke-width': 1.6, 'stroke-dasharray': '6,3' }, 'wedge-line'), 'prices'));
       // A subsidy's Pp line would run off past S1 and read as a stray mark; the box's
       // top edge and the Pp axis symbol already mark that price.
-      if (result.mode !== 'subsidy') {
+      if (result.mode !== 'subsidy' && layerOn.has('prices')) {
         svg.appendChild(tag(el('line', { x1: xQ, y1: yp, x2: M.left + plotW, y2: yp, stroke: 'var(--supply)', 'stroke-width': 1.6, 'stroke-dasharray': '6,3' }, 'wedge-line'), 'prices'));
       }
     }
@@ -628,7 +659,7 @@ function badgeFitScale(pts, x, y, { halfW = 20, halfH = 11, avoid = [], min = BA
 }
 
 // Renders an interactive pill-badge with category styling inside a chart region.
-function drawRegionBadge(layer, { id, text, center, colorVar, textVar = colorVar, title, plain = false }) {
+function drawRegionBadge(layer, { id, text, center, colorVar, textVar = colorVar, title, plain = false, minChars = 0 }) {
   if (!center || center.scale == null) return null;
   const k = center.scale;
   // `plain` chips are labels only: no region key, so no hover/click explainer.
@@ -647,7 +678,7 @@ function drawRegionBadge(layer, { id, text, center, colorVar, textVar = colorVar
   const body = el('g', {}, 'region-badge__body');
   g.appendChild(body);
 
-  const pillW = (plain ? text.length * 8 + 14 : text.length > 2 ? 40 : 34) * k;
+  const pillW = (plain ? Math.max(text.length, minChars) * 8 + 14 : text.length > 2 ? 40 : 34) * k;
   const pillH = 22 * k;
   const r = pillH / 2;
 
@@ -698,18 +729,25 @@ function drawRegionBadge(layer, { id, text, center, colorVar, textVar = colorVar
 // shrinks with the gap, and drops out when the gap or the room to the plot edge is too small.
 // `caption` replaces the money text; without one the amount is a computed number, shown
 // only at full detail (resolveLayers only turns the bracket on there by default).
-function drawSubsidyBracket(layer, result, caption, detail) {
+function drawSubsidyBracket(layer, result, caption, detail, { arrow = false } = {}) {
   const amount = result.Pp - result.Pc;
   if (!(amount > 0)) return;
-  const x = sx(result.Q) + 12;
-  const yTop = sy(result.Pp), yBot = sy(result.Pc);
+  // The arrow runs up the Q1 line itself, from e2 (just clear of its dot) to S1, instead of
+  // standing beside it like the bracket.
+  const x = sx(result.Q) + (arrow ? 0 : 12);
+  const yTop = sy(result.Pp), yBot = sy(result.Pc) - (arrow ? 9 : 0);
   if (yBot - yTop < 8 || x + 8 > M.left + plotW) return;
-  const stroke = { stroke: 'var(--ink)', 'stroke-width': 1.4 };
-  const g = el('g', {}, 'subsidy-bracket');
-  g.appendChild(el('line', { x1: x, y1: yTop, x2: x, y2: yBot, ...stroke }));
-  g.appendChild(el('line', { x1: x - 4, y1: yTop, x2: x + 4, y2: yTop, ...stroke }));
-  g.appendChild(el('line', { x1: x - 4, y1: yBot, x2: x + 4, y2: yBot, ...stroke }));
-  layer.appendChild(tag(g, 'subsidyBracket'));
+  const stroke = { stroke: 'var(--ink)', 'stroke-width': arrow ? 2 : 1.4 };
+  const g = el('g', {}, arrow ? 'subsidy-arrow' : 'subsidy-bracket');
+  if (arrow) {
+    g.appendChild(el('line', { x1: x, y1: yBot, x2: x, y2: yTop + 7, ...stroke }));
+    g.appendChild(el('polygon', { points: `${x},${yTop} ${x - 5},${yTop + 10} ${x + 5},${yTop + 10}`, fill: 'var(--ink)' }));
+  } else {
+    g.appendChild(el('line', { x1: x, y1: yTop, x2: x, y2: yBot, ...stroke }));
+    g.appendChild(el('line', { x1: x - 4, y1: yTop, x2: x + 4, y2: yTop, ...stroke }));
+    g.appendChild(el('line', { x1: x - 4, y1: yBot, x2: x + 4, y2: yBot, ...stroke }));
+  }
+  layer.appendChild(tag(g, arrow ? 'subsidyArrow' : 'subsidyBracket'));
   const text = caption ?? (detail === 'full' ? fmtMoney(amount) : null);
   if (!text) return;
   const halfW = (text.length * 8 + 14) / 2;
@@ -782,15 +820,44 @@ function drawSurplusBadges(layer, result) {
 
 // Explorer focus: one value chip on the focused area, in its own group (not the surplus
 // badges) so a focused view never carries the badge set. It is a label, not a region.
-function drawFocusChip(layer, result, focus) {
-  const spec = focusSpec(result, focus);
-  if (!spec || !(spec.value > 0.005)) return;
-  const text = `${spec.label} ${fmtMoney(spec.value)}`;
-  const c = polygonCentroid(spec.poly, placedLabels, { halfW: (text.length * 8 + 14) / 2 });
-  if (!c) return;
+function drawFocusChip(layer, result, focus, bandOn = true) {
   const g = el('g', {}, 'chart-focus-chip');
-  drawRegionBadge(g, { id: focus, text, center: { ...c, scale: c.scale ?? 1 }, colorVar: spec.colorVar, title: spec.label, plain: true });
-  layer.appendChild(tag(g, 'focusChip'));
+  if (focus === 'overlap') {
+    // Just names the two free-market surplus triangles; the growing areas carry no figures.
+    const sub = result.mode === 'subsidy';
+    placeFocusChip(g, { label: 'CS', value: sub ? result.csTriangleArea : result.CS, colorVar: 'demand' }, 'cs', sub ? result.csTrianglePoly : result.csPoly);
+    placeFocusChip(g, { label: 'PS', value: sub ? result.psTriangleArea : result.PS, colorVar: 'supply' }, 'ps', sub ? result.psTrianglePoly : result.psPoly);
+    if (g.childNodes.length) layer.appendChild(tag(g, 'focusChip'));
+    return;
+  }
+  const spec = focusSpec(result, focus);
+  if (!spec) return;
+  placeFocusChip(g, spec, focus, spec.chipPoly?.length >= 3 ? spec.chipPoly : spec.poly);
+  // A subsidised CS/PS also names its marginal band, so both areas read in the one view.
+  const band = MARGINAL_BANDS[focus];
+  if (band && bandOn && result.mode === 'subsidy') {
+    placeFocusChip(g, { label: band.label, value: result[band.value], colorVar: band.colorVar, textVar: 'ink' }, band.region, result[band.poly]);
+  }
+  if (g.childNodes.length) layer.appendChild(tag(g, 'focusChip'));
+}
+
+const FOCUS_CHIP_CHARS = 10;   // "mCS $2,250"
+
+const MARGINAL_BANDS = {
+  cs: { label: 'mCS', value: 'marginalCS', poly: 'marginalCsPoly', colorVar: 'demand-alt', region: 'marginal-cs' },
+  ps: { label: 'mPS', value: 'marginalPS', poly: 'marginalPsPoly', colorVar: 'supply-alt', region: 'marginal-ps' },
+};
+
+function placeFocusChip(g, spec, id, chipPoly) {
+  if (!(spec.value > 0.005) || !(chipPoly?.length >= 3)) return;
+  const text = `${spec.label} ${fmtMoney(spec.value)}`;
+  // Sized as if for FOCUS_CHIP_CHARS characters, so the pill stays one width as the figure
+  // gains digits; otherwise it would fail to fit the band at each digit boundary and jump.
+  const fit = { halfW: (Math.max(text.length, FOCUS_CHIP_CHARS) * 8 + 14) / 2 };
+  // Centred in its area, shrinking with it; drawRegionBadge drops the chip once it can't fit.
+  const c = polygonCentroid(chipPoly, placedLabels, fit);
+  if (!c) return;
+  drawRegionBadge(g, { id, text, center: c, colorVar: spec.colorVar, textVar: spec.textVar, title: spec.label, plain: true, minChars: FOCUS_CHIP_CHARS });
 }
 
 // IB perfect: the areas named in plain text, as a student would write them on an exam
@@ -991,7 +1058,7 @@ function curveName(text, base, sub, attrs) {
 export function renderMarketChart(svg, result, options = {}) {
   svg._lastResult = result;
   // The resize replay redraws the same picture, so it must not replay the entry animation.
-  const { enter: _enter, grow: _grow, ...replayOptions } = options;
+  const { enter: _enter, grow: _grow, exit: _exit, ...replayOptions } = options;
   svg._lastOptions = replayOptions;
   // 'full' = every chip and explainer; 'clean' = no chips; 'ib' = exactly what an exam
   // diagram shows (plain area names, no numbers). See the onboarding/detail-settings spec.
@@ -1010,6 +1077,7 @@ export function renderMarketChart(svg, result, options = {}) {
   // later render without them (a slider tick) draws no animation classes.
   layerEnter = new Set(options.enter ?? []);
   layerGrow = new Set(options.grow ?? []);
+  layerExit = new Set(options.exit ?? []);   // layers fading out on this render, about to be dropped
   const captions = options.captions ?? {};
   const focusId = FOCUS_IDS.includes(options.focus) ? options.focus : null;
   if (focusId) svg.dataset.focus = focusId; else delete svg.dataset.focus;
@@ -1044,8 +1112,24 @@ export function renderMarketChart(svg, result, options = {}) {
     // regions: tapping one explains and values the pre-subsidy CS/PS, not the subsidised one.
     bandFill('csTriangle', 'cs-original', result.csTrianglePoly, 'var(--demand-fill)', false, 'cs-fill');
     bandFill('psTriangle', 'ps-original', result.psTrianglePoly, 'var(--supply-fill)', false, 'ps-fill');
-    bandFill('marginalCs', 'marginal-cs', result.marginalCsPoly, 'var(--demand-alt-fill)', true, 'wedge-fill wedge-fill--consumer');
-    bandFill('marginalPs', 'marginal-ps', result.marginalPsPoly, 'var(--supply-alt-fill)', true, 'wedge-fill wedge-fill--producer');
+    // Each half's stripes run the way its surplus is growing: the consumer half (below Pe) top-left
+    // to bottom-right, parallel to demand; the producer half (above Pe) bottom-left to top-right,
+    // parallel to supply. Measured on screen so they track the sliders and the chart size.
+    if (result.mode === 'subsidy') {
+      const pxSlope = (slope) => (sy(0) - sy(slope)) / (sx(1) - sx(0));  // magnitude, px per px
+      const stripeAngle = (m) => (-Math.atan(1 / m) * 180) / Math.PI;       // m = on-screen dy/dx
+      svg.querySelector('#overlapStripesBelow')?.setAttribute('patternTransform', `rotate(${stripeAngle(pxSlope(result.slopeD)).toFixed(2)})`);
+      svg.querySelector('#overlapStripesAbove')?.setAttribute('patternTransform', `rotate(${stripeAngle(-pxSlope(result.slopeS)).toFixed(2)})`);
+    }
+    // In the overlap view each band is the old CS/PS simply extended: its own colour, no backing,
+    // so it blends with the surplus it grows into.
+    if (focusId === 'overlap') {
+      bandFill('marginalCs', 'marginal-cs', result.marginalCsPoly, 'var(--demand-fill)', false, 'cs-fill');
+      bandFill('marginalPs', 'marginal-ps', result.marginalPsPoly, 'var(--supply-fill)', false, 'ps-fill');
+    } else {
+      bandFill('marginalCs', 'marginal-cs', result.marginalCsPoly, 'var(--demand-alt-fill)', true, 'wedge-fill wedge-fill--consumer');
+      bandFill('marginalPs', 'marginal-ps', result.marginalPsPoly, 'var(--supply-alt-fill)', true, 'wedge-fill wedge-fill--producer');
+    }
     if (result.mode === 'tax' || result.mode === 'subsidy') {
       // The wedge is split at the pre-intervention price into a consumer-incidence portion
       // (tinted with the demand color) and a producer-incidence portion (tinted with the
@@ -1066,27 +1150,18 @@ export function renderMarketChart(svg, result, options = {}) {
         // the overlap is striped in both colours rather than an opaque backing that would
         // hide where each surplus really ends.
         const overlapG = el('g', { 'data-region': 'subsidy-overlap' }, 'region region--fill');
-        // Stripes run parallel to the curve bounding each half: demand above Pe, supply below.
-        // Slopes are measured on screen, so they follow both the sliders and the chart size.
-        const pxSlope = (slope) => (sy(0) - sy(slope)) / (sx(1) - sx(0));  // magnitude, px per px
-        const stripeAngle = (m) => (-Math.atan(1 / m) * 180) / Math.PI;       // m = on-screen dy/dx
-        svg.querySelector('#overlapStripesAbove')?.setAttribute('patternTransform', `rotate(${stripeAngle(pxSlope(result.slopeD)).toFixed(2)})`);
-        svg.querySelector('#overlapStripesBelow')?.setAttribute('patternTransform', `rotate(${stripeAngle(-pxSlope(result.slopeS)).toFixed(2)})`);
-        for (const [poly, id] of [[result.overlapAbovePoly, 'overlapStripesAbove'], [result.overlapBelowPoly, 'overlapStripesBelow']]) {
-          if (poly && poly.length >= 3) overlapG.appendChild(el('polygon', { points: pts(poly), fill: `url(#${id})` }, 'overlap-fill'));
+        // Stripes run parallel to the curve bounding each half: demand above Pe, supply below
+        // (angles set above, with the extension patterns).
+        // `overlapHalves` lets the overlap view draw one half at a time, and a half takes its own
+        // grow name so its stripes can wipe in alongside the band it belongs to.
+        const halves = options.overlapHalves ?? ['above', 'below'];
+        for (const [half, poly, id] of [['above', result.overlapAbovePoly, 'overlapStripesAbove'], ['below', result.overlapBelowPoly, 'overlapStripesBelow']]) {
+          if (!halves.includes(half) || !(poly && poly.length >= 3)) continue;
+          const node = el('polygon', { points: pts(poly), fill: `url(#${id})` }, `overlap-fill overlap-fill--${half}`);
+          if (layerGrow.has(half === 'above' ? 'overlapAbove' : 'overlapBelow')) node.classList.add('layer-grow');
+          overlapG.appendChild(node);
         }
-        fills.appendChild(tag(overlapG, 'overlap'));
-        // Hovering (or opening) CS or PS pops the whole triangle over the stripes. Each pop
-        // shares its surplus's data-region, so regionExplainers' hover/active classes reach
-        // it; it's hidden and click-through until then, so the stripes stay hoverable.
-        // A pop only exists alongside the surplus it pops (nothing to hover otherwise).
-        for (const [id, poly] of [['cs', result.csPoly], ['ps', result.psPoly]]) {
-          if (!on.has(id)) continue;
-          const popG = el('g', { 'data-region': id }, `region region--fill region-pop region-pop--${id}`);
-          popG.appendChild(el('polygon', { points: pts(poly), fill: 'var(--surface)' }, 'pop-backing'));
-          popG.appendChild(el('polygon', { points: pts(poly) }, `${id}-pop-fill`));
-          fills.appendChild(tag(popG, 'overlap'));
-        }
+        if (overlapG.childNodes.length) fills.appendChild(tag(overlapG, 'overlap'));
       } else if (!isSubsidy && on.has('taxWedges')) {
         const consumerG = el('g', { 'data-region': 'tax-consumer' }, 'region region--fill');
         consumerG.appendChild(el('polygon', { points: pts(result.consumerWedgePoly), fill: 'var(--surface)' }, 'wedge-backing'));
@@ -1211,7 +1286,8 @@ export function renderMarketChart(svg, result, options = {}) {
     // perfect (no chips, no numbers on the diagram) drop both. A caption from the caller
     // is drawn at any detail level.
     if (result.mode === 'subsidy' && on.has('subsidyBracket')) drawSubsidyBracket(layer, result, captions.bracket, detail);
-    if (on.has('focusChip')) drawFocusChip(layer, result, focusId);
+    if (result.mode === 'subsidy' && on.has('subsidyArrow')) drawSubsidyBracket(layer, result, undefined, 'full', { arrow: true });
+    if (on.has('focusChip')) drawFocusChip(layer, result, focusId, on.has('marginalCs') || on.has('marginalPs'));
     if (on.has('areaNames')) drawAreaNames(layer, result, options.areaLabels ?? 'full');
   }
 

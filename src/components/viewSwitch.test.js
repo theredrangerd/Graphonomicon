@@ -19,7 +19,7 @@ describe('mountViewSwitch', () => {
     expect(bar.hidden).toBe(false);
   });
 
-  it('has the five labelled chips', () => {
+  it('has the seven labelled chips', () => {
     const { bar } = setup('explorer');
     expect([...bar.querySelectorAll('.focus-chip')].map((c) => c.textContent)).toEqual(
       ['Consumer surplus', 'Producer surplus', 'Overlap', 'Government spending', 'Deadweight loss']);
