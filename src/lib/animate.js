@@ -10,6 +10,13 @@ export function easeOutCubic(t) {
 // riding requestAnimationFrame — keeps page-controller tests synchronous and deterministic.
 const SKIP_ANIMATION = typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'test';
 
+// Runs `fn` after `ms`; immediately under Vitest, like tweenValue. Returns a cancel function.
+export function delay(ms, fn) {
+  if (SKIP_ANIMATION) { fn(); return () => {}; }
+  const id = setTimeout(fn, ms);
+  return () => clearTimeout(id);
+}
+
 // Animates `from` -> `to`, calling onUpdate(value) every frame. Returns a cancel function.
 export function tweenValue({ from, to, duration = 400, easing = easeOutCubic, onUpdate, onComplete }) {
   if (SKIP_ANIMATION) {

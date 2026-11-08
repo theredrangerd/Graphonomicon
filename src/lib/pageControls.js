@@ -149,7 +149,7 @@ export function fillSharedStats(doc, result) {
 // so every future intervention page picks it up automatically instead of re-copying the
 // tween/cancel bookkeeping. `beforeOn` runs just before switching on, so a page can pull
 // its intervention slider back into range first.
-export function wireInterventionToggle(toggle, render, { beforeOn } = {}) {
+export function wireInterventionToggle(toggle, render, { beforeOn, duration } = {}) {
   let fraction = toggle.checked ? 1 : 0;
   let cancelAnim = null;
   toggle.addEventListener('change', () => {
@@ -158,6 +158,7 @@ export function wireInterventionToggle(toggle, render, { beforeOn } = {}) {
     cancelAnim = tweenValue({
       from: fraction,
       to: toggle.checked ? 1 : 0,
+      ...(duration ? { duration } : {}),
       onUpdate(v) { fraction = v; render(); },
       onComplete() { cancelAnim = null; },
     });

@@ -1,15 +1,15 @@
-@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
 :root {
   color-scheme: light;
-  --bg:            #eef1f4;
+  --bg:            #f2ead7;
   --surface:       #ffffff;
-  --surface-2:     #f5f7f9;
-  --ink:           #15191f;
-  --ink-secondary: #4b5566;
-  --ink-muted:     #838d9c;
-  --hairline:      #dde2e8;
-  --hairline-2:    #cbd2db;
+  --surface-2:     #f6efdb;
+  --ink:           #1d1d1b;
+  --ink-secondary: #4a463a;
+  --ink-muted:     #6a6454;
+  --hairline:      #d8ccae;
+  --hairline-2:    #c2b48d;
 
   --demand:        #2a5fa8;
   --demand-fill:   rgba(42, 95, 168, 0.14);
@@ -46,7 +46,13 @@
   --accent-fill:   rgba(42, 95, 168, 0.14);
   --good:          #157a3d;
 
-  --shadow: 0 1px 2px rgba(21,25,31,0.06), 0 8px 24px -12px rgba(21,25,31,0.18);
+  /* Brand: Isotype wall chart. Display caps + poster-stock ground. */
+  --font-display:  "Barlow Condensed", "Arial Narrow", sans-serif;
+  --brand-ground:  #f2ead7;
+  --paper:         #fbf6e8; /* warm panel stock; the chart card stays white (--surface) */
+  --brand-ink:     #1d1d1b;
+
+  --shadow: none;
 }
 
 /* Dark mode is disabled for now: the site defaults to light regardless of OS

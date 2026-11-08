@@ -86,8 +86,8 @@ describe('unitHref', () => {
   });
 
   it('honors an explicit base path, so links still work under a GitHub Pages project subpath', () => {
-    expect(unitHref({ slug: 'macroeconomics', status: 'coming-soon' }, '/econ-tools/')).toBe(
-      '/econ-tools/units/wip.html?unit=macroeconomics'
+    expect(unitHref({ slug: 'macroeconomics', status: 'coming-soon' }, '/Graphonomicon/')).toBe(
+      '/Graphonomicon/units/wip.html?unit=macroeconomics'
     );
   });
 });

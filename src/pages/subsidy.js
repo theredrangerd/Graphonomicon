@@ -1,6 +1,7 @@
 import { renderMiniHeader } from '../components/chrome.js';
 import { computeMarket } from '../lib/marketEngine.js';
-import { renderMarketChart } from '../lib/marketChart.js';
+import { renderMarketChart, resolveLayers } from '../lib/marketChart.js';
+import { delay } from '../lib/animate.js';
 import { fmtMoney, fmtPrice, setStatusPill } from '../lib/format.js';
 import { getFamilyNav } from '../components/familyNav.js';
 import { wireShiftAndSlopeInputs, updateShiftAndSlopeLabels, wireInterventionToggle, readCurveParams, marketFits, guardSliders, settleDown, fillSharedStats, NO_TRADE_NOTE, DEFAULT_MARKET } from '../lib/pageControls.js';
@@ -16,7 +17,7 @@ import { SUBSIDY_STEPS } from './subsidyExplainSteps.js';
 export const SUBSIDY_AREA_LABELS = 'full'; // 'full' | 'half' | 'none' — Ms. Patel request 3; flip after she confirms.
 
 // Explorer focuses that only exist once the subsidy is on, and what the note calls them.
-const SUBSIDY_ONLY_FOCUS = { overlap: 'the overlap', gov: 'government spending', dwl: 'the deadweight loss' };
+const SUBSIDY_ONLY_FOCUS = { gov: 'government spending', dwl: 'the deadweight loss' };
 
 export function initSubsidyPage(doc, win = window) {
   const { backHref, backLabel, siblings } = getFamilyNav('subsidy');
@@ -47,8 +48,16 @@ export function initSubsidyPage(doc, win = window) {
     view: playView.view,
     focus: playView.focus,
     onChange(next) {
+      const enteringOverlap = next.focus === 'overlap' && playView.focus !== 'overlap';
       playView = next;
       writePlayView(next, win);
+      stopReveal();
+      reveal = {};
+      // Overlap tells its story from the free market, so landing on it switches the subsidy off.
+      if (enteringOverlap && subsidyToggle.checked) {
+        subsidyToggle.checked = false;
+        subsidyToggle.dispatchEvent(new Event('change'));
+      }
       explainers?.close();
       render();
     },
@@ -60,6 +69,61 @@ export function initSubsidyPage(doc, win = window) {
   // regions shift smoothly instead of snapping between free-market and subsidized states.
   let toggleCtl;
 
+  // Explorer focus, subsidy switched on: the supply line shifts at once, then each step below
+  // is drawn STAGGER_MS after the one before. A step holds back the layers in `keys` until it
+  // runs, then animates them in (`enter` fades, `grow` scales). PS: the per-unit arrow, then
+  // the marginal band, its chip and the Pp line. CS: the band. Overlap: arrow, Pp line, CS
+  // wiping down with its stripes, then PS wiping up with its stripes.
+  // `reveal` maps held layer -> drawn yet; `pendingEnter`/`pendingGrow` animate what was just revealed.
+  const STAGGER_MS = 800;
+  const FADE_HOLD_MS = 1600;   // how long the finished overlap stays whole before the rest fades
+  const FADE_MS = 700;         // matches .layer-exit in pages.css
+  const FADED_LAYERS = ['cs', 'ps', 'csTriangle', 'psTriangle', 'marginalCs', 'marginalPs', 'focusChip'];
+  const REVEALS = {
+    ps: [
+      { keys: ['subsidyArrow'], enter: ['subsidyArrow'] },
+      { keys: ['prices', 'marginalPs'], enter: ['marginalPs', 'focusChip'] },
+    ],
+    cs: [{ keys: ['marginalCs'], enter: ['marginalCs', 'focusChip'] }],
+    overlap: [
+      { keys: ['subsidyArrow'], enter: ['subsidyArrow'] },
+      { keys: ['prices'], grow: ['producerPrice'] },
+      { keys: ['marginalCs', 'overlapBelow'], grow: ['marginalCs', 'overlapBelow'] },
+      { keys: ['marginalPs', 'overlapAbove'], grow: ['marginalPs', 'overlapAbove'] },
+      // With the overlap shown, the areas that built it fade out, leaving the overlap alone
+      // like every other Explorer focus.
+      { after: FADE_HOLD_MS, exit: FADED_LAYERS },
+    ],
+  };
+  let reveal = {};
+  let pendingEnter = [];
+  let pendingGrow = [];
+  let pendingExit = [];
+  let cancelReveal = [];
+  const stopReveal = () => { cancelReveal.forEach((c) => c()); cancelReveal = []; };
+  function startReveal() {
+    stopReveal();
+    const steps = REVEALS[playView.focus] ?? [];
+    reveal = Object.fromEntries(steps.flatMap((step) => (step.keys ?? []).map((key) => [key, false])));
+    const next = (i) => {
+      if (i >= steps.length) return;
+      const { keys = [], enter = [], grow = [], exit = [], after = STAGGER_MS } = steps[i];
+      cancelReveal.push(delay(after, () => {
+        for (const key of keys) reveal[key] = true;
+        pendingEnter = enter;
+        pendingGrow = grow;
+        pendingExit = exit;
+        render();
+        if (exit.length) {
+          // Let the fade play on the still-drawn layers, then drop them for good.
+          cancelReveal.push(delay(FADE_MS, () => { reveal.faded = true; render(); }));
+        }
+        next(i + 1);
+      }));
+    };
+    next(0);
+  }
+
   // Only a switched-on subsidy constrains the sliders — one that's off shouldn't make the
   // curve sliders stop early for a reason the student can't see.
   function isValid() {
@@ -69,10 +133,15 @@ export function initSubsidyPage(doc, win = window) {
 
   const sliders = wireShiftAndSlopeInputs(doc, () => render(), isValid);
 
-  function updateLegend(focus) {
+  // A subsidised CS/PS focus also draws its marginal band, so its legend entry shows too; the
+  // overlap view draws the lot.
+  function updateLegend(focus, subsidised) {
+    const shown = ['demand', 'supply', focus];
+    if (subsidised && (focus === 'cs' || focus === 'ps')) shown.push(`marginal-${focus}`);
+    if (focus === 'overlap') shown.push('cs', 'ps', ...(subsidised ? ['marginal-cs', 'marginal-ps'] : []));
     doc.querySelectorAll('.legend [data-legend]').forEach((item) => {
       const key = item.dataset.legend;
-      item.hidden = focus ? !['demand', 'supply', focus].includes(key) : key === 'overlap';
+      item.hidden = focus ? !shown.includes(key) : key === 'overlap';
     });
   }
 
@@ -94,8 +163,24 @@ export function initSubsidyPage(doc, win = window) {
     const intervention = subsidyActive ? { type: 'subsidy', amount: amount * subsidyFraction } : { type: 'none' };
     const result = computeMarket({ ...market, intervention });
 
-    renderMarketChart(chart, result, { showSurplusLabels: true, detail: chrome.getDetail(), focus, areaLabels: SUBSIDY_AREA_LABELS });
-    updateLegend(focus);
+    const options = { showSurplusLabels: true, detail: chrome.getDetail(), focus, areaLabels: SUBSIDY_AREA_LABELS };
+    if (focus && (reveal.faded || Object.values(reveal).includes(false))) {
+      const held = resolveLayers(result, options);
+      // The Pc line tracks e2 throughout, so holding the prices only withholds the Pp line.
+      for (const [key, drawn] of Object.entries(reveal)) {
+        if (drawn) continue;
+        if (key === 'prices') { if (held.delete('prices')) held.add('pricesCOnly'); } else held.delete(key);
+      }
+      if (reveal.faded) FADED_LAYERS.forEach((name) => held.delete(name));
+      // The overlap stripes come in half by half with the band each belongs to.
+      options.overlapHalves = [['above', 'overlapAbove'], ['below', 'overlapBelow']].filter(([, key]) => reveal[key] !== false).map(([half]) => half);
+      options.layers = [...held];
+    }
+    if (pendingEnter.length) { options.enter = pendingEnter; pendingEnter = []; }
+    if (pendingGrow.length) { options.grow = pendingGrow; pendingGrow = []; }
+    if (pendingExit.length) { options.exit = pendingExit; pendingExit = []; }
+    renderMarketChart(chart, result, options);
+    updateLegend(focus, result.mode === 'subsidy');
 
     setStatusPill(doc.querySelector('#status-pill'), subsidyOn ? 'Subsidy applied' : 'Free market', result.mode);
     doc.querySelector('#stat-price-consumer').textContent = result.noTrade ? '—' : fmtPrice(result.Pc);
@@ -108,6 +193,7 @@ export function initSubsidyPage(doc, win = window) {
     let note = '';
     if (result.noTrade) note = NO_TRADE_NOTE;
     else if (!subsidyActive && SUBSIDY_ONLY_FOCUS[focus]) note = `Turn the subsidy on to see ${SUBSIDY_ONLY_FOCUS[focus]}.`;
+    else if (!subsidyActive && focus === 'overlap') note = 'Turn the subsidy on to watch consumer and producer surplus grow into each other.';
     else if (subsidyActive) note = `<strong>Deadweight loss (DWL): ${fmtMoney(result.DWL)}.</strong> The subsidy pushes output past the efficient quantity — the last few units cost more to produce than buyers value them at.`;
     doc.querySelector('#market-note').innerHTML = note;
   }
@@ -117,7 +203,10 @@ export function initSubsidyPage(doc, win = window) {
     card.refresh(); // keep the Explain slider on the same amount
     render();
   });
-  toggleCtl = wireInterventionToggle(subsidyToggle, render, { beforeOn: () => settleDown(subsidySlider, isValid) });
+  toggleCtl = wireInterventionToggle(subsidyToggle, render, { beforeOn: () => settleDown(subsidySlider, isValid), duration: 650 });
+  subsidyToggle.addEventListener('change', () => {
+    if (subsidyToggle.checked) { startReveal(); render(); } else { stopReveal(); reveal = {}; }
+  });
 
   // ---- Explain ----
   // Always the default curves; the subsidy toggle doesn't matter here, only the step does.

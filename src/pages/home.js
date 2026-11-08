@@ -1,5 +1,5 @@
 // src/pages/home.js
-import { renderHero } from '../components/chrome.js';
+import { renderHero, renderSiteBar, renderFooter } from '../components/chrome.js';
 import { renderBento } from '../components/bento.js';
 import { renderSearchResults } from '../components/searchResults.js';
 import { matchGraphs } from '../components/search.js';
@@ -31,10 +31,13 @@ export function initHomePage(doc) {
   const searchInput = doc.querySelector('#search-input');
   const noResultsEl = doc.querySelector('#no-results');
 
+  const siteBarEl = doc.querySelector('#site-bar');
+  if (siteBarEl) renderSiteBar(siteBarEl);
+  renderFooter(doc);
+
   renderHero(heroEl, {
-    eyebrow: 'IB ECONOMICS · INTERACTIVE GRAPHS',
-    title: 'Understand the graph, not just the answer',
-    lede: 'Interactive diagrams built for IB Economics revision — see how each intervention changes the market, not just the finished picture.',
+    title: 'Drag the control. Watch the market move.',
+    lede: 'Interactive IB Economics graphs. Change a price control, tax or subsidy and see surplus, revenue and deadweight loss redraw in their own colours.',
   });
 
   const units = getUnits();
