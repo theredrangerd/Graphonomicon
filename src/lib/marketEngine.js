@@ -134,6 +134,9 @@ function taxResult(base, intervention) {
   // absorb (price received fell) — this is what actually varies with relative elasticity.
   const consumerWedgePoly = [[0, Pstar], [Q, Pstar], [Q, Pc], [0, Pc]];
   const producerWedgePoly = [[0, Pp], [Q, Pp], [Q, Pstar], [0, Pstar]];
+  // The deadweight loss cut across Pe: the part above is taken out of CS, the part below out of PS.
+  const dwlConsumerPoly = dwlPoly ? clipPoly(dwlPoly, ([, p]) => p - Pstar) : null;
+  const dwlProducerPoly = dwlPoly ? clipPoly(dwlPoly, ([, p]) => Pstar - p) : null;
 
   return {
     ...base,
@@ -144,6 +147,9 @@ function taxResult(base, intervention) {
     govRevenue: wedge * Q, govCost: 0,
     consumerIncidence: (Pc - Pstar) * Q, producerIncidence: (Pstar - Pp) * Q,
     csPoly, psPoly, dwlPoly, wedgePoly, consumerWedgePoly, producerWedgePoly,
+    dwlConsumerPoly, dwlProducerPoly,
+    DWLConsumer: dwlConsumerPoly?.length >= 3 ? shoelaceArea(dwlConsumerPoly) : 0,
+    DWLProducer: dwlProducerPoly?.length >= 3 ? shoelaceArea(dwlProducerPoly) : 0,
     requestedControl: null,
     interventionMode: intervention.mode,
     taxRate: intervention.mode === 'advalorem' ? intervention.rate : null,

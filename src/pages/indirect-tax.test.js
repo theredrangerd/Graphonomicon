@@ -1,11 +1,17 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { initIndirectTaxPage } from './indirect-tax.js';
+import { initIndirectTaxPage, TAX_AREA_LABELS } from './indirect-tax.js';
 
 function buildDom() {
   document.body.innerHTML = `
     <div id="mini-header"></div>
-    <svg id="chart" class="market-chart"></svg>
-    <div class="chart-head"><span id="status-pill"></span></div>
+    <section class="chart-card">
+      <div class="chart-head"><span id="status-pill"></span></div>
+      <svg id="chart" class="market-chart"></svg>
+    </section>
+    <div class="legend">
+      ${['demand', 'supply', 'cs', 'ps', 'tax-consumer', 'tax-producer', 'revenue', 'dwl'].map((k) => `<span class="item" data-legend="${k}"></span>`).join('')}
+    </div>
+    <section class="card explain-card" id="explain-card" hidden></section>
     <input id="demand-slider" type="range" min="-50" max="50" step="1" value="0">
     <span id="demand-val"></span>
     <input id="supply-slider" type="range" min="-50" max="50" step="1" value="0">
@@ -156,5 +162,183 @@ describe('initIndirectTaxPage', () => {
     expect(document.querySelector('#stat-price-consumer').textContent).toBe('—');
     expect(document.querySelector('#stat-price-producer').textContent).toBe('—');
     expect(document.querySelector('#market-note').textContent).toContain('No units are traded');
+  });
+});
+
+// A stand-in window whose URL the test controls; history.replaceState rewrites it and
+// fire('hashchange') plays a hand-edited hash.
+function fakeWin(url) {
+  const listeners = {};
+  const win = {
+    location: {},
+    history: { replaceState(_s, _t, next) { setUrl(next); } },
+    addEventListener(type, fn) { (listeners[type] ||= []).push(fn); },
+    removeEventListener(type, fn) { listeners[type] = (listeners[type] || []).filter((f) => f !== fn); },
+    fire(type) { (listeners[type] || []).forEach((fn) => fn()); },
+  };
+  function setUrl(next) {
+    const u = new URL(next, 'http://test.local/units/microeconomics/government-intervention/indirect-tax.html');
+    Object.assign(win.location, { pathname: u.pathname, search: u.search, hash: u.hash });
+  }
+  setUrl(url);
+  return win;
+}
+
+const $ = (sel) => document.querySelector(sel);
+const button = (text) => [...document.querySelectorAll('button')].find((b) => b.textContent === text);
+const dot = (i) => document.querySelectorAll('.explain-card .explain-dot')[i];
+const stepCount = () => $('#explain-card .explain-card__count').textContent;
+const regions = () => [...document.querySelectorAll('#chart .region--fill')].map((f) => f.dataset.region);
+const toggleTax = (on = true) => { $('#tax-toggle').checked = on; $('#tax-toggle').dispatchEvent(new Event('change')); };
+const qSymbols = () => [...document.querySelectorAll('#chart .axis-symbol')].map((t) => t.textContent).filter((t) => t.startsWith('Q'));
+
+describe('initIndirectTaxPage — Explain and Play', () => {
+  beforeEach(() => { buildDom(); });
+
+  it('exports the area-label setting', () => {
+    expect(TAX_AREA_LABELS).toBe('full');
+  });
+
+  it('lands a bare URL in Play on IB perfect, with the view switch and no detail gear', () => {
+    initIndirectTaxPage(document, fakeWin('indirect-tax.html'));
+    expect(document.body.dataset.mode).toBe('play');
+    expect($('.detail-gear')).toBeNull();
+    expect($('.view-switch')).not.toBeNull();
+    expect($('#chart').dataset.detail).toBe('ib');
+    expect([...document.querySelectorAll('.focus-chip')].map((c) => c.dataset.focus)).toEqual(['consumer-lens', 'producer-lens', 'revenue']);
+  });
+
+  it('draws the IB perfect tax diagram with the quantity axis reading Qe and Qtax', () => {
+    initIndirectTaxPage(document, fakeWin('indirect-tax.html#play'));
+    toggleTax();
+    expect(regions().sort()).toEqual(['cs', 'dwl', 'ps', 'tax-consumer', 'tax-producer']);
+    expect($('#chart [data-region="tax-revenue"]')).not.toBeNull();
+    expect(qSymbols().sort()).toEqual(['Qe', 'Qtax']);
+  });
+
+  it('ignores a subsidy-only focus in a shared link', () => {
+    initIndirectTaxPage(document, fakeWin('indirect-tax.html?view=explorer&focus=overlap#play'));
+    expect($('.focus-chip[aria-pressed="true"]')).toBeNull();
+    expect($('.focus-bar').hidden).toBe(false);
+  });
+
+  const chipTexts = () => [...document.querySelectorAll('#chart .chart-focus-chip text')].map((t) => t.textContent);
+  const shownLegend = () => [...document.querySelectorAll('.legend [data-legend]')].filter((i) => !i.hidden).map((i) => i.dataset.legend);
+
+  it('consumer lens, tax on: CS, the consumer burden and only the DWL above Pe, each with a chip', () => {
+    initIndirectTaxPage(document, fakeWin('indirect-tax.html?view=explorer&focus=consumer-lens#play'));
+    expect($('#market-note').textContent).toContain('Turn the tax on to see the consumer burden and deadweight loss');
+    toggleTax();
+    expect(regions().sort()).toEqual(['cs', 'dwl', 'tax-consumer']);
+    expect($('#chart .burden-fill--consumer').getAttribute('fill')).toBe('var(--burden-consumer-fill)');
+    expect($('#chart [data-layer="dwlConsumer"]')).not.toBeNull();
+    expect($('#chart [data-layer="dwlProducer"]')).toBeNull();
+    // The DWL half's chip only appears when the half is big enough to hold it.
+    expect(chipTexts().map((t) => t.split(' ')[0]).slice(0, 2)).toEqual(['CS', 'CB']);
+    expect(shownLegend()).toEqual(['demand', 'supply', 'cs', 'tax-consumer', 'dwl']);
+  });
+
+  it('producer lens, tax on: PS, the producer burden and only the DWL below Pe', () => {
+    initIndirectTaxPage(document, fakeWin('indirect-tax.html?view=explorer&focus=producer-lens#play'));
+    toggleTax();
+    expect(regions().sort()).toEqual(['dwl', 'ps', 'tax-producer']);
+    expect($('#chart [data-layer="dwlProducer"]')).not.toBeNull();
+    expect($('#chart [data-layer="dwlConsumer"]')).toBeNull();
+    expect(chipTexts().map((t) => t.split(' ')[0]).slice(0, 2)).toEqual(['PS', 'PB']);
+    expect(shownLegend()).toEqual(['demand', 'supply', 'ps', 'tax-producer', 'dwl']);
+  });
+
+  it('opens an old ?focus=cs link on the consumer lens', () => {
+    initIndirectTaxPage(document, fakeWin('indirect-tax.html?view=explorer&focus=cs#play'));
+    expect($('.focus-chip[aria-pressed="true"]').dataset.focus).toBe('consumer-lens');
+  });
+
+  it('revenue focus shows only the box, split into both burdens, with its revenue chip', () => {
+    initIndirectTaxPage(document, fakeWin('indirect-tax.html?view=explorer&focus=revenue#play'));
+    expect($('#market-note').textContent).toContain('Turn the tax on to see tax revenue');
+    toggleTax();
+    expect(regions().sort()).toEqual(['tax-consumer', 'tax-producer']);
+    expect($('#chart [data-region="tax-revenue"]')).not.toBeNull();
+    expect($('#chart .chart-focus-chip').textContent).toBe('Revenue $1,050');
+    const shown = [...document.querySelectorAll('.legend [data-legend]')].filter((i) => !i.hidden).map((i) => i.dataset.legend);
+    expect(shown).toEqual(['demand', 'supply', 'tax-consumer', 'tax-producer', 'revenue']);
+  });
+
+  // Animations are skipped under Vitest, so every reveal step has run by now: the band is
+  // drawn and its chip has followed it (in the browser the chip waits for the wipe to end).
+  it('draws the lens, then its chips, when a focus is picked with the tax already on', () => {
+    initIndirectTaxPage(document, fakeWin('indirect-tax.html#play'));
+    toggleTax();
+    $('.view-switch input[value="explorer"]').click();
+    $('.focus-chip[data-focus="producer-lens"]').click();
+    expect(regions().sort()).toEqual(['dwl', 'ps', 'tax-producer']);
+    expect(chipTexts()[0]).toMatch(/^PS/);
+  });
+
+  it('opens #explain on step 1 of 12, drawing only demand', () => {
+    initIndirectTaxPage(document, fakeWin('indirect-tax.html#explain'));
+    expect(document.body.dataset.mode).toBe('explain');
+    expect(stepCount()).toBe('Step 1 of 12');
+    expect($('#chart line.demand-curve')).not.toBeNull();
+    expect($('#chart line.supply-curve')).toBeNull();
+    expect($('.explain-slider').getAttribute('aria-label')).toBe('Tax per can');
+  });
+
+  it('brings the burdens in one at a time, each wiping in', () => {
+    initIndirectTaxPage(document, fakeWin('indirect-tax.html#explain'));
+    dot(5).click();
+    expect(regions()).toEqual(['tax-consumer']);
+    expect($('#chart [data-region="tax-consumer"] .layer-grow')).not.toBeNull();
+    button('Next').click();
+    expect(regions().sort()).toEqual(['tax-consumer', 'tax-producer']);
+    expect($('#chart [data-region="tax-consumer"] .layer-grow')).toBeNull();
+    expect($('#explain-card').textContent).toContain('$10 + $10 = the whole $20 tax');
+  });
+
+  it('the elasticity step steepens demand so consumers carry most of the tax, and the wrap-up restores it', () => {
+    initIndirectTaxPage(document, fakeWin('indirect-tax.html#explain'));
+    const demandY1 = () => +$('#chart line.demand-curve').getAttribute('y1');
+    dot(9).click();
+    const before = demandY1();
+    button('Next').click();
+    expect(stepCount()).toBe('Step 11 of 12');
+    expect(demandY1()).not.toBe(before);
+    expect($('#explain-card').textContent).toContain('Customers pay $15 of the $20 tax, and the company only $5');
+    button('Next').click();
+    expect($('#chart').dataset.detail).toBe('ib');
+    expect(demandY1()).toBe(before);
+  });
+
+  it('shares one tax amount between the Explain slider and the Play specific-tax slider', () => {
+    initIndirectTaxPage(document, fakeWin('indirect-tax.html#explain'));
+    dot(2).click();
+    const slider = $('.explain-slider');
+    slider.value = '30';
+    slider.dispatchEvent(new Event('input'));
+    expect($('#specific-slider').value).toBe('30');
+    expect($('#explain-card').textContent).toContain('$30');
+  });
+
+  it('Try it in Play → switches to Play with the specific tax animated on', () => {
+    const win = fakeWin('indirect-tax.html#explain');
+    initIndirectTaxPage(document, win);
+    $('#tax-mode-advalorem').checked = true;
+    dot(11).click();
+    button('Try it in Play →').click();
+    expect(document.body.dataset.mode).toBe('play');
+    expect(win.location.hash).toBe('#play');
+    expect($('#tax-toggle').checked).toBe(true);
+    expect($('#tax-mode-specific').checked).toBe(true);
+    expect($('#stat-revenue').textContent).toBe('$1,050');
+  });
+
+  it('entering Explain switches the tax off and restarts at step 1', () => {
+    const win = fakeWin('indirect-tax.html#play');
+    initIndirectTaxPage(document, win);
+    toggleTax();
+    $('.mode-switch input[value="explain"]').click();
+    expect(win.location.hash).toBe('#explain');
+    expect($('#tax-toggle').checked).toBe(false);
+    expect(stepCount()).toBe('Step 1 of 12');
   });
 });

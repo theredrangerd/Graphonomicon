@@ -1,79 +1,287 @@
-// The 11-step Explain walkthrough for the subsidy page. Each step's `layers` is the complete
+// The 14-step Explain walkthrough for the subsidy page. Each step's `layers` is the complete
 // set drawn at that step (not a diff); `enter` lists the layers that fade in on it.
-import { fmtMoney, fmtQty } from '../lib/format.js';
+//
+// The order follows the three places students get lost (owner, 2026-11-09):
+//   1. why S2 is *below* S1: drag a dot along S1 to see each point is one loaf and its cost,
+//      watch the government's $X come down off that loaf, then every loaf;
+//   2. why there are two prices: what the customer pays, the government's part on top, = Pp;
+//   3. why the box is government spending: one $X strip per loaf sold, lined up into the box,
+//      height × width. Only then do the surplus bands appear, as where that money goes.
+// The words and the chart are tied together: every number in the text is a coloured term
+// (`term`) whose colour and `data-mark` key match the mark it names on the chart, and each
+// step's readout (top-right of the chart) lists the same values in the same colours.
+// Research notes behind it: docs/superpowers/specs/2026-11-09-subsidy-explain-pedagogy-design.md.
+//
+// Context each step's functions get: { amount, result, dotQ, dotPos, explored, touched, gliding }
+// (see subsidy.js).
+import { fmtMoney as fmtWhole } from '../lib/format.js';
 
-const L1 = ['demand'];
-const L2 = [...L1, 'supply', 'eq1'];
-const L3 = [...L2, 'supply2', 'subsidyBracket'];
-const L4 = [...L3, 'eq2'];
-const L5 = [...L4, 'prices'];
-const L6 = [...L5.filter((n) => n !== 'subsidyBracket'), 'psTriangle', 'marginalPs'];
-const L7 = [...L6, 'csTriangle', 'marginalCs'];
-const L8 = [...L7.filter((n) => !['csTriangle', 'psTriangle', 'marginalCs', 'marginalPs'].includes(n)), 'cs', 'ps', 'overlap'];
-const L9 = [...L7, 'wedgeBox'];
-const L10 = [...L9, 'dwl'];
+// Dollars, with cents only when there are some ($637.50, but $80), so every sum on screen
+// adds up exactly: mCS + mPS + DWL really is the government's total, Pc + subsidy is Pp.
+const fmtMoney = (v) => {
+  const cents = Math.round(v * 100);
+  return cents % 100 === 0 ? fmtWhole(cents / 100)
+    : '$' + (cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// Where the draggable dot starts: loaf 75, the point (75, $100) on S1, with a "drag me" hint.
+export const LOAF_Q = 75;
+// The dot's travel: it stays a little inside both ends of the axis.
+export const DOT_Q_MIN = 3;
+export const DOT_Q_MAX = 96;
+// The halo the student is asked to bring the dot to: loaf 42 on S1 ($56), well down the curve
+// from where the dot starts. Next unlocks once the dot has reached it.
+export const TARGET_Q = 42;
+// How close (in loaves, either side) counts as in the halo. The chart draws the halo this big,
+// so "the dot is in the circle" and "Next unlocks" are the same thing.
+export const TARGET_TOLERANCE = 4;
+// The dot moves a whole loaf at a time (a loaf is a unit, so no fractions; the cost shown may
+// carry cents, e.g. loaf 43 is $57.33).
+export const LOAF_STEP = 1;
+export const snapLoaf = (q) => Math.min(DOT_Q_MAX, Math.max(DOT_Q_MIN, Math.round(q / LOAF_STEP) * LOAF_STEP));
+
+// Loaves are counted, so show whole numbers bare and halves with one decimal.
+const loaves = (v) => (Math.abs(v - Math.round(v)) < 0.05 ? String(Math.round(v)) : v.toFixed(1));
+
+// A coloured word in the card that names a mark on the chart (same colour, same key).
+const t = (key, text) => `<span class="term term--${key}" data-mark="${key}" tabindex="0">${text}</span>`;
+const row = (label, value, mark) => ({ label, value, mark });
+// A government figure in a headline: the subsidy arrow's purple, very dark (purple means government).
+const govInk = (text) => `<span class="gov-ink">${text}</span>`;
+
+const BASE = ['demand', 'supply', 'eq1'];
+const WITH_S2 = [...BASE, 'supply2'];
+const AT_E2 = [...WITH_S2, 'eq2'];
+const PRICED = [...AT_E2, 'prices'];
+const BOXED = [...PRICED, 'wedgeBox'];
 
 const S1 = 'S1 = what it costs to make';
 const S2 = 'S2 = what customers need to pay';
+const s1s2 = { s1: S1, s2: S2 };
+// From the two-prices step on, students know what S1 and S2 mean, and the chart is busier
+// (brackets, arrow, labels), so those steps leave the curves as plain S1/S2.
 
-const s1Only = () => ({ s1: S1 });
-const s1s2 = () => ({ s1: S1, s2: S2 });
-const withBracket = ({ amount }) => ({ s1: S1, s2: S2, bracket: `${fmtMoney(amount)} paid by government` });
+const costAt = (result, q) => result.Smin + result.slopeS * q;
+
+// The loaf the drop step follows: the one the student left the dot on, nudged right if
+// needed so the government's share never takes the customer's price below $0.
+export function loafQ({ amount, result, dotQ = LOAF_Q }) {
+  const lowest = Math.ceil((amount - result.Smin) / result.slopeS / LOAF_STEP) * LOAF_STEP;
+  return Math.min(DOT_Q_MAX, Math.max(snapLoaf(dotQ), lowest));
+}
+
+function oneLoaf(ctx) {
+  const q = loafQ(ctx);
+  const cost = costAt(ctx.result, q);
+  return { q, cost, customer: cost - ctx.amount };
+}
 
 export const SUBSIDY_STEPS = [
   {
     id: 'demand', headline: () => 'Demand',
     text: () => 'This is demand: how many loaves people want to buy at each price. Lower price, more loaves.',
-    slider: false, subsidy: false, layers: L1, enter: ['demand'],
+    slider: false, subsidy: false, layers: ['demand'], enter: ['demand'],
   },
   {
-    id: 'supply', headline: () => 'Supply',
-    text: () => 'This is supply: what it costs the bakery to bake each extra loaf. Where it meets demand is the market price, Pe.',
-    slider: false, subsidy: false, layers: L2, enter: ['supply', 'eq1'], captions: s1Only,
+    id: 'supply', headline: () => 'Supply: what it costs to bake',
+    text: ({ result }) => `This is supply, ${t('cost', 'S1')}: what it costs the bakery to bake each extra loaf. Where it meets demand is the market: loaves sell for ${t('pe', `Pe = ${fmtMoney(result.Pstar)}`)}, and ${t('qe', `${loaves(result.Qstar)} loaves`)} are sold.`,
+    slider: false, subsidy: false, layers: [...BASE, 'readout'], enter: ['supply', 'eq1', 'readout'],
+    captions: ({ result }) => ({
+      s1: S1,
+      readout: [row('Market price (Pe)', fmtMoney(result.Pstar), 'pe'), row('Loaves sold (Qe)', loaves(result.Qstar), 'qe')],
+    }),
   },
   {
-    id: 'subsidy', headline: () => 'The bakery’s costs don’t change, so S1 stays put.',
-    text: ({ amount }) => `The government pays ${fmtMoney(amount)} per loaf, so the bakery needs ${fmtMoney(amount)} less from each customer. That’s S2.`,
-    slider: true, subsidy: true, layers: L3, enter: ['supply2', 'subsidyBracket'], captions: withBracket,
+    id: 'cost of a loaf', headline: () => 'Every point on S1 is one loaf',
+    text: ({ result, dotQ }) => {
+      const q = Math.round(dotQ);
+      return `The dot is loaf number ${t('qty', q)}. Baking it costs the bakery ${t('cost', fmtMoney(costAt(result, q)))}. Drag it along S1: the more loaves the bakery bakes, the more the next one costs.`;
+    },
+    think: ({ explored }) => (explored
+      ? 'Every point on S1 works like this: a number of loaves, and what the last one costs to bake.'
+      : 'Drag the orange dot along S1 and put it in the halo.'),
+    gate: ({ explored }) => explored,
+    lockedLabel: 'Put the dot in the halo',
+    drag: true,
+    slider: false, subsidy: false, layers: [...BASE, 'costDot'], enter: ['costDot'],
+    // The dot is drawn where it actually is (it glides and follows the pointer smoothly);
+    // the words name the whole loaf it's nearest (dotQ).
+    chartOptions: ({ dotQ, dotPos = dotQ, explored }) => ({ dotQ: dotPos, dotTarget: TARGET_Q, dotTargetTolerance: TARGET_TOLERANCE, dotTargetReached: Boolean(explored) }),
+    captions: ({ result, dotQ, touched, gliding, explored }) => {
+      const q = Math.round(dotQ);
+      const cost = fmtMoney(costAt(result, q));
+      return {
+        s1: S1, dotLabel: `loaf ${q}: ${cost} to bake`, dotCostTag: cost, dotQtyTag: `loaf ${q}`,
+        // Until the student first takes the dot (and not while it's gliding on its own).
+        ...(!touched && !gliding ? { dragHint: 'drag me' } : {}),
+        ...(!explored ? { targetHint: 'put the dot here' } : {}),
+      };
+    },
   },
   {
-    id: 'equilibrium', headline: () => 'A new equilibrium',
-    text: ({ result }) => `More loaves are sold, Q<sub>subsidy</sub> (${fmtQty(result.Q)}) instead of Qe, because customers pay less.`,
-    slider: true, subsidy: true, layers: L4, enter: ['eq2'], captions: withBracket,
+    id: 'one loaf', headline: ({ amount }) => `The government pays ${govInk(fmtMoney(amount))} of every loaf`,
+    text: (ctx) => {
+      const { q, cost, customer } = oneLoaf(ctx);
+      // Owner's wording (2026-11-09), including the emphasised IB phrasing at the end.
+      return `Loaf ${t('qty', q)} still costs ${t('cost', fmtMoney(cost))} to bake. The government now pays ${t('gov', fmtMoney(ctx.amount))} of it, so the bakery only needs ${t('customer', fmtMoney(customer))} from the customer to make the same amount of money. This means the bakery can offer consumers prices ${t('gov', fmtMoney(ctx.amount))} lower because <em>its cost of production is lesser by the amount of the subsidy</em>.`;
+    },
+    // The student presses Subsidise! on the dot to bring the drop in (the page holds the arrow, the
+    // labels and the readout back until then); Next stays locked until they have.
+    trigger: true,
+    gate: ({ armed }) => !armed,
+    lockedLabel: 'Press Subsidise!',
+    slider: true, subsidy: true, layers: [...BASE, 'loafDrop', 'readout'], enter: ['loafDrop', 'readout'],
+    chartOptions: (ctx) => ({ loafQ: loafQ(ctx) }),
+    captions: (ctx) => {
+      const { cost, customer } = oneLoaf(ctx);
+      return {
+        s1: S1,
+        loafCost: `${fmtMoney(cost)} to bake`,
+        loafGov: `${fmtMoney(ctx.amount)} from government`,
+        loafCustomer: `${fmtMoney(customer)} from customer`,
+        readout: [
+          row('Cost to bake', fmtMoney(cost), 'cost'),
+          row('Government pays', fmtMoney(ctx.amount), 'gov'),
+          row('Customer pays', fmtMoney(customer), 'customer'),
+        ],
+      };
+    },
   },
   {
-    id: 'prices', headline: () => 'Two prices',
-    text: ({ amount }) => `Customers pay Pc. The bakery receives Pp: what the customer pays plus ${fmtMoney(amount)} from the government.`,
-    slider: true, subsidy: true, layers: L5, enter: ['prices'], captions: withBracket,
+    id: 'every loaf', headline: () => 'Every loaf drops by the same amount: that’s S2',
+    text: ({ amount }) => `Do the same for every loaf: each one drops by ${t('gov', fmtMoney(amount))}, so the points line up into a new line, ${t('customer', 'S2')}: what customers now need to pay. ${t('cost', 'S1')} stays where it was, because baking costs exactly what it did.`,
+    think: () => 'Before you click Next: where will S2 cross demand?',
+    slider: true, subsidy: true, layers: [...WITH_S2, 'loafDrops', 'readout'], enter: ['loafDrops', 'supply2'],
+    captions: ({ amount }) => ({ ...s1s2, readout: [row('Government pays, every loaf', fmtMoney(amount), 'gov')] }),
   },
   {
-    id: 'producer', headline: () => 'Producer surplus shifts',
-    text: () => 'Producers gain this extra band: they now receive Pp instead of Pe.',
-    slider: true, subsidy: true, layers: L6, enter: ['psTriangle', 'marginalPs'], grow: ['marginalPs'], captions: s1s2,
+    id: 'equilibrium', headline: () => 'A new equilibrium, e2',
+    text: ({ result }) => `S2 meets demand at ${t('qty', 'e2')}. Customers now buy ${t('qty', `${loaves(result.Q)} loaves`)} (Q<sub>subsidy</sub>) instead of ${t('qe', loaves(result.Qstar))}, because each one costs them less.`,
+    slider: true, subsidy: true, layers: [...AT_E2, 'readout'], enter: ['eq2', 'readout'],
+    captions: ({ result }) => ({
+      ...s1s2,
+      readout: [row('Loaves before (Qe)', loaves(result.Qstar), 'qe'), row('Loaves now (Q subsidy)', loaves(result.Q), 'qty')],
+    }),
   },
   {
-    id: 'consumer', headline: () => 'Consumer surplus shifts',
-    text: () => 'Consumers gain this band: they now pay Pc instead of Pe.',
-    slider: true, subsidy: true, layers: L7, enter: ['csTriangle', 'marginalCs'], grow: ['marginalCs'], captions: s1s2,
+    id: 'two prices', headline: () => 'One loaf, two prices',
+    text: ({ amount, result }) => `Customers pay ${t('customer', `Pc = ${fmtMoney(result.Pc)}`)}: read it off demand. The government adds ${t('gov', fmtMoney(amount))} on top, so the bakery receives ${t('cost', `Pp = ${fmtMoney(result.Pp)}`)}, back up on S1.`,
+    think: ({ amount }) => `The government pays ${fmtMoney(amount)} on every loaf sold. How much does it pay altogether?`,
+    slider: true, subsidy: true, layers: [...PRICED, 'priceBrackets', 'subsidyArrow', 'readout'], enter: ['prices', 'priceBrackets', 'readout'],
+    // Next doesn't cut straight to the revenue step: first the customer's and government's
+    // figures, Pc, the arrow and the readout fade, while the two coloured brackets and "bakery
+    // gets" stay (see onLeave in subsidy.js).
+    leave: { exit: ['priceBrackets', 'pricesC', 'subsidyArrow', 'readout'], ms: 1150 },
+    captions: ({ amount, result }) => ({
+      customer: `customer pays ${fmtMoney(result.Pc)}`,
+      gov: `+ ${fmtMoney(amount)} government`,
+      total: `bakery gets ${fmtMoney(result.Pp)}`,
+      readout: [
+        row('Customer pays (Pc)', fmtMoney(result.Pc), 'customer'),
+        row('Government adds', `+ ${fmtMoney(amount)}`, 'gov'),
+        row('Bakery receives (Pp)', fmtMoney(result.Pp), 'cost'),
+      ],
+    }),
   },
   {
-    id: 'overlap', headline: () => 'Notice the overlap',
-    text: () => 'Look: part of the area is counted as both consumer <em>and</em> producer surplus. It’s the same money, and the government pays for it.',
-    slider: true, subsidy: true, layers: L8, enter: ['cs', 'ps', 'overlap'], captions: s1s2,
+    // Area as revenue: the idea the box and the bands in the next steps lean on. Built slowly:
+    // the height (price) rises, the width (quantity) sweeps across, the rectangle fills in,
+    // then it is named. The bakery's revenue is Pp × Q (what it receives per loaf, times loaves).
+    id: 'revenue', headline: () => 'Revenue is an area',
+    text: ({ result }) => `Revenue is ${t('cost', 'price')} × ${t('qty', 'quantity')}: what a seller takes in. On a graph, that’s an area: height is the price, width is the quantity. The bakery gets ${t('cost', `${fmtMoney(result.Pp)} a loaf`)} and sells ${t('qty', `${loaves(result.Q)} loaves`)}, so its revenue is ${t('cost', fmtMoney(result.Pp * result.Q))}.`,
+    think: () => 'Before you click Next: how much of this rectangle do customers pay, and how much does the government?',
+    // Pp only: the bakery's side of the story. Pc comes back with the strips, which need it.
+    // The two-prices brackets carry over with no figures (blue = customer, purple = government):
+    // their colours hint at the answer to the question above. "Bakery gets" stays as the anchor.
+    slider: true, subsidy: true, layers: [...AT_E2, 'pricesPOnly', 'priceBrackets', 'revenueDims', 'revenueBox', 'readout'], enter: ['revenueDims', 'revenueBox', 'readout'],
+    captions: ({ result }) => {
+      const revenue = fmtMoney(result.Pp * result.Q);
+      return {
+        total: `bakery gets ${fmtMoney(result.Pp)}`,
+        revPrice: `price ${fmtMoney(result.Pp)}`,
+        revQty: `quantity ${loaves(result.Q)}`,
+        revBox: `Revenue = ${fmtMoney(result.Pp)} × ${loaves(result.Q)} = ${revenue}`,
+        revBoxShort: `Revenue ${revenue}`,
+        readout: [
+          row('Price (Pp)', fmtMoney(result.Pp), 'cost'),
+          row('Quantity (Q subsidy)', loaves(result.Q), 'qty'),
+          row('Revenue = price × quantity', revenue, 'cost'),
+        ],
+      };
+    },
   },
   {
-    id: 'government', headline: () => 'Government spending',
-    text: ({ amount, result }) => `The government pays ${fmtMoney(amount)} × Q<sub>subsidy</sub> in total (${fmtMoney(result.govCost)}). That’s this whole box: the consumers’ gain, the producers’ gain, plus one more piece…`,
-    slider: true, subsidy: true, layers: L9, enter: ['wedgeBox'], captions: s1s2,
+    id: 'strips', headline: ({ amount }) => `${govInk(fmtMoney(amount))} on every loaf sold`,
+    text: ({ amount }) => `Each thin strip is one loaf: ${t('gov', `${fmtMoney(amount)} tall`)}, from Pc up to Pp, paid by the government. There’s one strip for ${t('qty', 'every loaf sold')}, all the way out to Q<sub>subsidy</sub>.`,
+    slider: true, subsidy: true, layers: [...PRICED, 'govStrips', 'readout'], enter: ['govStrips', 'readout'],
+    fadeIn: ['pricesC'], // Pc, left out of the revenue step, comes back as the strips' floor
+    captions: ({ amount, result }) => ({
+      strip: `1 loaf: ${fmtMoney(amount)}`,
+      readout: [row('Government pays per loaf', fmtMoney(amount), 'gov'), row('Loaves sold', loaves(result.Q), 'qty')],
+    }),
   },
   {
-    id: 'deadweight loss', headline: () => 'Deadweight loss',
-    text: () => '…this triangle. Those last loaves cost more to make (S1) than buyers value them (D), so society loses this much.',
-    slider: true, subsidy: true, layers: L10, enter: ['dwl'], captions: s1s2,
+    id: 'government', headline: () => 'This box is government spending',
+    text: ({ amount, result }) => `Height ${t('gov', `${fmtMoney(amount)} per loaf`)} × width ${t('qty', `${loaves(result.Q)} loaves`)} = ${t('gov', fmtMoney(result.govCost))}. That’s exactly the government’s bill, which is why this box is always government spending.`,
+    slider: true, subsidy: true, layers: [...BOXED, 'govFill', 'subsidyBracket', 'boxWidth', 'boxLabel', 'readout'],
+    enter: ['wedgeBox', 'subsidyBracket', 'boxWidth', 'boxLabel', 'readout'],
+    captions: ({ amount, result }) => ({
+      bracket: `${fmtMoney(amount)} per loaf`,
+      width: `${loaves(result.Q)} loaves`,
+      box: `Government spending ${fmtMoney(result.govCost)}`,
+      boxShort: `Gov ${fmtMoney(result.govCost)}`,
+      readout: [
+        row('Height: per loaf', fmtMoney(amount), 'gov'),
+        row('Width: loaves sold', loaves(result.Q), 'qty'),
+        row('Government spending', fmtMoney(result.govCost), 'gov'),
+      ],
+    }),
+  },
+  {
+    id: 'producer', headline: () => 'Where the money goes: the bakery',
+    text: ({ result }) => `The bakery now gets ${t('cost', fmtMoney(result.Pp))} a loaf instead of ${t('pe', fmtMoney(result.Pstar))}: ${t('cost', `${fmtMoney(result.Pp - result.Pstar)} more`)}. This band is the bakery’s share of the box, its marginal producer surplus.`,
+    slider: true, subsidy: true, layers: [...BOXED, 'marginalPs', 'readout'], enter: ['marginalPs', 'readout'], grow: ['marginalPs'],
+    captions: ({ result }) => ({
+      mps: 'marginal PS',
+      readout: [
+        row('Bakery got (Pe)', fmtMoney(result.Pstar), 'pe'),
+        row('Bakery gets now (Pp)', fmtMoney(result.Pp), 'cost'),
+        row('Extra per loaf', `+ ${fmtMoney(result.Pp - result.Pstar)}`, 'cost'),
+      ],
+    }),
+  },
+  {
+    id: 'consumer', headline: () => 'Where the money goes: customers',
+    text: ({ result }) => `Customers now pay ${t('customer', fmtMoney(result.Pc))} a loaf instead of ${t('pe', fmtMoney(result.Pstar))}: ${t('customer', `${fmtMoney(result.Pstar - result.Pc)} less`)}. This band is their share of the box, their marginal consumer surplus.`,
+    slider: true, subsidy: true, layers: [...BOXED, 'marginalPs', 'marginalCs', 'readout'], enter: ['marginalCs', 'readout'], grow: ['marginalCs'],
+    captions: ({ result }) => ({
+      mps: 'marginal PS',
+      mcs: 'marginal CS',
+      readout: [
+        row('Customers paid (Pe)', fmtMoney(result.Pstar), 'pe'),
+        row('Customers pay now (Pc)', fmtMoney(result.Pc), 'customer'),
+        row('Saved per loaf', fmtMoney(result.Pstar - result.Pc), 'customer'),
+      ],
+    }),
+  },
+  {
+    id: 'deadweight loss', headline: () => 'The rest of the box: deadweight loss',
+    text: ({ result }) => `This last corner goes to nobody: the extra loaves past Qe cost more to bake (S1) than buyers value them (D). ${t('cost', 'Bakery’s share')} + ${t('customer', 'customers’ share')} + ${t('dwl', 'this deadweight loss')} = the whole ${t('gov', fmtMoney(result.govCost))}.`,
+    slider: true, subsidy: true, layers: [...BOXED, 'marginalPs', 'marginalCs', 'dwl', 'readout'], enter: ['dwl', 'readout'],
+    captions: ({ result }) => ({
+      mps: 'marginal PS',
+      mcs: 'marginal CS',
+      readout: [
+        row('Bakery’s share', fmtMoney(result.marginalPS), 'cost'),
+        row('Customers’ share', fmtMoney(result.marginalCS), 'customer'),
+        row('Deadweight loss', fmtMoney(result.DWL), 'dwl'),
+        row('Total: government spending', fmtMoney(result.govCost), 'gov'),
+      ],
+    }),
   },
   {
     id: 'wrap', headline: () => 'The full diagram',
-    text: () => 'That’s the full subsidy diagram, the one you’d draw in an exam.',
+    text: () => 'That’s the full subsidy diagram, the one you’d draw in an exam. The dashed box is still government spending: the bakery’s share, the customers’ share and the deadweight loss.',
     slider: true, subsidy: true, layers: [], view: 'ib', finish: true,
   },
 ];

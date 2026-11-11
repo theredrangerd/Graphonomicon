@@ -20,6 +20,24 @@
         ],
         "createdAt": "2026-10-27T15:17:57.063Z",
         "reason": "Claude: throwaway gitignored brainstorm wireframe, not shipped UI"
+      },
+      {
+        "rule": "flat-type-hierarchy",
+        "value": "*",
+        "files": [
+          ".superpowers/brainstorm/49338-1794194425/content/cs-shrink.html"
+        ],
+        "createdAt": "2026-11-09T03:21:22.540Z",
+        "reason": "Claude: throwaway brainstorm wireframe, not shipped UI"
+      },
+      {
+        "rule": "cream-palette",
+        "value": "*",
+        "files": [
+          ".superpowers/brainstorm/49338-1794194425/content/cs-shrink.html"
+        ],
+        "createdAt": "2026-11-09T03:21:22.559Z",
+        "reason": "Claude: throwaway brainstorm wireframe, not shipped UI"
       }
     ]
   }

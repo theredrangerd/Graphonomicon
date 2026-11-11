@@ -1,4 +1,4 @@
-// URL state for the subsidy page: Explain/Play mode lives in the hash, the Play view
+// URL state for the Explain/Play pages (subsidy, indirect tax): Explain/Play mode lives in the hash, the Play view
 // (IB perfect vs Explorer) and Explorer focus live in query params. All writes use
 // replaceState so toggling never piles up history entries, and a failing history API
 // just leaves the address bar as it was.
@@ -7,7 +7,7 @@ import { FOCUS_IDS } from './marketChart.js';
 
 const VIEW_PARAM = 'view';
 const FOCUS_PARAM = 'focus';
-// The subsidy page has no detail levels; an old link's ?detail= is dropped on the next write.
+// These pages have no detail levels; an old link's ?detail= is dropped on the next write.
 const STALE_PARAMS = ['detail'];
 
 export function readMode(win = window) {
@@ -32,10 +32,13 @@ export function onModeChange(cb, win = window) {
   return () => win.removeEventListener('hashchange', handler);
 }
 
-export function readPlayView(win = window) {
+// `focusIds` is the page's own focus list, so a link can't pick a focus the page doesn't offer.
+// `aliases` maps a retired focus id to its replacement, so links already shared keep working.
+export function readPlayView(win = window, focusIds = FOCUS_IDS, aliases = {}) {
   const params = new URLSearchParams(win.location.search);
-  const rawFocus = params.get(FOCUS_PARAM);
-  const focus = FOCUS_IDS.includes(rawFocus) ? rawFocus : null;
+  const raw = params.get(FOCUS_PARAM);
+  const rawFocus = aliases[raw] ?? raw;
+  const focus = focusIds.includes(rawFocus) ? rawFocus : null;
   const view = focus || params.get(VIEW_PARAM) === 'explorer' ? 'explorer' : 'ib';
   return { view, focus };
 }

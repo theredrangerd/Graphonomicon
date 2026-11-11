@@ -1,7 +1,7 @@
 import { renderMiniHeader } from '../components/chrome.js';
 import { computeMarket } from '../lib/marketEngine.js';
-import { renderMarketChart, resolveLayers } from '../lib/marketChart.js';
-import { delay } from '../lib/animate.js';
+import { renderMarketChart, resolveLayers, quantityAtClientX } from '../lib/marketChart.js';
+import { delay, tweenValue } from '../lib/animate.js';
 import { fmtMoney, fmtPrice, setStatusPill } from '../lib/format.js';
 import { getFamilyNav } from '../components/familyNav.js';
 import { wireShiftAndSlopeInputs, updateShiftAndSlopeLabels, wireInterventionToggle, readCurveParams, marketFits, guardSliders, settleDown, fillSharedStats, NO_TRADE_NOTE, DEFAULT_MARKET } from '../lib/pageControls.js';
@@ -10,9 +10,10 @@ import { FEEDBACK_FORM_URL } from '../lib/feedback.js';
 import { initGraphChrome, maybeAutoStartTour, interventionTourSteps } from '../components/graphChrome.js';
 import { readMode, writeMode, onModeChange, readPlayView, writePlayView } from '../lib/pageMode.js';
 import { mountModeSwitch } from '../components/modeSwitch.js';
-import { mountViewSwitch } from '../components/viewSwitch.js';
+import { mountViewSwitch, SUBSIDY_FOCUSES } from '../components/viewSwitch.js';
 import { mountExplainCard } from '../components/explainCard.js';
-import { SUBSIDY_STEPS } from './subsidyExplainSteps.js';
+import { whenAnimationsDone } from '../lib/animationSettle.js';
+import { SUBSIDY_STEPS, LOAF_Q, LOAF_STEP, TARGET_Q, TARGET_TOLERANCE, snapLoaf } from './subsidyExplainSteps.js';
 
 export const SUBSIDY_AREA_LABELS = 'full'; // 'full' | 'half' | 'none' — Ms. Patel request 3; flip after she confirms.
 
@@ -30,7 +31,7 @@ export function initSubsidyPage(doc, win = window) {
   let explainers;
   let card; // the Explain step card, mounted below
   let mode = readMode(win);
-  let playView = readPlayView(win);
+  let playView = readPlayView(win, SUBSIDY_FOCUSES.map(([id]) => id));
 
   // No detail gear on this page: Play's IB perfect / Explorer switch replaces it, and the
   // chart is always drawn at the IB level.
@@ -47,6 +48,7 @@ export function initSubsidyPage(doc, win = window) {
   mountViewSwitch(chartHead, {
     view: playView.view,
     focus: playView.focus,
+    focuses: SUBSIDY_FOCUSES,
     onChange(next) {
       const enteringOverlap = next.focus === 'overlap' && playView.focus !== 'overlap';
       playView = next;
@@ -216,8 +218,115 @@ export function initSubsidyPage(doc, win = window) {
     return computeMarket({ ...DEFAULT_MARKET, intervention });
   }
 
+  // The draggable cost dot (the "every point on S1 is one loaf" step): where it is, and the
+  // student has reached the halo at TARGET_Q (Next unlocks then, and stays unlocked).
+  // `pos` is where the dot is drawn (smooth, it glides and follows the pointer); `q` is the
+  // whole loaf it's nearest, which the words and numbers name. `touched` hides the
+  // "drag me" hint once the student has taken the dot; `gliding` hides it during the intro.
+  // A step with `trigger` (step 4) waits on its Subsidise! button: `armed` while it hasn't been
+  // pressed, with `armedWait` a promise the card's text-reveal waits behind (resolved on press, or
+  // when the student leaves the step).
+  let armed = false;
+  let armedWait = null;
+  const dot = { q: LOAF_Q, pos: LOAF_Q, explored: false, touched: false, gliding: false };
+  let cancelSettle = () => {};
+
   function explainContext(step) {
-    return { amount: +subsidySlider.value, result: explainResult(step) };
+    return {
+      amount: +subsidySlider.value, result: explainResult(step),
+      dotQ: dot.q, dotPos: dot.pos, explored: dot.explored, touched: dot.touched, gliding: dot.gliding,
+      armed,
+    };
+  }
+
+  const currentStep = () => SUBSIDY_STEPS[card ? card.index() : 0];
+
+  // Re-renders the current step in place (no entry animation), keeping keyboard focus on the
+  // dot, since a render rebuilds it.
+  function redrawStep() {
+    const hadFocus = doc.activeElement?.classList?.contains('cost-dot__handle');
+    renderExplain(currentStep(), { animate: false });
+    if (hadFocus) chart.querySelector('.cost-dot__handle')?.focus();
+  }
+
+  const DOT_LIMITS = [snapLoaf(0), snapLoaf(Infinity)];
+  function moveDot(pos, byStudent) {
+    dot.pos = Math.min(DOT_LIMITS[1], Math.max(DOT_LIMITS[0], pos));
+    const next = snapLoaf(dot.pos);
+    if (byStudent) {
+      dot.touched = true;
+      // Reached when the dot lands in, or sweeps through, the halo: TARGET_TOLERANCE loaves
+      // either side of its centre (how big the chart draws it) plus one loaf, so the dot's body
+      // touching the ring counts, not just its centre.
+      const reach = TARGET_TOLERANCE + 1;
+      const [from, to] = dot.q < next ? [dot.q, next] : [next, dot.q];
+      dot.explored = dot.explored || (from <= TARGET_Q + reach && TARGET_Q - reach <= to);
+    }
+    const crossed = next !== dot.q;
+    dot.q = next;
+    redrawStep();
+    // The card's words only change when the dot reaches another loaf (or the gate opens).
+    if (crossed || byStudent) card.refresh();
+  }
+
+  // On release, the dot eases onto the loaf its numbers name.
+  function settleDot() {
+    cancelSettle();
+    cancelSettle = tweenValue({ from: dot.pos, to: dot.q, duration: 350, onUpdate: (p) => { dot.pos = p; redrawStep(); } });
+  }
+
+  // On arriving at the drag step (or replaying it), the dot rests at its starting loaf with the
+  // "drag me" hint. Progress toward the gate is kept once earned.
+  function placeDot() {
+    cancelSettle();
+    dot.touched = false;
+    dot.gliding = false;
+    moveDot(LOAF_Q, false);
+  }
+
+  // Dragging: pressing anywhere on the chart puts the dot at that loaf, and it follows the
+  // pointer along S1 until release. Only on a step that asks for it.
+  let dragging = false;
+  chart.addEventListener('pointerdown', (e) => {
+    if (mode !== 'explain' || !currentStep().drag) return;
+    cancelSettle();
+    dragging = true;
+    chart.classList.add('is-dragging');
+    chart.setPointerCapture?.(e.pointerId);
+    moveDot(quantityAtClientX(chart, e.clientX), true);
+    e.preventDefault();
+  });
+  chart.addEventListener('pointermove', (e) => {
+    if (dragging) moveDot(quantityAtClientX(chart, e.clientX), true);
+  });
+  const endDrag = () => {
+    if (!dragging) return;
+    dragging = false;
+    chart.classList.remove('is-dragging');
+    settleDot();
+  };
+  chart.addEventListener('pointerup', endDrag);
+  chart.addEventListener('pointercancel', endDrag);
+  chart.addEventListener('keydown', (e) => {
+    if (!e.target.closest?.('.cost-dot__handle')) return;
+    const step = LOAF_STEP * (e.shiftKey ? 5 : 1);
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { moveDot(dot.q + step, true); e.preventDefault(); }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { moveDot(dot.q - step, true); e.preventDefault(); }
+  });
+
+  // A coloured word in the step card (or a row of the chart's readout) lights up the marks it
+  // names: the chart's data-hot fades every other marked thing (pages.css).
+  const setHot = (e) => {
+    const key = e.target.closest?.('[data-mark]')?.dataset.mark;
+    if (key && e.target.closest('.term, .readout__row, .explain-card__readout-row')) chart.dataset.hot = key;
+  };
+  const clearHot = () => { delete chart.dataset.hot; };
+  const explainCardEl = doc.querySelector('#explain-card');
+  for (const host of [explainCardEl, chart]) {
+    host.addEventListener('pointerover', setHot);
+    host.addEventListener('pointerout', clearHot);
+    host.addEventListener('focusin', setHot);
+    host.addEventListener('focusout', clearHot);
   }
 
   // Layout A reads like a slideshow: on a step change, if the step card has dropped below the
@@ -237,25 +346,79 @@ export function initSubsidyPage(doc, win = window) {
     if (mode !== 'explain') return;
     const ctx = explainContext(step);
     const ib = step.view === 'ib';
+    const waiting = armed && step.trigger;
+    const captions = step.captions?.(ctx);
     renderMarketChart(chart, ctx.result, {
       detail: ib ? 'ib' : 'clean',
       // The IB wrap-up draws the full IB perfect diagram, i.e. the default layer set.
-      layers: ib ? undefined : step.layers,
-      captions: step.captions?.(ctx),
+      // While a step waits on its button, its readout waits too, and the button is drawn.
+      layers: ib ? undefined : waiting ? step.layers.filter((l) => l !== 'readout') : step.layers,
+      captions: waiting ? { ...captions, readout: undefined, subsidiseButton: 'Subsidise!' } : captions,
+      ...(waiting ? { loafArmed: true } : {}),
       areaLabels: SUBSIDY_AREA_LABELS,
-      ...(animate ? { enter: step.enter, grow: step.grow } : {}),
+      reserveDimBands: true, // room outside the axes for the revenue step's dimension lines
+      arrowChip: false, // Explain's price brackets already carry the amount; no chip beside the arrow
+      ...(typeof step.chartOptions === 'function' ? step.chartOptions(ctx) : step.chartOptions),
+      ...(animate ? { enter: [...(step.enter ?? []), ...(step.fadeIn ?? [])], grow: step.grow } : {}),
     });
   }
 
+  function deferred() {
+    let resolve;
+    const promise = new Promise((r) => { resolve = r; });
+    return { promise, resolve };
+  }
+
+  // Pressing Subsidise!: draw the step as it normally arrives (the arrow drops, the labels follow),
+  // let the card reveal its text once that has played, and unlock Next.
+  function subsidise() {
+    if (!armed) return;
+    armed = false;
+    renderExplain(currentStep(), { animate: true });
+    armedWait?.resolve();
+    card.refresh();
+  }
+  chart.addEventListener('click', (e) => { if (e.target.closest?.('.subsidise-btn')) subsidise(); });
+  chart.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.closest?.('.subsidise-btn')) { e.preventDefault(); subsidise(); }
+  });
+
   card = mountExplainCard(doc.querySelector('#explain-card'), {
     steps: SUBSIDY_STEPS,
+    replayHost: doc.querySelector('.chart-head'),
+    // Text waits for the step's animation; a step with a button waits for the press first.
+    animationsDone: () => (armedWait ? armedWait.promise.then(() => whenAnimationsDone(chart)) : whenAnimationsDone(chart)),
     amount: +subsidySlider.value,
     min: +subsidySlider.min,
     max: +subsidySlider.max,
     getContext: () => explainContext(SUBSIDY_STEPS[card ? card.index() : 0]),
+    // A step with `leave` plays its exit on the chart (the step redrawn with those layers fading)
+    // before the card moves on; the promise resolves when it has played.
+    onLeave: (step) => {
+      if (!step.leave) return null;
+      explainers?.close();
+      clearHot();
+      cancelSettle();
+      const ctx = explainContext(step);
+      renderMarketChart(chart, ctx.result, {
+        detail: 'clean', layers: step.layers, captions: step.captions?.(ctx), areaLabels: SUBSIDY_AREA_LABELS,
+        arrowChip: false, reserveDimBands: true, exit: step.leave.exit,
+      });
+      return new Promise((resolve) => { delay(step.leave.ms, resolve); });
+    },
     onRender: (step, opts) => {
       explainers?.close();
+      clearHot();
+      chart.classList.toggle('is-draggable', Boolean(step.drag));
+      if (opts.animate) {
+        cancelSettle();
+        armedWait?.resolve(); // a step we're leaving (or replaying) no longer waits
+        armed = Boolean(step.trigger);
+        armedWait = armed ? deferred() : null;
+        card?.refresh(); // the card painted before this; its Next lock depends on `armed`
+      }
       renderExplain(step, opts);
+      if (opts.animate && step.drag) placeDot();
       if (opts.animate) keepStepCardInView();
     },
     onAmount: (amount) => { subsidySlider.value = String(amount); },

@@ -36,7 +36,7 @@ const UNITS = [
         diagrams: [
           { slug: 'price-ceiling', name: 'Price ceiling', level: 'SL', status: 'built', tags: ['price ceiling', 'rent control', 'shortage', 'deadweight loss'] },
           { slug: 'price-floor', name: 'Price floor', level: 'SL', status: 'built', tags: ['price floor', 'minimum wage', 'surplus', 'deadweight loss'] },
-          { slug: 'indirect-tax', name: 'Indirect tax', level: 'SL', status: 'built', tags: ['indirect tax', 'specific tax', 'ad valorem tax', 'tax incidence', 'tax revenue'] },
+          { slug: 'indirect-tax', name: 'Indirect tax', level: 'SL', status: 'built', modes: ['explain', 'play'], tags: ['indirect tax', 'specific tax', 'ad valorem tax', 'tax incidence', 'tax revenue'] },
           { slug: 'subsidy', name: 'Subsidy', level: 'SL', status: 'built', modes: ['explain', 'play'], tags: ['subsidy', 'government spending'] },
         ],
       },

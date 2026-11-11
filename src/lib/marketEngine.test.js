@@ -120,6 +120,14 @@ describe('computeMarket — specific (per-unit) tax', () => {
     expect(r.noTrade).toBe(true);
     expect(r.govRevenue).toBe(0);
   });
+
+  it('cuts the deadweight loss across Pe: the half above comes out of CS, the half below out of PS', () => {
+    const r = computeMarket({ ...base, intervention: { type: 'tax', mode: 'specific', amount: 20 } });
+    expect(r.DWL).toBeGreaterThan(0);
+    expect(r.DWLConsumer + r.DWLProducer).toBeCloseTo(r.DWL, 9);
+    expect(Math.min(...r.dwlConsumerPoly.map(([, p]) => p))).toBeGreaterThanOrEqual(r.Pstar - 1e-9);
+    expect(Math.max(...r.dwlProducerPoly.map(([, p]) => p))).toBeLessThanOrEqual(r.Pstar + 1e-9);
+  });
 });
 
 describe('computeMarket — ad valorem tax', () => {

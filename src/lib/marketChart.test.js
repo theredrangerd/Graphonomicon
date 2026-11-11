@@ -90,8 +90,8 @@ describe('renderMarketChart', () => {
     const result = computeMarket({ ...base, intervention: { type: 'tax', mode: 'specific', amount: 20 } });
     renderMarketChart(svg, result);
     expect(svg.querySelectorAll('line.wedge-line')).toHaveLength(2);
-    expect(svg.querySelector('polygon.wedge-fill--consumer')).not.toBeNull();
-    expect(svg.querySelector('polygon.wedge-fill--producer')).not.toBeNull();
+    expect(svg.querySelector('polygon.burden-fill--consumer')).not.toBeNull();
+    expect(svg.querySelector('polygon.burden-fill--producer')).not.toBeNull();
     expect(svg.querySelector('polygon.wedge-outline')).not.toBeNull();
   });
 
@@ -135,23 +135,22 @@ describe('renderMarketChart', () => {
     expect(svg.querySelector('.tick-label')).toBe(gridLine);
   });
 
-  it('tints the consumer/producer incidence fills with the demand/supply colors, and outlines the total wedge in gov color', () => {
+  it('fills the tax burdens in their own burden colours, never a surplus colour, and outlines the total wedge in gov color', () => {
     const result = computeMarket({ ...base, intervention: { type: 'tax', mode: 'specific', amount: 20 } });
     renderMarketChart(svg, result);
-    const consumerFill = svg.querySelector('polygon.wedge-fill--consumer').getAttribute('fill');
-    const producerFill = svg.querySelector('polygon.wedge-fill--producer').getAttribute('fill');
-    const psFill = svg.querySelector('polygon.ps-fill').getAttribute('fill');
-    expect(consumerFill).toContain('--demand');
-    expect(producerFill).toContain('--supply');
-    expect(producerFill).not.toBe(psFill);
+    const consumerFill = svg.querySelector('polygon.burden-fill--consumer').getAttribute('fill');
+    const producerFill = svg.querySelector('polygon.burden-fill--producer').getAttribute('fill');
+    expect(consumerFill).toBe('var(--burden-consumer-fill)');
+    expect(producerFill).toBe('var(--burden-producer-fill)');
+    [consumerFill, producerFill].forEach((f) => expect(f).not.toMatch(/--(demand|supply)/));
     expect(svg.querySelector('polygon.wedge-outline').getAttribute('stroke')).toBe('var(--gov)');
   });
 
   it('splits the tax wedge at the pre-tax equilibrium price so the incidence fills track relative elasticity', () => {
     const result = computeMarket({ ...base, intervention: { type: 'tax', mode: 'specific', amount: 20 } });
     renderMarketChart(svg, result);
-    const consumerPoly = svg.querySelector('polygon.wedge-fill--consumer').getAttribute('points');
-    const producerPoly = svg.querySelector('polygon.wedge-fill--producer').getAttribute('points');
+    const consumerPoly = svg.querySelector('polygon.burden-fill--consumer').getAttribute('points');
+    const producerPoly = svg.querySelector('polygon.burden-fill--producer').getAttribute('points');
     expect(consumerPoly).not.toBe(producerPoly);
   });
 
@@ -225,7 +224,7 @@ describe('renderMarketChart', () => {
 
   it('names the tax prices Pc/Pp on the axis and the burdens as CB/PB chips, not on the lines', () => {
     renderMarketChart(svg, computeMarket({ ...base, intervention: { type: 'tax', mode: 'specific', amount: 40 } }), { showSurplusLabels: true });
-    expect(symbols(svg).sort()).toEqual(['Pc', 'Pe', 'Pp', 'Q1', 'Qe']);
+    expect(symbols(svg).sort()).toEqual(['Pc', 'Pe', 'Pp', 'Qe', 'Qtax']);
     expect(svg.querySelector('.region-badge--tax-consumer .region-badge__text').textContent).toBe('CB');
     expect(svg.querySelector('.region-badge--tax-producer .region-badge__text').textContent).toBe('PB');
     expect(svg.querySelector('.band-label')).toBeNull();
@@ -366,12 +365,66 @@ describe('renderMarketChart', () => {
     expect(lbl.classList.contains('tick-label')).toBe(false);
   });
 
-  it('flips the excess-supply bracket below a floor set near the top of the chart', () => {
+  it('fades the customer/government figures and Pc, but keeps the brackets and bakery total, when leaving the two-prices step', () => {
+    const result = computeMarket({ ...base, intervention: { type: 'subsidy', mode: 'specific', amount: 40 } });
+    const layers = ['demand', 'supply', 'supply2', 'eq1', 'eq2', 'prices', 'priceBrackets', 'subsidyArrow'];
+    const captions = { customer: 'customer pays', gov: '+ gov', total: 'bakery gets' };
+    renderMarketChart(svg, result, { detail: 'clean', layers, captions, exit: ['priceBrackets', 'pricesC'] });
+    expect(svg.querySelector('.pb-customer').classList.contains('layer-exit')).toBe(false);
+    expect(svg.querySelector('.pb-gov').classList.contains('layer-exit')).toBe(false);
+    expect(svg.querySelector('.pb-customer-label').classList.contains('layer-exit')).toBe(true);
+    expect(svg.querySelector('.pb-gov-label').classList.contains('layer-exit')).toBe(true);
+    expect(svg.querySelector('.pb-total-label').classList.contains('layer-exit')).toBe(false);
+    expect(svg.querySelector('.wedge-line[data-layer="pricesC"]').classList.contains('layer-exit')).toBe(true);
+    expect(svg.querySelector('.price-line--producer').classList.contains('layer-exit')).toBe(false);
+  });
+
+  it('draws only the Pp line and symbol for pricesPOnly', () => {
+    const result = computeMarket({ ...base, intervention: { type: 'subsidy', mode: 'specific', amount: 40 } });
+    renderMarketChart(svg, result, { detail: 'clean', layers: ['demand', 'supply', 'supply2', 'eq1', 'eq2', 'pricesPOnly'] });
+    expect(svg.querySelector('.price-line--producer')).not.toBeNull();
+    expect(svg.querySelector('.wedge-line[data-layer="pricesC"]')).toBeNull();
+    const syms = [...svg.querySelectorAll('.axis-symbol')].map((n) => n.textContent);
+    expect(syms.some((t) => t.startsWith('Pp'))).toBe(true);
+    expect(syms.some((t) => t.startsWith('Pc'))).toBe(false);
+  });
+
+  it('drops the amount chip beside the subsidy arrow when arrowChip is false', () => {
+    const result = computeMarket({ ...base, intervention: { type: 'subsidy', mode: 'specific', amount: 40 } });
+    renderMarketChart(svg, result, { focus: 'ps' });
+    expect(svg.querySelector('.subsidy-arrow')).not.toBeNull();
+    expect(svg.querySelector('.region-badge--subsidy-amount')).not.toBeNull();
+    renderMarketChart(svg, result, { focus: 'ps', arrowChip: false });
+    expect(svg.querySelector('.subsidy-arrow')).not.toBeNull();
+    expect(svg.querySelector('.region-badge--subsidy-amount')).toBeNull();
+  });
+
+  it('hangs the gap bracket under the x-axis, spanning Qs to Qd, with its label beneath', () => {
+    renderMarketChart(svg, computeMarket({ ...base, intervention: { type: 'ceiling', price: 50 } }));
+    const axisY = +svg.querySelector('#plotClip rect').getAttribute('y') + +svg.querySelector('#plotClip rect').getAttribute('height');
+    const bracket = svg.querySelector('[data-region="shortage"] .gap-bracket');
+    const y = +bracket.getAttribute('y1');
+    expect(y).toBeGreaterThan(axisY);
+    expect(+svg.querySelector('[data-region="shortage"] .bracket-label').getAttribute('y')).toBeGreaterThan(y);
+    // Qs (37.5) to Qd (75) on the 0-100 axis: the bracket is as wide as the gap between the dots.
+    const xs = [...svg.querySelectorAll('circle.control-point')].map((c) => +c.getAttribute('cx')).sort((a, b) => a - b);
+    expect(+bracket.getAttribute('x1')).toBeCloseTo(xs[0]);
+    expect(+bracket.getAttribute('x2')).toBeCloseTo(xs[1]);
+  });
+
+  it('keeps the floor bracket under the axis even for a floor near the top of the chart', () => {
     renderMarketChart(svg, computeMarket({ ...base, intervention: { type: 'floor', price: 175 } }));
     const bracket = svg.querySelector('[data-region="excess-supply"] .gap-bracket');
     if (!bracket) return; // market may close entirely at this floor
-    const lineY = +svg.querySelector('[data-region="floor"] .wedge-line').getAttribute('y1');
-    expect(+bracket.getAttribute('y1')).toBeGreaterThan(lineY);
+    const axisY = +svg.querySelector('#plotClip rect').getAttribute('y') + +svg.querySelector('#plotClip rect').getAttribute('height');
+    expect(+bracket.getAttribute('y1')).toBeGreaterThan(axisY);
+  });
+
+  it('draws only the control line and bracket for the gap focus', () => {
+    renderMarketChart(svg, computeMarket({ ...base, intervention: { type: 'ceiling', price: 50 } }), { focus: 'gap' });
+    expect(svg.querySelector('[data-region="shortage"]')).not.toBeNull();
+    expect(svg.querySelector('[data-region="ceiling"]')).not.toBeNull();
+    expect(svg.querySelector('.cs-fill, .ps-fill, .dwl-fill')).toBeNull();
   });
 
   it('keeps curve names inside the plot when a curve leaves through the top edge', () => {
@@ -709,5 +762,205 @@ describe('focus', () => {
     renderMarketChart(svg, r(0), { detail: 'ib', focus: 'gov' });
     expect(svg.querySelector('.fills [data-region]')).toBeNull();
     expect(svg.textContent).not.toContain('Gov $');
+  });
+});
+
+describe('tax: IB perfect, Explain layers and Explorer foci', () => {
+  let svg;
+  beforeEach(() => { svg = makeSvg(); });
+  const tax = (amount = 20) => computeMarket({ ...base, intervention: { type: 'tax', mode: 'specific', amount } });
+  const names = () => [...svg.querySelectorAll('.area-name')].map((t) => t.textContent);
+  const regions = () => [...svg.querySelectorAll('.fills [data-region]')].map((g) => g.dataset.region);
+
+  it('IB perfect names the deadweight loss (not welfare loss); the label setting thins the names', () => {
+    renderMarketChart(svg, tax(), { detail: 'ib' });
+    expect(names().some((n) => n === 'deadweight loss' || n === 'DWL')).toBe(true);
+    expect(names()).not.toContain('welfare loss');
+    renderMarketChart(svg, tax(), { detail: 'ib', areaLabels: 'half' });
+    expect(names().every((n) => ['consumer burden', 'CB', 'producer burden', 'PB'].includes(n))).toBe(true);
+    expect(names().length).toBe(2);
+    renderMarketChart(svg, tax(), { detail: 'ib', areaLabels: 'none' });
+    expect(names()).toEqual([]);
+  });
+
+  it('labels the traded quantity Qtax, ending at its own line left of Qe', () => {
+    renderMarketChart(svg, tax(), { detail: 'ib' });
+    const q = [...svg.querySelectorAll('.axis-symbol')].find((t) => t.textContent === 'Qtax');
+    expect(q.getAttribute('text-anchor')).toBe('end');
+  });
+
+  it('draws each burden band as its own layer, and the tax bracket with its caption', () => {
+    renderMarketChart(svg, tax(), { layers: ['demand', 'supply', 'supply2', 'taxConsumer'] });
+    expect(regions()).toEqual(['tax-consumer']);
+    expect(svg.querySelector('[data-layer="taxConsumer"]')).not.toBeNull();
+    renderMarketChart(svg, tax(), { layers: ['demand', 'supply', 'supply2', 'taxBracket'], captions: { bracket: '$20 tax per can' } });
+    expect(svg.querySelector('[data-layer="taxBracket"]').textContent).toContain('$20 tax per can');
+  });
+
+  it('focus layers: CS/PS show only the surplus, each burden is its own focus, revenue is the split box, a closed market draws none', () => {
+    const cs = resolveLayers(tax(), { focus: 'cs' });
+    expect([...cs]).toEqual(expect.arrayContaining(['cs', 'focusChip']));
+    expect(cs.has('taxConsumer')).toBe(false);
+    expect(resolveLayers(tax(), { focus: 'ps' }).has('taxProducer')).toBe(false);
+    const cb = resolveLayers(tax(), { focus: 'consumer-burden' });
+    expect([...cb]).toEqual(expect.arrayContaining(['taxConsumer', 'pricesCOnly', 'focusChip']));
+    expect(cb.has('cs')).toBe(false);
+    expect(cb.has('taxProducer')).toBe(false);
+    expect([...resolveLayers(tax(), { focus: 'producer-burden' })]).toEqual(expect.arrayContaining(['taxProducer', 'prices', 'focusChip']));
+    const revenue = resolveLayers(tax(), { focus: 'revenue' });
+    expect([...revenue]).toEqual(expect.arrayContaining(['taxConsumer', 'taxProducer', 'wedgeBox', 'focusChip']));
+    expect(revenue.has('cs')).toBe(false);
+    const closed = computeMarket({ ...base, intervention: { type: 'tax', mode: 'specific', amount: 200 } });
+    expect(closed.closed).toBe(true);
+    renderMarketChart(svg, closed, { detail: 'ib', focus: 'revenue' });
+    expect(regions()).toEqual([]);
+  });
+});
+
+describe('subsidy Explain teaching marks', () => {
+  let svg;
+  beforeEach(() => { svg = makeSvg(); });
+  // base curves: Pe 80, Qe 60; a $20 subsidy gives Pc 70, Pp 90, Q 70.
+  const sub = () => computeMarket({ ...base, intervention: { type: 'subsidy', amount: 20 } });
+  const texts = (sel) => [...svg.querySelectorAll(`${sel} .teach-label, ${sel}.teach-label`)].map((t) => t.textContent);
+
+  it('draws none of them by default', () => {
+    renderMarketChart(svg, sub(), { detail: 'full' });
+    for (const cls of ['.loaf-drop', '.loaf-drops', '.price-brackets', '.cost-dot', '.readout', '.gov-strips', '.box-width']) {
+      expect(svg.querySelector(cls)).toBeNull();
+    }
+  });
+
+  it('keeps S1 solid when a subsidy result is drawn without S2', () => {
+    renderMarketChart(svg, sub(), { detail: 'clean', layers: ['demand', 'supply', 'loafDrop'] });
+    expect(svg.querySelector('.supply-curve').getAttribute('stroke-dasharray')).toBeNull();
+    renderMarketChart(svg, sub(), { detail: 'clean', layers: ['demand', 'supply', 'supply2'] });
+    expect(svg.querySelector('.supply-curve').getAttribute('stroke-dasharray')).toBe('6,4');
+  });
+
+  it('follows one loaf down by the subsidy with the step’s captions', () => {
+    renderMarketChart(svg, sub(), {
+      detail: 'clean', layers: ['demand', 'supply', 'loafDrop'], loafQ: 30,
+      captions: { loafCost: '$50 to bake', loafGov: '$20 from government', loafCustomer: '$30 from customer' },
+    });
+    const g = svg.querySelector('[data-layer="loafDrop"]');
+    expect(g).not.toBeNull();
+    expect(g.querySelectorAll('circle')).toHaveLength(2);
+    expect(texts('.loaf-drop')).toEqual(['$50 to bake', '$20 from government', '$30 from customer']);
+  });
+
+  it('drops an arrow from every sample loaf that stays on the chart, animating only on entry', () => {
+    renderMarketChart(svg, sub(), { detail: 'clean', layers: ['demand', 'supply', 'supply2', 'loafDrops'], enter: ['loafDrops'] });
+    const ones = svg.querySelectorAll('.loaf-drops__one');
+    expect(ones.length).toBeGreaterThan(3);
+    expect([...ones].every((o) => o.classList.contains('layer-drop'))).toBe(true);
+    renderMarketChart(svg, sub(), { detail: 'clean', layers: ['demand', 'supply', 'supply2', 'loafDrops'] });
+    expect(svg.querySelector('.layer-drop')).toBeNull();
+  });
+
+  it('keeps every loaf arrow when a big subsidy lands below the x axis, clipped to the plot', () => {
+    const small = computeMarket({ ...base, intervention: { type: 'subsidy', amount: 20 } });
+    const big = computeMarket({ ...base, intervention: { type: 'subsidy', amount: 90 } });
+    const opts = { detail: 'clean', layers: ['demand', 'supply', 'supply2', 'loafDrops'] };
+    renderMarketChart(svg, small, opts);
+    const before = svg.querySelectorAll('.loaf-drops__one').length;
+    renderMarketChart(svg, big, opts);
+    expect(svg.querySelectorAll('.loaf-drops__one').length).toBe(before);
+    expect(svg.querySelector('.loaf-drops').getAttribute('clip-path')).toBe('url(#plotClip)');
+  });
+
+  it('splits the free-market equilibrium by term: Pe lights its line, Qe its own, the point both', () => {
+    renderMarketChart(svg, sub(), { detail: 'clean', layers: ['demand', 'supply', 'eq1'] });
+    const marks = (sel) => [...svg.querySelectorAll(sel)].map((n) => n.dataset.mark);
+    const eq1 = [...svg.querySelectorAll('[data-layer="eq1"]')];
+    expect(eq1.some((n) => n.dataset.mark === 'pe' && n.tagName === 'line')).toBe(true);
+    expect(eq1.some((n) => n.dataset.mark === 'qe' && n.tagName === 'line')).toBe(true);
+    expect(eq1.some((n) => n.dataset.mark === 'pe qe' && n.tagName === 'circle')).toBe(true);
+    expect(marks('.axis-symbol--ref')).toEqual(expect.arrayContaining(['pe', 'qe']));
+    expect(svg.querySelectorAll('[data-mark="undefined"]')).toHaveLength(0);
+  });
+
+  it('builds the two prices as stacked brackets (customer, then government), animating only on entry', () => {
+    const opts = {
+      detail: 'clean', layers: ['demand', 'supply', 'supply2', 'eq1', 'eq2', 'prices', 'priceBrackets', 'subsidyArrow'],
+      captions: { customer: 'customer pays $70', gov: '+ $20 government', total: 'bakery gets $90' },
+    };
+    renderMarketChart(svg, sub(), { ...opts, enter: ['priceBrackets'] });
+    expect(svg.querySelector('.price-brackets--enter')).not.toBeNull();
+    expect(svg.querySelector('.pb-customer').dataset.mark).toBe('customer');
+    expect(svg.querySelector('.pb-gov').dataset.mark).toBe('gov');
+    expect(svg.querySelector('.subsidy-arrow')).not.toBeNull();
+    expect(svg.querySelector('.price-line--producer')).not.toBeNull();
+    expect(texts('.price-brackets')).toEqual(['customer pays $70', '+ $20 government', 'bakery gets $90']);
+    renderMarketChart(svg, sub(), opts);
+    expect(svg.querySelector('.price-brackets--enter')).toBeNull();
+  });
+
+  it('draws the draggable cost dot on a free market, with axis tags from captions', () => {
+    const free = computeMarket({ ...base, intervention: { type: 'none' } });
+    renderMarketChart(svg, free, {
+      detail: 'clean', layers: ['demand', 'supply', 'costDot'], dotQ: 30,
+      captions: { s1: 'S1 = what it costs to make', dotLabel: 'loaf 30: $50 to bake', dotCostTag: '$50', dotQtyTag: 'loaf 30' },
+    });
+    const handle = svg.querySelector('.cost-dot__handle');
+    expect(handle.getAttribute('tabindex')).toBe('0');
+    expect(handle.getAttribute('aria-valuenow')).toBe('30');
+    expect(texts('.cost-dot')).toEqual(['$50', 'loaf 30', 'loaf 30: $50 to bake']);
+    expect(svg.querySelector('.drag-hint')).toBeNull();
+    // The lone supply curve carries the step's S1 caption instead of "Supply".
+    expect([...svg.querySelectorAll('.curve-label')].map((t) => t.textContent)).toContain('S1 = what it costs to make');
+  });
+
+  it('adds a "drag me" pill and a chevron either side along S1 when the step asks for the hint', () => {
+    const free = computeMarket({ ...base, intervention: { type: 'none' } });
+    renderMarketChart(svg, free, { detail: 'clean', layers: ['demand', 'supply', 'costDot'], dotQ: 30, captions: { dragHint: 'drag me' } });
+    expect(svg.querySelector('.drag-hint__text').textContent).toBe('drag me');
+    expect(svg.querySelectorAll('.drag-hint__chevron')).toHaveLength(2);
+  });
+
+  it('draws the readout rows in their marks’ colours and reserves its corner', () => {
+    renderMarketChart(svg, sub(), {
+      detail: 'clean', layers: ['demand', 'supply', 'supply2', 'readout'],
+      captions: { readout: [{ label: 'Customer pays (Pc)', value: '$70', mark: 'customer' }, { label: 'Government adds', value: '+ $20', mark: 'gov' }] },
+    });
+    const rows = [...svg.querySelectorAll('.readout__row')];
+    expect(rows.map((r) => r.dataset.mark)).toEqual(['customer', 'gov']);
+    expect(rows[1].querySelector('.readout__value').textContent).toBe('+ $20');
+    expect(rows[1].querySelector('.readout__value').getAttribute('fill')).toBe('var(--gov)');
+  });
+
+  it('marks base layers with what they stand for, for word-to-mark highlighting', () => {
+    renderMarketChart(svg, sub(), { detail: 'clean', layers: ['demand', 'supply', 'supply2', 'eq1', 'wedgeBox', 'eq2', 'prices'] });
+    expect(svg.querySelector('.demand-curve').dataset.mark).toBe('customer');
+    expect(svg.querySelector('.supply-curve').dataset.mark).toBe('cost');
+    expect(svg.querySelector('[data-region="subsidy-cost"]').closest('[data-mark]').dataset.mark).toBe('gov');
+  });
+
+  it('builds government spending from one strip per loaf sold, filling in left to right', () => {
+    renderMarketChart(svg, sub(), { detail: 'clean', layers: ['demand', 'supply', 'supply2', 'govStrips'], enter: ['govStrips'] });
+    const strips = svg.querySelectorAll('[data-layer="govStrips"] .gov-strip');
+    expect(strips).toHaveLength(70);
+    expect(svg.querySelector('[data-layer="govStrips"]').dataset.region).toBe('subsidy-cost');
+    // Delays are set at 1× pace (ms) as --d; pages.css scales them by --pace.
+    expect(strips[0].style.getPropertyValue('--d')).toBe('0');
+    expect(+strips[69].style.getPropertyValue('--d')).toBeGreaterThan(1000);
+  });
+
+  it('labels the box’s width and total', () => {
+    renderMarketChart(svg, sub(), {
+      detail: 'clean', layers: ['demand', 'supply', 'supply2', 'wedgeBox', 'govFill', 'boxWidth', 'boxLabel'],
+      captions: { width: '70 loaves', box: 'Government spending $1,400' },
+    });
+    expect(texts('.box-width')).toEqual(['70 loaves']);
+    expect(svg.querySelector('[data-layer="boxLabel"]').textContent).toBe('Government spending $1,400');
+  });
+
+  it('names the marginal bands by caption once they are drawn', () => {
+    renderMarketChart(svg, sub(), {
+      detail: 'clean', layers: ['demand', 'supply', 'supply2', 'wedgeBox', 'marginalPs', 'marginalCs'],
+      captions: { mps: 'marginal PS', mcs: 'marginal CS' },
+    });
+    expect(svg.querySelector('text[data-layer="marginalPs"]').textContent).toBe('marginal PS');
+    expect(svg.querySelector('text[data-layer="marginalCs"]').textContent).toBe('marginal CS');
   });
 });

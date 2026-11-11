@@ -53,6 +53,10 @@ export const REGION_INFO = {
     title: 'Government Spending',
     text: 'The total the government pays: the subsidy per unit multiplied by the quantity sold.',
   },
+  'bakery-revenue': {
+    title: 'Bakery Revenue',
+    text: 'What the seller takes in: the price it receives per unit multiplied by the quantity it sells. On a graph, that is the rectangle with height equal to the price and width equal to the quantity.',
+  },
   'cs-original': {
     title: 'Consumer Surplus (before the subsidy)',
     text: 'The consumer surplus at the free-market price Pe: the area under demand and above Pe. The subsidy adds the marginal CS band beneath it.',
@@ -84,6 +88,7 @@ export const REGION_BADGES = {
   'tax-revenue': 'Tax rev',
   'subsidy-overlap': 'CS ∩ PS',
   'subsidy-cost': 'Gov',
+  'bakery-revenue': 'Revenue',
   'marginal-cs': 'mCS',
   'marginal-ps': 'mPS',
   'cs-original': 'CS',
@@ -115,7 +120,25 @@ function getContextNote(key, result) {
     if (key === 'ps') {
       return `At free-market equilibrium (Pe = ${fmtPrice(result.Pstar)}), producer surplus is maximized without price suppression.`;
     }
+  } else if (result.mode === 'tax' && !result.closed) {
+    // The tax page's story is a tax on cans of soft drink.
+    const perUnit = result.Pc - result.Pp;
+    if (key === 'tax-revenue') {
+      return `The government collects ${fmtMoney(perUnit)} on each of the ${fmtQty(result.Q)} cans sold, ${fmtMoney(result.govRevenue)} in all. Consumers pay ${fmtMoney(result.consumerIncidence)} of it through the higher price (consumer burden), and producers ${fmtMoney(result.producerIncidence)} through the lower price they keep (producer burden).`;
+    }
+    if (key === 'tax-consumer') {
+      return `Customers now pay ${fmtPrice(result.Pc)} a can instead of ${fmtPrice(result.Pstar)}: ${fmtPrice(result.Pc - result.Pstar)} of the ${fmtPrice(perUnit)} tax, on each of the ${fmtQty(result.Q)} cans they still buy.`;
+    }
+    if (key === 'tax-producer') {
+      return `Producers now keep ${fmtPrice(result.Pp)} a can instead of ${fmtPrice(result.Pstar)}: ${fmtPrice(result.Pstar - result.Pp)} of the ${fmtPrice(perUnit)} tax, on each of the ${fmtQty(result.Q)} cans they still sell.`;
+    }
+    if (key === 'dwl') {
+      return `The ${fmtQty(result.Qstar - result.Q)} cans between Qtax and Qe are no longer sold, although buyers valued them more than they cost to make. That lost value goes to nobody, not even the government.`;
+    }
   } else if (result.mode === 'subsidy') {
+    if (key === 'bakery-revenue') {
+      return `The bakery receives ${fmtMoney(result.Pp)} a loaf (Pp) and sells ${fmtQty(result.Q)} loaves, so its revenue is ${fmtMoney(result.Pp * result.Q)}. Customers pay ${fmtMoney(result.Pc)} of each loaf's price and the government pays the other ${fmtMoney(result.Pp - result.Pc)}.`;
+    }
     if (key === 'subsidy-cost') {
       const amount = result.Pp - result.Pc;
       return `The government pays ${fmtMoney(amount)} on each of the ${fmtQty(result.Q)} loaves sold, ${fmtMoney(result.govCost)} in all. That money ends up in three places: lower prices for consumers (marginal CS), higher prices for producers (marginal PS), and a deadweight loss (DWL) nobody gets.`;
@@ -132,7 +155,10 @@ function getStatValue(key, result) {
   if (key === 'ceiling' && result.Pc != null) return fmtPrice(result.Pc);
   if (key === 'shortage' && result.gap != null) return `${fmtQty(result.gap)} units`;
   if (key === 'tax-revenue' && result.govRevenue != null) return fmtMoney(result.govRevenue);
+  if (key === 'tax-consumer' && result.consumerIncidence != null) return fmtMoney(result.consumerIncidence);
+  if (key === 'tax-producer' && result.producerIncidence != null) return fmtMoney(result.producerIncidence);
   if (key === 'subsidy-cost' && result.govCost != null) return fmtMoney(result.govCost);
+  if (key === 'bakery-revenue' && result.Pp != null && result.Q != null) return fmtMoney(result.Pp * result.Q);
   if (key === 'marginal-cs' && result.marginalCS != null) return fmtMoney(result.marginalCS);
   if (key === 'marginal-ps' && result.marginalPS != null) return fmtMoney(result.marginalPS);
   if (key === 'cs-original' && result.csTriangleArea != null) return fmtMoney(result.csTriangleArea);

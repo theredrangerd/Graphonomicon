@@ -78,6 +78,8 @@ Short form used on the chart and in step text: **S1 = what it costs to make. S2 
 
 ### Steps (working draft; the builder implements these as written, the owner will revise the copy later)
 
+> **Superseded 2026-11-09:** the step sequence below was replaced by a 13-step, box-before-surplus version. See `2026-11-09-subsidy-explain-pedagogy-design.md`. Kept here for history.
+
 `$X` = the current slider amount; Pc/Pp/Q₁ = live values.
 
 1. **Demand.** Only D is drawn. "This is demand: how many loaves people want to buy at each price. Lower price, more loaves."

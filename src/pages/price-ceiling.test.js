@@ -90,29 +90,54 @@ describe('initPriceCeilingPage', () => {
     expect([...links].some((a) => a.textContent === 'Price floor')).toBe(true);
   });
 
-  it('renders CS and PS badges on the chart initially, and adds DWL when ceiling is imposed', () => {
-    expect(document.querySelector('#chart .region-badge--cs')).not.toBeNull();
-    expect(document.querySelector('#chart .region-badge--ps')).not.toBeNull();
-    expect(document.querySelector('#chart .region-badge--dwl')).toBeNull();
+  it('draws IB area names (no chips), adding the welfare loss once the ceiling is imposed', () => {
+    const names = () => [...document.querySelectorAll('#chart .area-name')].map((n) => n.textContent);
+    expect(document.querySelector('#chart .region-badge')).toBeNull();
+    expect(names()).not.toContain('welfare loss');
 
     document.querySelector('#ceiling-toggle').checked = true;
     document.querySelector('#ceiling-toggle').dispatchEvent(new Event('change'));
 
-    expect(document.querySelector('#chart .region-badge--dwl')).not.toBeNull();
-    expect(document.querySelector('#chart .region-badge--dwl .region-badge__text').textContent).toBe('DWL');
+    expect(document.querySelector('#chart .region-badge')).toBeNull();
+    expect(names()).toContain('welfare loss');
   });
 
-  it('opens an explainer popover with live values and context when a region badge is clicked', () => {
+  it('opens an explainer popover with live values and context when a shaded area is clicked', () => {
     document.querySelector('#ceiling-toggle').checked = true;
     document.querySelector('#ceiling-toggle').dispatchEvent(new Event('change'));
 
-    const dwlBadge = document.querySelector('#chart .region-badge--dwl');
-    dwlBadge.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 200, clientY: 200 }));
+    document.querySelector('#chart [data-region="dwl"]').dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 200, clientY: 200 }));
 
     const popover = document.querySelector('.region-popover');
     expect(popover).not.toBeNull();
     expect(popover.querySelector('h4').textContent).toBe('Deadweight Loss');
     expect(popover.querySelector('.region-popover__stat .v').textContent).toBe('$675');
     expect(popover.querySelector('.region-popover__callout').textContent).toContain('Restricting output');
+  });
+
+  describe('Explorer', () => {
+    const pickFocus = (id) => document.querySelector(`.focus-chip[data-focus="${id}"]`).click();
+
+    it('offers the four ceiling foci, hidden until Explorer is picked', () => {
+      const chips = [...document.querySelectorAll('.focus-chip')].map((c) => c.dataset.focus);
+      expect(chips).toEqual(['cs', 'ps', 'gap', 'dwl']);
+      expect(document.querySelector('.focus-bar').hidden).toBe(true);
+    });
+
+    it('focusing the shortage draws the control line and bracket, but no shaded area', () => {
+      document.querySelector('#ceiling-toggle').checked = true;
+      document.querySelector('#ceiling-toggle').dispatchEvent(new Event('change'));
+      pickFocus('gap');
+      const chart = document.querySelector('#chart');
+      expect(chart.dataset.focus).toBe('gap');
+      expect(chart.querySelector('[data-region="shortage"]')).not.toBeNull();
+      expect(chart.querySelector('.cs-fill')).toBeNull();
+      expect(history.state ?? location.search).toContain('focus=gap');
+    });
+
+    it('says to turn the ceiling on when a ceiling-only focus is picked with it off', () => {
+      pickFocus('dwl');
+      expect(document.querySelector('#market-note').textContent).toBe('Turn the ceiling on to see the deadweight loss.');
+    });
   });
 });

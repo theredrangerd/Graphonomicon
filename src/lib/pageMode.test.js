@@ -82,4 +82,8 @@ describe('stale detail param', () => {
     expect(w.location.search).toBe('');
     expect(w.location.hash).toBe('#play');
   });
+  it('readPlayView only accepts a focus from the page\'s own list', () => {
+    expect(readPlayView(fakeWin('https://x.test/p.html?focus=revenue'), ['cs', 'ps', 'revenue', 'dwl'])).toEqual({ view: 'explorer', focus: 'revenue' });
+    expect(readPlayView(fakeWin('https://x.test/p.html?view=explorer&focus=overlap'), ['cs', 'ps', 'revenue', 'dwl'])).toEqual({ view: 'explorer', focus: null });
+  });
 });

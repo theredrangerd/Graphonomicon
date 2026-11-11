@@ -41,6 +41,14 @@
   --dwl-hatch:     rgba(179, 52, 52, 0.55);
   --gov:           #7c3aed;
   --gov-fill:      rgba(124, 58, 237, 0.14);
+  --gov-ink:       color-mix(in srgb, var(--gov) 72%, black);  /* government figures in headings: the arrow's purple, very dark */
+  /* Tax burdens (owner's pick, 2026-11-09): violet for consumers, plum for producers, both
+     slices of the violet tax-revenue box. Not teal/gold: those are the subsidy's marginal
+     CS/PS, and a burden must never read as a kind of surplus. */
+  --burden-consumer:      #7c3aed;
+  --burden-consumer-fill: rgba(124, 58, 237, 0.20);
+  --burden-producer:      #a21caf;
+  --burden-producer-fill: rgba(162, 28, 175, 0.16);
 
   --accent:        #2a5fa8;
   --accent-fill:   rgba(42, 95, 168, 0.14);
@@ -95,6 +103,11 @@
   --dwl-hatch:     rgba(226, 114, 111, 0.65);
   --gov:           #b794f4;
   --gov-fill:      rgba(183, 148, 244, 0.20);
+  --gov-ink:       color-mix(in srgb, var(--gov) 70%, white);  /* dark theme: the same idea reads as a lighter purple */
+  --burden-consumer:      #b794f4;
+  --burden-consumer-fill: rgba(183, 148, 244, 0.24);
+  --burden-producer:      #e879f9;
+  --burden-producer-fill: rgba(232, 121, 249, 0.20);
 
   --accent:        #6ea3e6;
   --accent-fill:   rgba(110, 163, 230, 0.20);
