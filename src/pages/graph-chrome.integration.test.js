@@ -10,10 +10,10 @@ import { initGraphChrome, interventionTourSteps } from '../components/graphChrom
 
 // Detail settings + walkthrough on every Government Intervention page, against the real markup.
 const PAGES = [
-  { file: 'price-ceiling.html', init: initPriceCeilingPage, toggle: '#ceiling-toggle', policy: 'impose the price ceiling', gear: true },
-  { file: 'price-floor.html', init: initPriceFloorPage, toggle: '#floor-toggle', policy: 'impose the price floor', gear: true },
-  { file: 'indirect-tax.html', init: initIndirectTaxPage, toggle: '#tax-toggle', policy: 'impose the tax', gear: true },
-  // The subsidy page swaps the gear for its own IB perfect / Explorer view switch.
+  { file: 'price-ceiling.html', init: initPriceCeilingPage, toggle: '#ceiling-toggle', policy: 'impose the price ceiling', gear: false },
+  { file: 'price-floor.html', init: initPriceFloorPage, toggle: '#floor-toggle', policy: 'impose the price floor', gear: false },
+  // Every page: each swaps the gear for its own IB perfect / Explorer view switch.
+  { file: 'indirect-tax.html', init: initIndirectTaxPage, toggle: '#tax-toggle', policy: 'impose the tax', gear: false },
   { file: 'subsidy.html', init: initSubsidyPage, toggle: '#subsidy-toggle', policy: 'impose the subsidy', gear: false },
 ];
 
@@ -78,15 +78,18 @@ it('subsidy.html: ignores the saved detail level and always draws at IB', () => 
   expect(document.querySelector('#chart').dataset.detail).toBe('ib');
 });
 
-describe('price ceiling: changing detail closes an open explainer', () => {
-  it('removes the popover when switching from full to clean', () => {
+describe('price ceiling: changing view closes an open explainer', () => {
+  it('removes the popover when switching to Explorer', () => {
     localStorage.clear();
     localStorage.setItem('econ.tourSeen', '1');
+    history.replaceState(null, '', '/');
     loadPage('price-ceiling.html');
     initPriceCeilingPage(document);
     document.querySelector('#chart [data-region="cs"]').dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(document.querySelector('.region-popover')).not.toBeNull();
-    pick('clean');
+    const radio = document.querySelector('input[name="play-view"][value="explorer"]');
+    radio.checked = true;
+    radio.dispatchEvent(new Event('change', { bubbles: true }));
     expect(document.querySelector('.region-popover')).toBeNull();
   });
 });

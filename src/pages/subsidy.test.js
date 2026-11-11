@@ -192,7 +192,7 @@ describe('initSubsidyPage — Explain and Play', () => {
   it('opens #explain on step 1, drawing only demand', () => {
     initSubsidyPage(document, fakeWin('subsidy.html#explain'));
     expect(document.body.dataset.mode).toBe('explain');
-    expect($('#explain-card .explain-card__count').textContent).toBe('Step 1 of 11');
+    expect($('#explain-card .explain-card__count').textContent).toBe('Step 1 of 14');
     expect($('#chart line.demand-curve')).not.toBeNull();
     expect($('#chart line.supply-curve')).toBeNull();
   });
@@ -228,21 +228,60 @@ describe('initSubsidyPage — Explain and Play', () => {
     expect($('#market-note').textContent).not.toContain('Turn the subsidy on');
   });
 
-  it('draws the step animation only on the step change, not on a slider tick (step 3)', () => {
+  it('step 4 waits on a Subsidise! button on the dot, then drops the arrow and unlocks Next', async () => {
     initSubsidyPage(document, fakeWin('subsidy.html#explain'));
-    button('Next').click();
-    button('Next').click();
-    expect($('#explain-card .explain-card__count').textContent).toBe('Step 3 of 11');
-    expect($('#chart .layer-enter')).not.toBeNull();
+    document.querySelectorAll('.explain-card .explain-dot')[3].click();
+    expect($('#explain-card .explain-card__count').textContent).toBe('Step 4 of 14');
+    // Armed: the dot and its cost are there, the drop, its labels and the readout are not.
+    expect($('#chart .subsidise-btn')).not.toBeNull();
+    expect($('#chart .loaf-drop circle')).not.toBeNull();
+    expect($('#chart .loaf-drop__arrow')).toBeNull();
+    expect($('#chart .readout')).toBeNull();
+    expect($('#chart').textContent).not.toContain('from government');
+    expect(button('Press Subsidise!').disabled).toBe(true);
+    expect($('#explain-card').classList.contains('explain-card--waiting')).toBe(true);
+    // The pulsing button is the only cue: the card says nothing extra while it waits.
+    expect($('#explain-card .explain-card__think').hidden).toBe(true);
+    // Pressing it brings the step in as it normally arrives.
+    $('#chart .subsidise-btn').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect($('#chart .subsidise-btn')).toBeNull();
+    expect($('#chart .loaf-drop__arrow')).not.toBeNull();
+    expect($('#chart .readout')).not.toBeNull();
+    expect($('#chart').textContent).toContain('from government');
+    expect(button('Next').disabled).toBe(false);
+    expect($('#explain-card .explain-card__think').hidden).toBe(true);
+    await new Promise((r) => setTimeout(r, 0));
+    expect($('#explain-card').classList.contains('explain-card--waiting')).toBe(false);
+  });
+
+  it('Enter on the Subsidise! button also presses it, and leaving the step lets go of the wait', async () => {
+    initSubsidyPage(document, fakeWin('subsidy.html#explain'));
+    document.querySelectorAll('.explain-card .explain-dot')[3].click();
+    $('#chart .subsidise-btn').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect($('#chart .loaf-drop__arrow')).not.toBeNull();
+    // Re-arrives armed (Back then forward), and moving on without pressing never leaves text hidden.
+    document.querySelectorAll('.explain-card .explain-dot')[2].click();
+    document.querySelectorAll('.explain-card .explain-dot')[3].click();
+    expect($('#chart .subsidise-btn')).not.toBeNull();
+    document.querySelectorAll('.explain-card .explain-dot')[1].click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect($('#explain-card').classList.contains('explain-card--waiting')).toBe(false);
+  });
+
+  it('a slider tick on step 4 redraws without re-running the step animation', () => {
+    initSubsidyPage(document, fakeWin('subsidy.html#explain'));
+    document.querySelectorAll('.explain-card .explain-dot')[3].click();
+    $('#chart .subsidise-btn').dispatchEvent(new MouseEvent('click', { bubbles: true }));
     const slider = $('.explain-slider');
     slider.value = '30';
     slider.dispatchEvent(new Event('input'));
     expect($('#chart .layer-enter')).toBeNull();
+    expect($('#chart .subsidise-btn')).toBeNull();
   });
 
   it('shares one subsidy amount between the Explain slider and the Play slider', () => {
     initSubsidyPage(document, fakeWin('subsidy.html#explain'));
-    $('.explain-card .explain-dot:nth-child(3)').click();
+    $('.explain-card .explain-dot:nth-child(4)').click();
     const slider = $('.explain-slider');
     slider.value = '30';
     slider.dispatchEvent(new Event('input'));
@@ -263,13 +302,13 @@ describe('initSubsidyPage — Explain and Play', () => {
     $('.mode-switch input[value="explain"]').click();
     expect(document.body.dataset.mode).toBe('explain');
     expect(win.location.hash).toBe('#explain');
-    expect($('#explain-card .explain-card__count').textContent).toBe('Step 1 of 11');
+    expect($('#explain-card .explain-card__count').textContent).toBe('Step 1 of 14');
   });
 
-  it('Try it in Play → on step 11 switches to Play with the subsidy animated on', () => {
+  it('Try it in Play → on step 14 switches to Play with the subsidy animated on', () => {
     const win = fakeWin('subsidy.html#explain');
     initSubsidyPage(document, win);
-    document.querySelectorAll('.explain-card .explain-dot')[10].click();
+    document.querySelectorAll('.explain-card .explain-dot')[13].click();
     button('Try it in Play →').click();
     expect(document.body.dataset.mode).toBe('play');
     expect(win.location.hash).toBe('#play');
@@ -279,10 +318,52 @@ describe('initSubsidyPage — Explain and Play', () => {
 
   it('draws the IB perfect diagram on the wrap-up step', () => {
     initSubsidyPage(document, fakeWin('subsidy.html#explain'));
-    document.querySelectorAll('.explain-card .explain-dot')[10].click();
+    document.querySelectorAll('.explain-card .explain-dot')[13].click();
     expect($('#chart').dataset.detail).toBe('ib');
     expect($('#chart line.supply-curve')).not.toBeNull();
     expect($('#chart [data-region="dwl"]')).not.toBeNull();
+  });
+
+  it('locks Next on the drag step until the student has moved the cost dot along S1', () => {
+    initSubsidyPage(document, fakeWin('subsidy.html#explain'));
+    document.querySelectorAll('.explain-card .explain-dot')[2].click();
+    expect($('#explain-card .explain-card__count').textContent).toBe('Step 3 of 14');
+    expect(button('Put the dot in the halo').disabled).toBe(true);
+    expect($('#chart .cost-dot__handle')).not.toBeNull();
+    expect($('#chart .drag-hint')).not.toBeNull();
+    expect($('#explain-card .explain-card__text').textContent).toContain('loaf number 75');
+    // Keyboard drag: each arrow moves the dot one loaf; the handle is redrawn every time.
+    const press = (n) => {
+      for (let i = 0; i < n; i++) {
+        $('#chart .cost-dot__handle').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+      }
+    };
+    // The halo is drawn 42 ± 4 and the dot's body touching it counts (± 5). 27 presses from loaf 75 is
+    // loaf 48: outside, so
+    // Next stays locked; one more lands in it.
+    expect($('#chart .dot-target')).not.toBeNull();
+    press(27);
+    expect($('#explain-card .explain-card__text').textContent).toContain('loaf number 48');
+    expect(button('Put the dot in the halo').disabled).toBe(true);
+    press(1);
+    expect($('#explain-card .explain-card__text').textContent).toContain('loaf number 47');
+    expect($('#explain-card .explain-card__text').textContent).toContain('$62.67');
+    expect(button('Next').disabled).toBe(false);
+    expect($('#chart .drag-hint')).toBeNull();
+    expect($('#chart .dot-target--reached')).not.toBeNull();
+    button('Next').click();
+    // The government's share comes off the loaf the student left the dot on.
+    expect($('#explain-card .explain-card__text').textContent).toContain('Loaf 47 still costs $62.67');
+  });
+
+  it('lights up the marks a coloured word in the card names', () => {
+    initSubsidyPage(document, fakeWin('subsidy.html#explain'));
+    document.querySelectorAll('.explain-card .explain-dot')[1].click();
+    const term = $('#explain-card .term--pe');
+    term.dispatchEvent(new Event('pointerover', { bubbles: true }));
+    expect($('#chart').dataset.hot).toBe('pe');
+    term.dispatchEvent(new Event('pointerout', { bubbles: true }));
+    expect($('#chart').dataset.hot).toBeUndefined();
   });
 
   describe('keeping the step card on screen', () => {

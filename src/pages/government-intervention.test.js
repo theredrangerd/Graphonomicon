@@ -23,14 +23,17 @@ describe('initGovernmentInterventionPage', () => {
     expect(link.querySelector('.bento__badge')).toBeNull();
   });
 
-  it('splits the Subsidy tile into Explain and Play, but not Indirect tax', () => {
+  it('splits the Subsidy and Indirect tax tiles into Explain and Play, but not the price controls', () => {
     const click = (el) => el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    click(document.querySelector('a[href$="/indirect-tax.html"]'));
+    click(document.querySelector('a[href$="/price-ceiling.html"]'));
     expect(document.querySelector('.bento__split')).toBeNull();
-    click(document.querySelector('a[href$="/subsidy.html"]'));
-    const links = document.querySelectorAll('.bento__split a.bento__mode');
-    expect(links).toHaveLength(2);
-    expect(links[0].textContent).toBe('Explain');
-    expect(links[0].getAttribute('href').endsWith('subsidy.html#explain')).toBe(true);
+    for (const slug of ['subsidy', 'indirect-tax']) {
+      click(document.querySelector(`a[href$="/${slug}.html"]`));
+      const links = document.querySelectorAll('.bento__split a.bento__mode');
+      expect(links).toHaveLength(2);
+      expect(links[0].textContent).toBe('Explain');
+      expect(links[0].getAttribute('href').endsWith(`${slug}.html#explain`)).toBe(true);
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    }
   });
 });

@@ -3,6 +3,7 @@ import { REGION_INFO, attachRegionExplainers } from './regionExplainers.js';
 import { computeMarket } from './marketEngine.js';
 import { renderMarketChart } from './marketChart.js';
 import { DEFAULT_MARKET } from './pageControls.js';
+import { fmtMoney } from './format.js';
 
 describe('REGION_INFO wording', () => {
   it('does not equate too little trade with a shortage (a tax or floor causes no shortage)', () => {
@@ -98,6 +99,19 @@ describe('subsidy explainers', () => {
     svg.querySelector(`[data-region="${key}"]`).dispatchEvent(new MouseEvent('click', { bubbles: true }));
     return document.querySelector('.region-popover');
   }
+
+  it('explains the explain-mode revenue box with its value', () => {
+    document.body.innerHTML = '';
+    const chart = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    document.body.appendChild(chart);
+    const result = computeMarket({ ...base, intervention: { type: 'subsidy', amount: 20 } });
+    renderMarketChart(chart, result, { detail: 'clean', layers: ['demand', 'supply', 'supply2', 'eq1', 'eq2', 'pricesPOnly', 'revenueBox'] });
+    attachRegionExplainers(chart);
+    chart.querySelector('[data-region="bakery-revenue"]').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const pop = document.querySelector('.region-popover');
+    expect(pop.textContent).toContain('Bakery Revenue');
+    expect(pop.querySelector('.region-popover__stat .v').textContent).toBe(fmtMoney(result.Pp * result.Q));
+  });
 
   it('defines marginal CS and PS regions', () => {
     for (const key of ['marginal-cs', 'marginal-ps']) {

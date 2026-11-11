@@ -24,17 +24,18 @@
           </div>
           <svg id="chart" class="market-chart" viewBox="0 0 780 520" role="img" aria-label="Indirect tax diagram"></svg>
           <div class="legend">
-            <span class="item"><span class="line" style="background:var(--demand)"></span>Demand</span>
-            <span class="item"><span class="line" style="background:var(--supply)"></span>Supply</span>
-            <span class="item"><span class="swatch" style="background:var(--demand-fill); border:1px solid var(--demand)"></span>Consumer surplus</span>
-            <span class="item"><span class="swatch" style="background:var(--supply-fill); border:1px solid var(--supply)"></span>Producer surplus</span>
-            <span class="item"><span class="swatch" style="background:var(--demand-alt-fill); border:1px solid var(--demand-alt)"></span>Consumer tax burden</span>
-            <span class="item"><span class="swatch" style="background:var(--supply-alt-fill); border:1px solid var(--supply-alt)"></span>Producer tax burden</span>
-            <span class="item"><span class="swatch" style="background:transparent; border:1px dashed var(--gov)"></span>Tax revenue (total)</span>
-            <span class="item"><span class="swatch" style="background:var(--dwl-fill); border:1px solid var(--dwl-line)"></span>Deadweight loss</span>
+            <span class="item" data-legend="demand"><span class="line" style="background:var(--demand)"></span>Demand</span>
+            <span class="item" data-legend="supply"><span class="line" style="background:var(--supply)"></span>Supply</span>
+            <span class="item" data-legend="cs"><span class="swatch" style="background:var(--demand-fill); border:1px solid var(--demand)"></span>Consumer surplus</span>
+            <span class="item" data-legend="ps"><span class="swatch" style="background:var(--supply-fill); border:1px solid var(--supply)"></span>Producer surplus</span>
+            <span class="item" data-legend="tax-consumer"><span class="swatch" style="background:var(--burden-consumer-fill); border:1px solid var(--burden-consumer)"></span>Consumer tax burden</span>
+            <span class="item" data-legend="tax-producer"><span class="swatch" style="background:var(--burden-producer-fill); border:1px solid var(--burden-producer)"></span>Producer tax burden</span>
+            <span class="item" data-legend="revenue"><span class="swatch" style="background:transparent; border:1px dashed var(--gov)"></span>Tax revenue (total)</span>
+            <span class="item" data-legend="dwl"><span class="swatch" style="background:var(--dwl-fill); border:1px solid var(--dwl-line)"></span>Deadweight loss</span>
           </div>
         </section>
-        <section class="card panel">
+        <section class="card explain-card" id="explain-card" hidden></section>
+        <section class="card panel" id="outcome-panel">
           <h2>Market outcome</h2>
           <div class="stats-grid">
             <div class="stat"><div class="k">Price consumers pay</div><div class="v" id="stat-price-consumer">$80.00</div></div>
@@ -43,8 +44,8 @@
             <div class="stat cs"><div class="k">Consumer surplus</div><div class="v" id="stat-cs">$2,400</div></div>
             <div class="stat ps"><div class="k">Producer surplus</div><div class="v" id="stat-ps">$2,400</div></div>
             <div class="stat gov"><div class="k">Tax revenue</div><div class="v" id="stat-revenue">$0</div></div>
-            <div class="stat cs-alt"><div class="k">Consumer tax burden</div><div class="v" id="stat-incidence-consumer">$0</div></div>
-            <div class="stat ps-alt"><div class="k">Producer tax burden</div><div class="v" id="stat-incidence-producer">$0</div></div>
+            <div class="stat burden-c"><div class="k">Consumer tax burden</div><div class="v" id="stat-incidence-consumer">$0</div></div>
+            <div class="stat burden-p"><div class="k">Producer tax burden</div><div class="v" id="stat-incidence-producer">$0</div></div>
             <div class="stat dwl wide"><div class="k">Deadweight loss</div><div class="v" id="stat-dwl">$0</div></div>
           </div>
           <div class="note" id="market-note"></div>
