@@ -1064,14 +1064,9 @@ body[data-mode] .market-chart[data-seq="join"] .axis-symbol.layer-enter[data-lay
 body[data-mode] .market-chart[data-seq="join"] [data-layer="marginalCs"].layer-enter { animation: wipe-up calc(var(--pace) * 900ms) cubic-bezier(0.4, 0, 0.25, 1) calc(var(--pace) * 1500ms) both; }
 body[data-mode] .market-chart[data-seq="join"] :is([data-layer="marginalCs"], [data-layer="marginalPs"]) polygon.wedge-fill { animation: band-meet calc(var(--pace) * 800ms) ease-in-out calc(var(--pace) * 2500ms) both; }
 @media (prefers-reduced-motion: reduce) { body[data-mode] .market-chart[data-seq] [data-layer="loafDrops"] { display: none; } body[data-mode] .market-chart[data-seq] * { animation: none !important; } }
-/* Play's e2 arrives at the pace of the chain, not Explain's first-look timing, and the arrows' one label
-   (what each arrow is) comes in after the third has started down. */
-/* Play: every step is drawn, so the student sees how one mark leads to the next. S2 is traced through the
-   arrow tips; the Pc and Pp lines are drawn out from e2 to the axis, their symbols following; the producer's
-   arrow rises from e2 to S1; the bands wipe in from Pe. */
-@keyframes draw-line { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
-body[data-mode="play"] .market-chart line.supply-curve-shifted.layer-enter { stroke-dasharray: 1; animation: draw-line 700ms ease-in-out both; }
-body[data-mode="play"] .market-chart [data-layer="supply2"].layer-enter:not(line) { animation: layer-enter 300ms ease-out 600ms both; }
+/* Play: each lens step is drawn, so the student sees how one mark leads to the next: the Pc and Pp lines are
+   drawn out from e2 to the axis, their symbols following; the producer's arrow rises from e2 to S1; the
+   bands wipe in from Pe. (The supply shift itself is a tween, not an entrance: see subsidy.js.) */
 body[data-mode="play"] .market-chart line.wedge-line.layer-enter { transform-box: fill-box; transform-origin: right center; animation: layer-grow 600ms ease-in-out both; }
 body[data-mode="play"] .market-chart line.price-line--producer.layer-enter { animation-delay: 450ms; }
 body[data-mode="play"] .market-chart .axis-symbol.layer-enter:is([data-layer="pricesC"], [data-layer="prices"]) { animation: layer-enter 300ms ease-out 550ms both; }
@@ -1080,9 +1075,6 @@ body[data-mode="play"] .market-chart [data-layer="focusChip"].layer-enter { anim
 body[data-mode="play"] .market-chart [data-layer="marginalCs"].layer-enter { animation: wipe-down 800ms cubic-bezier(0.4, 0, 0.25, 1) both; }
 body[data-mode="play"] .market-chart [data-layer="marginalPs"].layer-enter { animation: wipe-up 800ms cubic-bezier(0.4, 0, 0.25, 1) both; }
 @media (prefers-reduced-motion: reduce) { body[data-mode="play"] .market-chart :is(.layer-enter, .layer-drop, .layer-grow) { animation: none !important; } }
-body[data-mode="play"] .market-chart .eq2-line.layer-enter { animation-duration: calc(var(--pace) * 450ms); animation-delay: calc(var(--pace) * 200ms); }
-body[data-mode="play"] .market-chart .eq-label.layer-enter[data-layer="eq2"] { animation-delay: calc(var(--pace) * 150ms); }
-body[data-mode="play"] .market-chart .axis-symbol.layer-enter[data-layer="eq2"] { animation-delay: calc(var(--pace) * 550ms); }
 /* ...and S2 waits for the arrows to land before it fades in through their tips. */
 .market-chart:has(.layer-drop) [data-layer="supply2"].layer-enter { animation-delay: calc(var(--pace) * 1650ms); }
 .market-chart.is-dragging .cost-dot .teach-label { font-size: 22px; font-weight: 700; stroke-width: 6px; }

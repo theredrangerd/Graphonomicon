@@ -26,37 +26,37 @@ const SUBSIDY_ONLY_FOCUS = { gov: 'government spending', cs: 'the marginal consu
 // changed by `drop` and `add`; `enter`/`grow`/`exit` animate layers on that step (marketChart.js).
 const BASE = ['demand', 'supply', 'eq1'];
 const BASELINE = { cs: ['csTriangle', 'focusChip'], ps: ['psTriangle', 'focusChip'] }; // already there before the toggle
-const DROP_STAGGER_MS = 90; // the arrows go down briskly: Explain's 250 is for a first look
+const SHIFT_MS = 1000; // the arrows grow down and S2 and e2 slide with them (the toggle's tween, same length)
 const FINAL_PARTS = ['wedgeBox', 'marginalCs', 'marginalPs', 'dwl', 'focusChip'];
 export function subsidyChain(focus) {
   const keep = [...BASE, ...(BASELINE[focus] ?? [])];
   const withS2 = [...keep, 'supply2'];
   const atE2 = [...withS2, 'eq2'];
   const priced = [...atE2, 'prices'];
-  const opening = [
-    { stage: 'arrows', only: [...keep, 'loafDrops'], enter: ['loafDrops'], after: 0 },
-    { stage: 'shift', only: [...withS2, 'loafDrops'], enter: ['supply2'], after: 1050 }, // S2 is drawn through the arrow tips once they've landed
-    { stage: 'e2', only: [...atE2, 'loafDrops', ...(focus === 'ps' ? ['pricesCOnly'] : [])], enter: ['eq2'], exit: ['loafDrops'], after: 1000 },
-  ];
+  // One motion, not three: the arrows grow down from S1 as S2 slides down with them, and e2 (already
+  // on S2, with its line to the quantity axis) slides along. The page's toggle tween drives it, so no
+  // layer enters here; the next step brings the arrows back out.
+  const shift = { stage: 'shift', only: [...atE2, 'loafDrops'], after: 0 };
+  const thenLeave = (step) => ({ ...step, only: [...step.only, 'loafDrops'], exit: [...(step.exit ?? []), 'loafDrops'], after: SHIFT_MS });
   const finish = (extra = {}) => ({ stage: 'final', ...extra });
   if (focus === 'cs') {
-    return [...opening,
-      { stage: 'pc', only: [...atE2, 'pricesCOnly'], enter: ['pricesC'], after: 1100 },
+    return [shift,
+      thenLeave({ stage: 'pc', only: [...atE2, 'pricesCOnly'], enter: ['pricesC'] }),
       finish({ enter: ['marginalCs', 'focusChip'], after: 1000 })];
   }
   if (focus === 'ps') {
-    return [...opening,
-      { stage: 'received', only: [...atE2, 'prices', 'subsidyArrow'], enter: ['subsidyArrow', 'prices'], after: 1100 },
+    return [shift,
+      thenLeave({ stage: 'received', only: [...atE2, 'prices', 'subsidyArrow'], enter: ['subsidyArrow', 'prices', 'pricesC'] }),
       finish({ enter: ['marginalPs', 'focusChip'], after: 1100 })];
   }
-  const prices = { stage: 'prices', only: priced, enter: ['pricesC', 'prices'], after: 1100 };
+  const prices = thenLeave({ stage: 'prices', only: priced, enter: ['pricesC', 'prices'] });
   if (focus === 'gov') {
     // The budget: customers pay Pc, the government's payment lifts that to what the bakery receives
     // (the arrow from e2 up to S1, then the Pp line), and it pays that on every loaf sold, one strip
     // per loaf, which make up the spending box.
     const received = [...priced, 'subsidyArrow'];
-    return [...opening,
-      { stage: 'pc', only: [...atE2, 'pricesCOnly'], enter: ['pricesC'], after: 1000 },
+    return [shift,
+      thenLeave({ stage: 'pc', only: [...atE2, 'pricesCOnly'], enter: ['pricesC'] }),
       { stage: 'received', only: received, enter: ['subsidyArrow', 'prices'], after: 1100 },
       { stage: 'strips', only: [...received, 'govStrips'], enter: ['govStrips'], after: 1300 },
       { stage: 'box', only: [...received, 'govStrips', 'govFill', 'wedgeBox', 'boxLabel'], enter: ['govFill', 'wedgeBox', 'boxLabel'], exit: ['govStrips'], after: 2000 },
@@ -67,7 +67,7 @@ export function subsidyChain(focus) {
   if (focus === 'societal') {
     // Explain's build-up: the box, which hands its money out as marginal CS, then marginal PS, then
     // the grey corner ("?") that turns out to be deadweight loss, and last the chips.
-    return [...opening, prices,
+    return [shift, prices,
       { stage: 'strips', drop: FINAL_PARTS, add: ['govStrips'], enter: ['govStrips'], after: 1000 },
       { stage: 'box', drop: FINAL_PARTS.slice(1), add: ['govStrips', 'govFill', 'boxLabel'], enter: ['govFill', 'wedgeBox', 'boxLabel'], exit: ['govStrips'], after: 2000 },
       { stage: 'boxHold', drop: FINAL_PARTS.slice(1), add: ['govFill', 'boxLabel'], after: 1100 },
@@ -129,9 +129,8 @@ export function initSubsidyPage(doc, win = window) {
   let toggleCtl;
 
   // Explorer focus, subsidy switched on: the page plays the lens's chain (subsidyChain). Every lens
-  // opens as Explain does: an arrow drops by the subsidy from several points on S1, their tips
-  // line up into S2, and e2 is where S2 meets demand. Then each lens runs its own stakeholder's
-  // part. The last step is the finished picture, which is also what a slider drag shows.
+  // opens with the shift (arrows down from S1, S2 and e2 sliding with them), then runs its own
+  // stakeholder's part. The last step is the finished picture, which is also what a slider drag shows.
   const CHAINS = Object.fromEntries(SUBSIDY_FOCUSES.map(([id]) => [id, subsidyChain(id)]));
   let chainStep = null; // the step being shown; null = the finished picture
   let pendingEnter = [];
@@ -191,7 +190,7 @@ export function initSubsidyPage(doc, win = window) {
   // The Societal lens says what each stage of the build-up is, in the words Explain uses.
   function societalNote(result, amount) {
     const stage = chainStep?.stage ?? 'final';
-    if (['arrows', 'shift', 'e2', 'prices'].includes(stage)) return '';
+    if (['shift', 'prices'].includes(stage)) return '';
     if (['strips', 'box', 'boxHold'].includes(stage)) return `<strong>Government spending: ${fmtMoney(result.govCost)}.</strong> ${fmtMoney(amount)} on every loaf sold, so the dashed box is the government's whole bill. Where does it end up?`;
     if (stage === 'mcs') return `<strong>Marginal consumer surplus: ${fmtMoney(result.marginalCS)}.</strong> Buyers pay less for every loaf, and that saving comes out of the government's box.`;
     if (stage === 'mps') return `<strong>Marginal producer surplus: ${fmtMoney(result.marginalPS)}.</strong> The bakery receives more for every loaf: the second slice of the box.`;
@@ -225,7 +224,6 @@ export function initSubsidyPage(doc, win = window) {
       (step.add ?? []).forEach((name) => held.add(name));
       options.layers = [...held];
       options.captions = {};
-      if (step.stage === 'arrows') options.dropStagger = DROP_STAGGER_MS;
       if (focus === 'gov' || focus === 'societal') {
         Object.assign(options.captions, {
           strip: `1 loaf: ${fmtMoney(amount)}`,
@@ -237,7 +235,7 @@ export function initSubsidyPage(doc, win = window) {
         // figures) take their place, so the words are dropped to leave them room.
         if (step.stage !== 'final') Object.assign(options.captions, { mcs: 'marginal CS', mps: 'marginal PS' });
         // From the first band on, the spending box's outline goes solid (Explain's "back to the box").
-        if (!['arrows', 'shift', 'e2', 'prices', 'strips', 'box', 'boxHold'].includes(step.stage)) options.sequence = 'box';
+        if (!['shift', 'prices', 'strips', 'box', 'boxHold'].includes(step.stage)) options.sequence = 'box';
       }
     }
     if (pendingEnter.length) { options.enter = pendingEnter; pendingEnter = []; }
@@ -266,8 +264,8 @@ export function initSubsidyPage(doc, win = window) {
     card.refresh(); // keep the Explain slider on the same amount
     render();
   });
-  // Switching on snaps to the full subsidy: the chain below plays the shift, not a tween of its size.
-  toggleCtl = wireInterventionToggle(subsidyToggle, render, { beforeOn: () => settleDown(subsidySlider, isValid), duration: 650, snapOn: true });
+  // Switching on tweens the subsidy in over the chain's first step: the arrows grow down as S2 and e2 slide with them.
+  toggleCtl = wireInterventionToggle(subsidyToggle, render, { beforeOn: () => settleDown(subsidySlider, isValid), duration: SHIFT_MS });
   subsidyToggle.addEventListener('change', () => {
     if (subsidyToggle.checked) startReveal(); else resetReveal();
   });

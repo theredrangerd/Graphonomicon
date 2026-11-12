@@ -1160,7 +1160,7 @@ function drawLoafDrop(layer, result, captions, q, armed = false, guides = true) 
 // Every loaf: the same drop from several points on S1. The arrow tips line up into S2,
 // which is why S2 is parallel to S1 and exactly the subsidy lower. On the step that brings
 // them in, the arrows draw down one after another.
-function drawLoafDrops(layer, result, skipQ = null, stagger = 250) {
+function drawLoafDrops(layer, result, skipQ = null) {
   // Clipped to the plot, so an arrow whose tip would land below zero runs under the x axis and
   // is cut off there instead of vanishing.
   const g = el('g', { 'clip-path': 'url(#plotClip)' }, 'loaf-drops');
@@ -1176,7 +1176,7 @@ function drawLoafDrops(layer, result, skipQ = null, stagger = 250) {
     if (yBot - yTop > 12) one.appendChild(arrowMark(x, yTop + 4, x, yBot - 2, { width: 1.8, head: 8, color: 'var(--gov)' }));
     if (entering) {
       one.classList.add('layer-drop');
-      one.style.setProperty('--d', String(i * stagger)); // ms at 1× pace; pages.css scales it
+      one.style.setProperty('--d', String(i * 250)); // ms at 1× pace; pages.css scales it
     }
     g.appendChild(one);
     // The same hollow blue dot the single loaf ends on: where the customer's price lands (S2).
@@ -1184,7 +1184,7 @@ function drawLoafDrops(layer, result, skipQ = null, stagger = 250) {
       const tip = customerDot(x, yBot, 'loaf-drops__tip');
       if (entering) {
         tip.classList.add('loaf-drops__tip--enter');
-        tip.style.setProperty('--d', String(i * stagger));
+        tip.style.setProperty('--d', String(i * 250));
       }
       g.appendChild(tip);
     }
@@ -1378,7 +1378,7 @@ function drawSubsidyTeachingMarks(layer, result, captions, options) {
     if (name) nameArea(layer, result.mode === 'subsidy' ? triPoly : plainPoly, captions[key], name, key);
   }
   if (result.mode !== 'subsidy') return;
-  if (layerOn.has('loafDrops')) drawLoafDrops(layer, result, layerOn.has('loafDrop') ? (options.loafQ ?? DEFAULT_LOAF_Q) : null, options.dropStagger ?? 250);
+  if (layerOn.has('loafDrops')) drawLoafDrops(layer, result, layerOn.has('loafDrop') ? (options.loafQ ?? DEFAULT_LOAF_Q) : null);
   if (layerOn.has('loafDrop')) drawLoafDrop(layer, result, captions, options.loafQ ?? DEFAULT_LOAF_Q, Boolean(options.loafArmed), options.loafGuides !== false);
   if (layerOn.has('priceBrackets')) drawPriceBrackets(layer, result, captions);
   if (layerOn.has('revenueDims')) drawRevenueDims(layer, result, captions);
@@ -1968,7 +1968,7 @@ export function renderMarketChart(svg, result, options = {}) {
       layer.appendChild(tag(curveName(captions.s1, 'S', '1', { x: p1.x, y: p1.y, fill: 'var(--supply)', 'text-anchor': 'end', ...(s1Muted ? { 'fill-opacity': '0.6' } : {}) }), 'supply'));
     }
     if (on.has('supply2')) {
-      layer.appendChild(tag(el('line', { x1: sx(s2Seg[0][0]), y1: sy(s2Seg[0][1]), x2: sx(s2Seg[1][0]), y2: sy(s2Seg[1][1]), stroke: 'var(--supply)', 'stroke-width': 2.5, 'stroke-linecap': 'round', pathLength: 1 }, 'supply-curve-shifted'), 'supply2'));
+      layer.appendChild(tag(el('line', { x1: sx(s2Seg[0][0]), y1: sy(s2Seg[0][1]), x2: sx(s2Seg[1][0]), y2: sy(s2Seg[1][1]), stroke: 'var(--supply)', 'stroke-width': 2.5, 'stroke-linecap': 'round' }, 'supply-curve-shifted'), 'supply2'));
       const p2 = supplyPos(s2Seg, captions.s2 ?? 'S2', s2Lower === true);
       layer.appendChild(tag(curveName(captions.s2, 'S', '2', { x: p2.x, y: p2.y, fill: 'var(--supply)', 'text-anchor': 'end' }), 'supply2'));
     }

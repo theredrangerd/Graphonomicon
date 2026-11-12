@@ -149,15 +149,12 @@ export function fillSharedStats(doc, result) {
 // so every future intervention page picks it up automatically instead of re-copying the
 // tween/cancel bookkeeping. `beforeOn` runs just before switching on, so a page can pull
 // its intervention slider back into range first.
-// `snapOn`: switching on jumps to the full intervention without rendering, for a page that plays
-// its own staged build-up (the caller renders); switching off still tweens out.
-export function wireInterventionToggle(toggle, render, { beforeOn, duration, holdOn, snapOn } = {}) {
+export function wireInterventionToggle(toggle, render, { beforeOn, duration, holdOn } = {}) {
   let fraction = toggle.checked ? 1 : 0;
   let cancelAnim = null;
   toggle.addEventListener('change', () => {
     if (toggle.checked && beforeOn) beforeOn();
     if (cancelAnim) cancelAnim();
-    if (toggle.checked && snapOn) { fraction = 1; cancelAnim = null; return; }
     // `holdOn()` ms (a page that opens with a beat before the intervention moves anything):
     // the intervention stays at its current fraction until then.
     const hold = toggle.checked && holdOn ? holdOn() : 0;
