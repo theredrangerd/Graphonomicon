@@ -1158,7 +1158,7 @@ function drawLoafDrop(layer, result, captions, q, armed = false, guides = true) 
 // Every loaf: the same drop from several points on S1. The arrow tips line up into S2,
 // which is why S2 is parallel to S1 and exactly the subsidy lower. On the step that brings
 // them in, the arrows draw down one after another.
-function drawLoafDrops(layer, result, skipQ = null) {
+function drawLoafDrops(layer, result, skipQ = null, stagger = 250, amountLabel = null) {
   // Clipped to the plot, so an arrow whose tip would land below zero runs under the x axis and
   // is cut off there instead of vanishing.
   const g = el('g', { 'clip-path': 'url(#plotClip)' }, 'loaf-drops');
@@ -1174,7 +1174,7 @@ function drawLoafDrops(layer, result, skipQ = null) {
     if (yBot - yTop > 12) one.appendChild(arrowMark(x, yTop + 4, x, yBot - 2, { width: 1.8, head: 8, color: 'var(--gov)' }));
     if (entering) {
       one.classList.add('layer-drop');
-      one.style.setProperty('--d', String(i * 250)); // ms at 1× pace; pages.css scales it
+      one.style.setProperty('--d', String(i * stagger)); // ms at 1× pace; pages.css scales it
     }
     g.appendChild(one);
     // The same hollow blue dot the single loaf ends on: where the customer's price lands (S2).
@@ -1182,11 +1182,21 @@ function drawLoafDrops(layer, result, skipQ = null) {
       const tip = customerDot(x, yBot, 'loaf-drops__tip');
       if (entering) {
         tip.classList.add('loaf-drops__tip--enter');
-        tip.style.setProperty('--d', String(i * 250));
+        tip.style.setProperty('--d', String(i * stagger));
       }
       g.appendChild(tip);
     }
   });
+  // One label for the lot: what every arrow is (the per-unit subsidy), beside the middle one.
+  if (amountLabel) {
+    const q = DROP_QS[2], { cost, customer } = loafPoint(result, q);
+    if (cost <= PMAX && sy(customer) - sy(cost) > 12) {
+      const t = mark(teachingLabel(sx(q) + 9, (sy(cost) + sy(customer)) / 2 + 4, amountLabel, 'start', 'var(--gov)'), 'gov');
+      t.classList.add('loaf-drops__amount');
+      if (entering) { t.classList.add('loaf-drops__amount--enter'); t.style.setProperty('--d', String(3 * stagger)); }
+      g.appendChild(t);
+    }
+  }
   g.setAttribute('data-layer', 'loafDrops');
   layer.appendChild(g);
 }
@@ -1376,7 +1386,7 @@ function drawSubsidyTeachingMarks(layer, result, captions, options) {
     if (name) nameArea(layer, result.mode === 'subsidy' ? triPoly : plainPoly, captions[key], name, key);
   }
   if (result.mode !== 'subsidy') return;
-  if (layerOn.has('loafDrops')) drawLoafDrops(layer, result, layerOn.has('loafDrop') ? (options.loafQ ?? DEFAULT_LOAF_Q) : null);
+  if (layerOn.has('loafDrops')) drawLoafDrops(layer, result, layerOn.has('loafDrop') ? (options.loafQ ?? DEFAULT_LOAF_Q) : null, options.dropStagger ?? 250, captions.dropAmount);
   if (layerOn.has('loafDrop')) drawLoafDrop(layer, result, captions, options.loafQ ?? DEFAULT_LOAF_Q, Boolean(options.loafArmed), options.loafGuides !== false);
   if (layerOn.has('priceBrackets')) drawPriceBrackets(layer, result, captions);
   if (layerOn.has('revenueDims')) drawRevenueDims(layer, result, captions);
