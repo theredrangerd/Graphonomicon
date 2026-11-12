@@ -83,8 +83,9 @@ export function subsidyChain(focus) {
       // Everything that was only there to explain goes at once: the old triangles, their chips and the box's tint
       // (the outline stays), leaving the two marginal bands; then what is left of the box is the deadweight loss.
       { stage: 'tidy', lens: 'ps', only: [...boxTint, ...bothTriangles, 'marginalCs', 'marginalPs', 'focusChip'], exit: [...bothTriangles, 'govFill', 'focusChip'], after: 1300 },
-      { stage: 'leftover', only: [...boxed, 'marginalCs', 'marginalPs', 'dwl'], enter: ['dwl'], after: 900 },
-      finish({ enter: ['focusChip'], after: 1300 })];
+      // The Society lens names its areas with chips, like every lens: the two bands' and the loss's, as the loss arrives.
+      { stage: 'leftover', lens: 'societal', only: [...boxed, 'marginalCs', 'marginalPs', 'dwl', 'focusChip'], enter: ['dwl', 'focusChip'], after: 900 },
+      finish({ after: 1300 })];
   }
   return [];
 }
@@ -255,9 +256,6 @@ export function initSubsidyPage(doc, win = window) {
         });
       }
       if (focus === 'societal') {
-        // The bands are named in words while they arrive; at the end the chips (which carry the
-        // figures) take their place, so the words are dropped to leave them room.
-        if (step.stage !== 'final') Object.assign(options.captions, { mcs: 'marginal CS', mps: 'marginal PS' });
         // From the first split on, the spending box's outline goes solid (Explain's "back to the box").
         if (!['shift', 'box'].includes(step.stage)) options.sequence = 'box';
         if (step.emphasis) options.emphasis = step.emphasis;

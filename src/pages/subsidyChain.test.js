@@ -77,6 +77,8 @@ describe('subsidyChain', () => {
     expect(leftover.only).not.toContain('govFill');
     expect(leftover.only).not.toContain('csTriangle');
     expect(leftover.enter).toContain('dwl');
+    expect(leftover.only).toContain('focusChip'); // chips, not plain text, name the bands and the loss
+    expect(leftover.lens).toBe('societal');
   });
 
   it('keeps the consumer and producer baseline triangles on screen during the shift', () => {
