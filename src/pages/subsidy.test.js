@@ -167,7 +167,7 @@ describe('initSubsidyPage — Explain and Play', () => {
     try {
       initSubsidyPage(document, fakeWin('subsidy.html#explain'));
       expect(document.querySelector('.tour-bubble')).toBeNull();
-      $('.mode-switch input[value="play"]').click();
+      $('.mode-link').click();
       expect(document.querySelector('.tour-bubble')).not.toBeNull();
     } finally {
       document.querySelectorAll('.tour-bubble, .tour-backdrop, .tour-spotlight').forEach((n) => n.remove());
@@ -184,7 +184,8 @@ describe('initSubsidyPage — Explain and Play', () => {
     expect(document.body.dataset.mode).toBe('play');
     expect($('.detail-gear')).toBeNull();
     expect($('.view-switch')).toBeNull();
-    expect($('.mode-switch')).not.toBeNull();
+    expect($('.mode-switch')).toBeNull();
+    expect($('.mode-link').textContent).toBe('Wait, how does this work?');
     expect($('.focus-bar').hidden).toBe(false);
     expect($('#chart').dataset.detail).toBe('ib');
     expect($('#chart [data-region="subsidy-overlap"]')).toBeNull();
@@ -342,8 +343,8 @@ describe('initSubsidyPage — Explain and Play', () => {
     win.location.hash = '#play';
     win.fire('hashchange');
     expect(document.body.dataset.mode).toBe('play');
-    expect($('.mode-switch input[value="play"]').checked).toBe(true);
-    $('.mode-switch input[value="explain"]').click();
+    expect($('.mode-link').textContent).toBe('Wait, how does this work?');
+    $('.mode-link').click();
     expect(document.body.dataset.mode).toBe('explain');
     expect(win.location.hash).toBe('#explain');
     expect($('#explain-card .explain-card__count').textContent).toBe('Step 1 of 19');
@@ -421,7 +422,7 @@ describe('initSubsidyPage — Explain and Play', () => {
 
     it('scrolls the chart card to the top when a step change leaves the step card below the viewport', () => {
       const chartCard = setup(window.innerHeight + 50);
-      $('.mode-switch input[value="explain"]').click();
+      $('.mode-link').click();
       expect(chartCard.scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({ block: 'start' }));
       chartCard.scrollIntoView.mockClear();
       button('Next').click();
@@ -430,7 +431,7 @@ describe('initSubsidyPage — Explain and Play', () => {
 
     it('does not scroll when the step card already fits, nor on a slider tick', () => {
       const chartCard = setup(window.innerHeight - 10);
-      $('.mode-switch input[value="explain"]').click();
+      $('.mode-link').click();
       button('Next').click();
       expect(chartCard.scrollIntoView).not.toHaveBeenCalled();
       $('#explain-card').getBoundingClientRect = () => ({ bottom: window.innerHeight + 50 });

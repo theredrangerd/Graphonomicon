@@ -46,3 +46,11 @@ Strips → box (2026-11-12): the strips no longer vanish when the solid box arri
 ## Play is Explorer only (2026-11-12)
 
 The IB perfect | Explorer switch is gone from the indirect tax page: a bare URL opens Play on Explorer with no lens picked, and the focus bar (Government perspective / Consumer lens / Producer lens) is always visible. `mountViewSwitch(..., { ibView: false })` skips the segmented control, `readPlayView(..., 'explorer')` makes Explorer the default, and the tour's last step points at the focus bar (`interventionTourSteps({ explorerOnly: true })`). Subsidy and price ceiling/floor keep the switch. The Explain wrap-up still draws the IB perfect diagram.
+
+## Explain is a text link, Play is the page (2026-11-12)
+
+The Explain | Play segmented control is replaced on the indirect tax page by one text link in the chart head: "Wait, how does this work?" in Play opens Explain, and in Explain it reads "← Back to Play" (`mountModeLink` in `modeSwitch.js`). The bare URL still lands in Play. The subsidy page keeps the segmented control.
+
+Placement and look: top right of the page header, level with the title, as a 18px IBM Plex Mono pill (hairline border, `--surface-2` fill, accent circle "?" glyph, accent on hover) matching the header sibling chips. In Explain (header hidden) it moves to the chart head as "← Back to Play".
+
+The same Explorer-only Play and "Wait, how does this work?" link were ported to the subsidy page (2026-11-12); the tour's focus-bar step reads "Pick something to highlight."

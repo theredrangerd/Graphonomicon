@@ -22,3 +22,26 @@ export function mountModeSwitch(chartHead, { mode, onChange }) {
 
   return { setMode };
 }
+
+// Text link for pages whose default is Play: "Wait, how does this work?" opens Explain, and in
+// Explain it reads "Back to Play". It sits in `playHost` (the page header) in Play and moves to
+// `explainHost` (the chart head) in Explain, where the header is hidden. Fires onChange on user click only.
+export function mountModeLink({ playHost, explainHost, mode, onChange }) {
+  const doc = playHost.ownerDocument;
+  const link = doc.createElement('button');
+  link.type = 'button';
+  link.className = 'mode-link';
+
+  let current = mode;
+  const setMode = (m) => {
+    current = m;
+    link.dataset.mode = m;
+    link.textContent = m === 'play' ? 'Wait, how does this work?' : '← Back to Play';
+    (m === 'play' ? playHost : explainHost).append(link);
+  };
+  setMode(mode);
+
+  link.addEventListener('click', () => onChange(current === 'play' ? 'explain' : 'play'));
+
+  return { setMode };
+}

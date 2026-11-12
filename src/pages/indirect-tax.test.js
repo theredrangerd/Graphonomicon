@@ -356,9 +356,13 @@ describe('initIndirectTaxPage — Explain and Play', () => {
     const win = fakeWin('indirect-tax.html#play');
     initIndirectTaxPage(document, win);
     toggleTax();
-    $('.mode-switch input[value="explain"]').click();
+    $('.mode-link').click();
     expect(win.location.hash).toBe('#explain');
     expect($('#tax-toggle').checked).toBe(false);
     expect(stepCount()).toBe('Step 1 of 12');
+    expect($('.mode-link').textContent).toBe('← Back to Play');
+    $('.mode-link').click();
+    expect(win.location.hash).toBe('#play');
+    expect($('.mode-switch')).toBeNull();
   });
 });

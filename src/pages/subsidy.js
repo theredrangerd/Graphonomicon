@@ -9,7 +9,7 @@ import { attachRegionExplainers } from '../lib/regionExplainers.js';
 import { FEEDBACK_FORM_URL } from '../lib/feedback.js';
 import { initGraphChrome, maybeAutoStartTour, interventionTourSteps } from '../components/graphChrome.js';
 import { readMode, writeMode, onModeChange, readPlayView, writePlayView } from '../lib/pageMode.js';
-import { mountModeSwitch } from '../components/modeSwitch.js';
+import { mountModeLink } from '../components/modeSwitch.js';
 import { mountViewSwitch, SUBSIDY_FOCUSES, SUBSIDY_FOCUS_ALIASES } from '../components/viewSwitch.js';
 import { mountExplainCard } from '../components/explainCard.js';
 import { whenAnimationsDone } from '../lib/animationSettle.js';
@@ -48,7 +48,9 @@ export function initSubsidyPage(doc, win = window) {
     steps: (detail) => interventionTourSteps({ policyName: 'subsidy', sliderNoun: 'subsidy', clickableRegions: true, explorerOnly: true }, detail),
     onDetailChange: () => {},
   });
-  const modeSwitch = mountModeSwitch(chartHead, {
+  const modeSwitch = mountModeLink({
+    playHost: doc.querySelector('header.top') ?? chartHead,
+    explainHost: chartHead,
     mode,
     onChange(next) { writeMode(next, win); applyMode(next); },
   });
