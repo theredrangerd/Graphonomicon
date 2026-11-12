@@ -53,19 +53,28 @@ describe('subsidyChain', () => {
     expect(subsidyChain('gov')[3].only).not.toContain('govFill');
   });
 
-  it('plays the society lens quickly: the box, then consumers\' share, producers\' share, and what is left as deadweight loss', () => {
-    expect(stages('societal')).toEqual(['shift', 'box', 'consumers', 'producers', 'leftover', 'final']);
-    const [, box, consumers, producers, leftover] = subsidyChain('societal');
+  it('plays the society lens as the box, then each party\'s surplus growing by its marginal band, then only the bands, then the DWL', () => {
+    expect(stages('societal')).toEqual(['shift', 'box', 'cs', 'mcs', 'ps', 'mps', 'tidy', 'leftover', 'final']);
+    const [, box, cs, mcs, ps, mps, tidy, leftover] = subsidyChain('societal');
     expect(box.only).toEqual(expect.arrayContaining(['govFill', 'wedgeBox']));
-    expect(box.only).not.toContain('marginalCs');
-    expect(consumers.only).toContain('marginalCs');
-    expect(consumers.only).not.toContain('marginalPs');
-    expect(consumers.emphasis).toBe('demand');
-    expect(producers.only).toEqual(expect.arrayContaining(['marginalCs', 'marginalPs']));
-    expect(producers.only).not.toContain('dwl');
-    expect(producers.emphasis).toBe('supply');
+    expect(box.only).not.toContain('csTriangle');
+    // consumers: the old triangle first, then the marginal band, with everything else ghosted
+    expect(cs.only).toContain('csTriangle');
+    expect(cs.only).not.toContain('marginalCs');
+    expect(mcs.only).toEqual(expect.arrayContaining(['csTriangle', 'marginalCs']));
+    expect([cs.emphasis, mcs.emphasis]).toEqual(['consumers', 'consumers']);
+    expect([cs.lens, mcs.lens]).toEqual(['cs', 'cs']);
+    // producers: the same
+    expect(ps.only).toContain('psTriangle');
+    expect(ps.only).not.toContain('marginalPs');
+    expect(mps.only).toEqual(expect.arrayContaining(['psTriangle', 'marginalPs']));
+    expect([ps.emphasis, mps.emphasis]).toEqual(['producers', 'producers']);
+    // only after both marginal bands are shown do the old triangles go; the DWL comes last
+    expect(tidy.exit).toEqual(expect.arrayContaining(['csTriangle', 'psTriangle']));
+    expect(tidy.only).toEqual(expect.arrayContaining(['marginalCs', 'marginalPs']));
+    expect(tidy.only).not.toContain('dwl');
+    expect(leftover.only).not.toContain('csTriangle');
     expect(leftover.enter).toContain('dwl');
-    expect(leftover.exit).toContain('govFill');
   });
 
   it('keeps the consumer and producer baseline triangles on screen during the shift', () => {

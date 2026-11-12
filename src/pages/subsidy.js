@@ -67,16 +67,22 @@ export function subsidyChain(focus) {
       finish({ enter: ['focusChip'], after: 800 })];
   }
   if (focus === 'societal') {
-    // Who captures the government's money, quickly: the spending box appears, then the part of it under
-    // the demand curve goes to consumers, the part above the original supply curve to producers, and what
-    // neither side captures is the deadweight loss.
+    // Who captures the government's money. The box appears; then, for consumers and for producers in
+    // turn, everything else fades back and their free-market surplus (the triangle) is shown growing by
+    // the marginal band the subsidy adds; then the old triangles go and only the marginal bands remain,
+    // inside the box; what is left of the box is the deadweight loss.
     const boxed = [...priced, 'wedgeBox'];
+    const boxTint = [...boxed, 'govFill'];
+    const bothTriangles = ['csTriangle', 'psTriangle'];
     return [shift,
-      thenLeave({ stage: 'box', only: [...boxed, 'govFill', 'boxLabel'], enter: ['govFill', 'wedgeBox', 'boxLabel'] }),
-      { stage: 'consumers', only: [...boxed, 'govFill', 'boxLabel', 'marginalCs'], enter: ['marginalCs'], exit: ['boxLabel'], emphasis: 'demand', after: 1000 },
-      { stage: 'producers', only: [...boxed, 'govFill', 'marginalCs', 'marginalPs'], enter: ['marginalPs'], emphasis: 'supply', after: 1800 },
-      { stage: 'leftover', only: [...boxed, 'govFill', 'marginalCs', 'marginalPs', 'dwl'], enter: ['dwl'], exit: ['govFill'], after: 1800 },
-      finish({ enter: ['focusChip'], after: 2000 })];
+      thenLeave({ stage: 'box', only: [...boxTint, 'boxLabel'], enter: ['govFill', 'wedgeBox', 'boxLabel'] }),
+      { stage: 'cs', lens: 'cs', emphasis: 'consumers', only: [...boxTint, 'boxLabel', 'csTriangle', 'focusChip'], enter: ['csTriangle', 'focusChip'], exit: ['boxLabel'], after: 1000 },
+      { stage: 'mcs', lens: 'cs', emphasis: 'consumers', only: [...boxTint, 'csTriangle', 'marginalCs', 'focusChip'], enter: ['marginalCs', 'focusChip'], after: 1500 },
+      { stage: 'ps', lens: 'ps', emphasis: 'producers', only: [...boxTint, 'csTriangle', 'marginalCs', 'psTriangle', 'focusChip'], enter: ['psTriangle', 'focusChip'], after: 2000 },
+      { stage: 'mps', lens: 'ps', emphasis: 'producers', only: [...boxTint, 'csTriangle', 'marginalCs', 'psTriangle', 'marginalPs', 'focusChip'], enter: ['marginalPs', 'focusChip'], after: 1500 },
+      { stage: 'tidy', only: [...boxTint, ...bothTriangles, 'marginalCs', 'marginalPs'], exit: bothTriangles, after: 2000 },
+      { stage: 'leftover', only: [...boxTint, 'marginalCs', 'marginalPs', 'dwl'], enter: ['dwl'], exit: ['govFill'], after: 1500 },
+      finish({ enter: ['focusChip'], after: 1800 })];
   }
   return [];
 }
@@ -194,8 +200,11 @@ export function initSubsidyPage(doc, win = window) {
     const stage = chainStep?.stage ?? 'final';
     if (stage === 'shift') return '';
     if (stage === 'box') return `<strong>Government spending: ${fmtMoney(result.govCost)}.</strong> ${fmtMoney(amount)} on every loaf sold, so the dashed box is the government's whole bill. Who captures it?`;
-    if (stage === 'consumers') return `<strong>Consumers: ${fmtMoney(result.marginalCS)}.</strong> The part of the box under the demand curve is value buyers get back: they pay less than they were willing to.`;
-    if (stage === 'producers') return `<strong>Producers: ${fmtMoney(result.marginalPS)}.</strong> The part above the original supply curve is extra revenue for the bakery over its cost.`;
+    if (stage === 'cs') return `<strong>Consumer surplus: ${fmtMoney(result.CS)}.</strong> Before the subsidy, this triangle: what buyers gain by paying Pe instead of what they were willing to pay.`;
+    if (stage === 'mcs') return `<strong>Marginal consumer surplus: ${fmtMoney(result.marginalCS)}.</strong> The subsidy lowers the price they pay to Pc, so their surplus grows by this band. It is part of the government's box.`;
+    if (stage === 'ps') return `<strong>Producer surplus: ${fmtMoney(result.PS)}.</strong> Before the subsidy, this triangle: what the bakery gains by selling above what each loaf costs to make.`;
+    if (stage === 'mps') return `<strong>Marginal producer surplus: ${fmtMoney(result.marginalPS)}.</strong> The bakery now receives Pp, so its surplus grows by this band. It is the rest of what the government pays out.`;
+    if (stage === 'tidy') return `<strong>Only the marginal bands are the subsidy's doing.</strong> The original triangles were there anyway; the bands are what the government's money bought.`;
     return `<strong>Deadweight loss (DWL): ${fmtMoney(result.DWL)}.</strong> What's left of the box is captured by nobody: those extra loaves cost more to make than buyers value them at.`;
   }
 
@@ -240,6 +249,7 @@ export function initSubsidyPage(doc, win = window) {
         // From the first split on, the spending box's outline goes solid (Explain's "back to the box").
         if (!['shift', 'box'].includes(step.stage)) options.sequence = 'box';
         if (step.emphasis) options.emphasis = step.emphasis;
+        if (step.lens) options.focus = step.lens; // the chips of the party being shown (old CS + marginal CS)
       }
     }
     if (pendingEnter.length) { options.enter = pendingEnter; pendingEnter = []; }

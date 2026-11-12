@@ -1152,9 +1152,13 @@ body[data-mode] .market-chart[data-seq="join"] .axis-symbol.layer-enter[data-lay
 body[data-mode] .market-chart[data-seq="join"] [data-layer="marginalCs"].layer-enter { animation: wipe-up calc(var(--pace) * 900ms) cubic-bezier(0.4, 0, 0.25, 1) calc(var(--pace) * 1500ms) both; }
 body[data-mode] .market-chart[data-seq="join"] :is([data-layer="marginalCs"], [data-layer="marginalPs"]) polygon.wedge-fill { animation: band-meet calc(var(--pace) * 800ms) ease-in-out calc(var(--pace) * 2500ms) both; }
 @media (prefers-reduced-motion: reduce) { body[data-mode] .market-chart[data-seq] [data-layer="loafDrops"] { display: none; } body[data-mode] .market-chart[data-seq] * { animation: none !important; } }
-/* Society lens: the curve a step points at (data-emphasis) is thickened, and S1 (muted once S2 is there) comes back to full strength. */
-.market-chart[data-emphasis="demand"] line.demand-curve { stroke-width: 4.5; }
-.market-chart[data-emphasis="supply"] line.supply-curve { stroke-width: 4; stroke-opacity: 1; stroke-dasharray: none; }
+/* Society lens: while a step is about one party (data-emphasis), everything that isn't theirs steps back to a
+   ghost, and the curve their surplus hangs from is thickened (S1, muted once S2 is there, comes back to full). */
+.market-chart[data-emphasis] [data-layer] { transition: opacity 0.35s; }
+.market-chart[data-emphasis="consumers"] :is([data-layer="supply"], [data-layer="supply2"], [data-layer="govFill"], [data-layer="wedgeBox"]) { opacity: 0.14; }
+.market-chart[data-emphasis="consumers"] line.demand-curve { stroke-width: 4.5; }
+.market-chart[data-emphasis="producers"] :is([data-layer="demand"], [data-layer="supply2"], [data-layer="govFill"], [data-layer="wedgeBox"], [data-layer="csTriangle"], [data-layer="marginalCs"]) { opacity: 0.14; }
+.market-chart[data-emphasis="producers"] line.supply-curve { stroke-width: 4; stroke-opacity: 1; stroke-dasharray: none; }
 body[data-mode="play"] .market-chart [data-layer="govFill"].layer-enter { animation-duration: 450ms; }
 /* Play: each lens step is drawn, so the student sees how one mark leads to the next: the Pc and Pp lines are
    drawn out from e2 to the axis, their symbols following; the producer's arrow rises from e2 to S1; the

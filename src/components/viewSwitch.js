@@ -5,7 +5,7 @@ export const SUBSIDY_QUESTIONS = Object.freeze({
   gov: "What is the impact on the government's budget?",
   cs: 'What is the impact on consumers?',
   ps: 'What is the impact on producers?',
-  societal: 'What is the impact on society?',
+  societal: 'Who captures what?',
 });
 // The status strip under the lens buttons says what the graph is showing: the whole diagram (what an
 // exam asks you to draw) or one lens, which is only a part of it.
