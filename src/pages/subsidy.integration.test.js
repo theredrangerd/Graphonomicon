@@ -45,7 +45,8 @@ describe('initSubsidyPage against the real page markup', () => {
     expect(document.querySelector('#explain-card')).not.toBeNull();
     expect(document.querySelector('#outcome-panel')).not.toBeNull();
     const keys = [...document.querySelectorAll('.legend [data-legend]')].map((i) => i.dataset.legend);
-    expect(keys).toEqual(expect.arrayContaining(['demand', 'supply', 'cs', 'ps', 'overlap', 'gov', 'dwl', 'marginal-cs', 'marginal-ps']));
+    expect(keys).toEqual(expect.arrayContaining(['demand', 'supply', 'cs', 'ps', 'gov', 'dwl', 'marginal-cs', 'marginal-ps']));
+    expect(keys).not.toContain('overlap');;
     expect(document.querySelector('[data-legend="marginal-cs"]').textContent).toBe('Marginal consumer surplus');
     expect(document.querySelector('[data-legend="marginal-ps"]').textContent).toBe('Marginal producer surplus');
   });

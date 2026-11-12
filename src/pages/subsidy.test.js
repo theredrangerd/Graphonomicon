@@ -204,26 +204,70 @@ describe('initSubsidyPage — Explain and Play', () => {
     fills.forEach((f) => expect(f.dataset.region).toBe('cs'));
   });
 
-  it('shows only demand, supply and the focused item in the legend; IB perfect hides only the overlap', () => {
+  it('shows only demand, supply and the focused item in the legend', () => {
     initSubsidyPage(document, fakeWin('subsidy.html?focus=ps#play'));
     const shown = () => [...document.querySelectorAll('.legend [data-legend]')].filter((i) => !i.hidden).map((i) => i.dataset.legend);
     expect(shown()).toEqual(['demand', 'supply', 'ps']);
-    $('.view-switch input[value="ib"]').click();
-    expect(shown()).toEqual(['demand', 'supply', 'cs', 'ps', 'marginal-cs', 'marginal-ps', 'gov', 'dwl']);
   });
 
   it('keeps the view in the URL when the student switches it', () => {
     const win = fakeWin('subsidy.html#play');
     initSubsidyPage(document, win);
     $('.view-switch input[value="explorer"]').click();
-    $('.focus-chip[data-focus="dwl"]').click();
-    expect(win.location.search).toBe('?view=explorer&focus=dwl');
+    $('.focus-chip[data-focus="ps"]').click();
+    expect(win.location.search).toBe('?view=explorer&focus=ps');
+  });
+
+  it('offers the government perspective, the two lenses and the societal lens, and opens retired links on their replacements', () => {
+    initSubsidyPage(document, fakeWin('subsidy.html?view=explorer&focus=dwl#play'));
+    expect([...document.querySelectorAll('.focus-chip')].map((c) => c.dataset.focus)).toEqual(['gov', 'cs', 'ps', 'societal']);
+    expect($('.focus-chip[aria-pressed="true"]').dataset.focus).toBe('gov');
+    initSubsidyPage(document, fakeWin('subsidy.html?view=explorer&focus=overlap#play'));
+    expect($('.focus-chip[aria-pressed="true"]').dataset.focus).toBe('cs');
+  });
+
+  it('offers a Societal lens last', () => {
+    initSubsidyPage(document, fakeWin('subsidy.html?view=explorer&focus=societal#play'));
+    expect([...document.querySelectorAll('.focus-chip')].map((c) => c.dataset.focus)).toEqual(['gov', 'cs', 'ps', 'societal']);
+    expect($('.focus-chip[aria-pressed="true"]').dataset.focus).toBe('societal');
+    expect($('#market-note').textContent).toContain('Turn the subsidy on');
+  });
+
+  it('Societal lens ends on just the marginal CS, marginal PS and deadweight loss inside the spending box outline', () => {
+    initSubsidyPage(document, fakeWin('subsidy.html?view=explorer&focus=societal#play'));
+    toggleOn(); // the page's timers run at once under Vitest, so this is the finished sequence
+    const regions = new Set([...document.querySelectorAll('#chart [data-region]')].map((e) => e.dataset.region));
+    // 'subsidy-cost' is the dashed box outline (tappable), not a fill.
+    expect(regions).toEqual(new Set(['marginal-cs', 'marginal-ps', 'dwl', 'subsidy-cost']));
+    expect($('#chart .gov-fill')).toBeNull();
+    expect($('#chart .wedge-outline')).not.toBeNull();
+    expect($('#chart .gov-strips')).toBeNull();
+    expect($('#chart [data-layer="govFill"]')).toBeNull();
+    expect($('#market-note').textContent).toContain('nobody would have traded');
+  });
+
+  it('Societal lens lists only what it shows in the legend', () => {
+    initSubsidyPage(document, fakeWin('subsidy.html?view=explorer&focus=societal#play'));
+    toggleOn();
+    const shown = [...document.querySelectorAll('.legend [data-legend]')].filter((i) => !i.hidden).map((i) => i.dataset.legend);
+    expect(shown).toEqual(['demand', 'supply', 'marginal-cs', 'marginal-ps', 'gov', 'dwl']);
+  });
+
+  it('draws the deadweight loss in the government perspective once the subsidy is on', () => {
+    initSubsidyPage(document, fakeWin('subsidy.html?view=explorer&focus=gov#play'));
+    expect($('#chart [data-region="dwl"]')).toBeNull();
+    toggleOn();
+    expect($('#chart [data-region="dwl"]')).not.toBeNull();
+    expect($('#chart [data-region="subsidy-cost"]')).not.toBeNull();
+    const shown = [...document.querySelectorAll('.legend [data-legend]')].filter((i) => !i.hidden).map((i) => i.dataset.legend);
+    expect(shown).toEqual(['demand', 'supply', 'gov', 'dwl']);
+    expect($('#market-note').textContent).not.toContain('Turn the subsidy on');
   });
 
   it('says to turn the subsidy on when the Explorer focus has nothing to show', () => {
     initSubsidyPage(document, fakeWin('subsidy.html?view=explorer&focus=gov#play'));
     expect($('#market-note').textContent).toContain('Turn the subsidy on');
-    expect($('#market-note').textContent).toContain('government spending');
+    expect($('#market-note').textContent).toContain('government spending and the deadweight loss');
     toggleOn();
     expect($('#market-note').textContent).not.toContain('Turn the subsidy on');
   });

@@ -10,7 +10,7 @@ import { FEEDBACK_FORM_URL } from '../lib/feedback.js';
 import { initGraphChrome, maybeAutoStartTour, interventionTourSteps } from '../components/graphChrome.js';
 import { readMode, writeMode, onModeChange, readPlayView, writePlayView } from '../lib/pageMode.js';
 import { mountModeSwitch } from '../components/modeSwitch.js';
-import { mountViewSwitch, SUBSIDY_FOCUSES } from '../components/viewSwitch.js';
+import { mountViewSwitch, SUBSIDY_FOCUSES, SUBSIDY_FOCUS_ALIASES } from '../components/viewSwitch.js';
 import { mountExplainCard } from '../components/explainCard.js';
 import { whenAnimationsDone } from '../lib/animationSettle.js';
 import { SUBSIDY_STEPS, LOAF_Q, LOAF_STEP, TARGET_Q, TARGET_TOLERANCE, snapLoaf, advanceSweep } from './subsidyExplainSteps.js';
@@ -18,7 +18,7 @@ import { SUBSIDY_STEPS, LOAF_Q, LOAF_STEP, TARGET_Q, TARGET_TOLERANCE, snapLoaf,
 export const SUBSIDY_AREA_LABELS = 'full'; // 'full' | 'half' | 'none' — Ms. Patel request 3; flip after she confirms.
 
 // Explorer focuses that only exist once the subsidy is on, and what the note calls them.
-const SUBSIDY_ONLY_FOCUS = { gov: 'government spending', dwl: 'the deadweight loss' };
+const SUBSIDY_ONLY_FOCUS = { gov: 'government spending and the deadweight loss', cs: 'the marginal consumer surplus', ps: 'the marginal producer surplus', societal: 'the marginal surpluses and the deadweight loss' };
 
 // Explain's demand curve: slider positions, as the indirect-tax page does.
 const ZERO = { value: '0' };
@@ -38,7 +38,7 @@ export function initSubsidyPage(doc, win = window) {
   let explainers;
   let card; // the Explain step card, mounted below
   let mode = readMode(win);
-  let playView = readPlayView(win, SUBSIDY_FOCUSES.map(([id]) => id));
+  let playView = readPlayView(win, SUBSIDY_FOCUSES.map(([id]) => id), SUBSIDY_FOCUS_ALIASES);
 
   // No detail gear on this page: Play's IB perfect / Explorer switch replaces it, and the
   // chart is always drawn at the IB level.
@@ -57,17 +57,12 @@ export function initSubsidyPage(doc, win = window) {
     focus: playView.focus,
     focuses: SUBSIDY_FOCUSES,
     onChange(next) {
-      const enteringOverlap = next.focus === 'overlap' && playView.focus !== 'overlap';
       playView = next;
       writePlayView(next, win);
-      stopReveal();
-      reveal = {};
-      // Overlap tells its story from the free market, so landing on it switches the subsidy off.
-      if (enteringOverlap && subsidyToggle.checked) {
-        subsidyToggle.checked = false;
-        subsidyToggle.dispatchEvent(new Event('change'));
-      }
+      resetReveal();
       explainers?.close();
+      // A lens picked with the subsidy already on plays its build-up, like switching the subsidy on.
+      if (subsidyToggle.checked && REVEALS[next.focus]) startReveal();
       render();
     },
   });
@@ -81,52 +76,67 @@ export function initSubsidyPage(doc, win = window) {
   // Explorer focus, subsidy switched on: the supply line shifts at once, then each step below
   // is drawn STAGGER_MS after the one before. A step holds back the layers in `keys` until it
   // runs, then animates them in (`enter` fades, `grow` scales). PS: the per-unit arrow, then
-  // the marginal band, its chip and the Pp line. CS: the band. Overlap: arrow, Pp line, CS
-  // wiping down with its stripes, then PS wiping up with its stripes.
+  // the marginal band, its chip and the Pp line. CS: the band.
   // `reveal` maps held layer -> drawn yet; `pendingEnter`/`pendingGrow` animate what was just revealed.
   const STAGGER_MS = 800;
-  const FADE_HOLD_MS = 1600;   // how long the finished overlap stays whole before the rest fades
-  const FADE_MS = 700;         // matches .layer-exit in pages.css
-  const FADED_LAYERS = ['cs', 'ps', 'csTriangle', 'psTriangle', 'marginalCs', 'marginalPs', 'focusChip'];
   const REVEALS = {
     ps: [
       { keys: ['subsidyArrow'], enter: ['subsidyArrow'] },
       { keys: ['prices', 'marginalPs'], enter: ['marginalPs', 'focusChip'] },
     ],
     cs: [{ keys: ['marginalCs'], enter: ['marginalCs', 'focusChip'] }],
-    overlap: [
-      { keys: ['subsidyArrow'], enter: ['subsidyArrow'] },
-      { keys: ['prices'], grow: ['producerPrice'] },
-      { keys: ['marginalCs', 'overlapBelow'], grow: ['marginalCs', 'overlapBelow'] },
-      { keys: ['marginalPs', 'overlapAbove'], grow: ['marginalPs', 'overlapAbove'] },
-      // With the overlap shown, the areas that built it fade out, leaving the overlap alone
-      // like every other Explorer focus.
-      { after: FADE_HOLD_MS, exit: FADED_LAYERS },
+    // Societal lens, the box then its three parts. Explain's own build-up, in Play: one strip per
+    // loaf fills the government's spending box, the strips dissolve into the solid box, which
+    // hands its money out as marginal CS, then marginal PS, then the grey corner ("?") that turns
+    // out to be deadweight loss, and last the chips. Each step is a `stage` (see SOCIETAL_STAGES).
+    societal: [
+      { stage: 'strips', enter: ['govStrips'] },
+      { stage: 'box', enter: ['govFill', 'wedgeBox', 'boxLabel'], exit: ['govStrips'], after: 2000 },
+      { stage: 'boxHold', after: 1100 },
+      { stage: 'mcs', enter: ['marginalCs'], exit: ['govFill', 'boxLabel'], after: 2200 },
+      { stage: 'mps', enter: ['marginalPs'], after: 2000 },
+      { stage: 'unknown', enter: ['dwlUnknown'], after: 2000 },
+      { stage: 'dwl', enter: ['dwl'], after: 2400 },
+      { stage: 'final', enter: ['focusChip'], after: 1600 },
     ],
   };
+  // What each Societal stage draws, as changes to the finished picture (resolveLayers): layers it
+  // doesn't have yet (`drop`) and transient ones it still shows (`add`).
+  const FINAL_PARTS = ['wedgeBox', 'marginalCs', 'marginalPs', 'dwl', 'focusChip'];
+  const SOCIETAL_STAGES = {
+    start: { drop: FINAL_PARTS, add: [] },
+    strips: { drop: FINAL_PARTS, add: ['govStrips'] },
+    box: { drop: FINAL_PARTS.slice(1), add: ['govStrips', 'govFill', 'boxLabel'] },
+    boxHold: { drop: FINAL_PARTS.slice(1), add: ['govFill', 'boxLabel'] },
+    mcs: { drop: ['marginalPs', 'dwl', 'focusChip'], add: ['govFill', 'boxLabel'] },
+    mps: { drop: ['dwl', 'focusChip'], add: [] },
+    unknown: { drop: ['dwl', 'focusChip'], add: ['dwlUnknown'] },
+    dwl: { drop: ['focusChip'], add: ['dwlUnknown'] },
+    final: { drop: [], add: [] },
+  };
+  let societalStage = 'final'; // 'final' = the finished picture, which is also what a focus change or slider drag shows
   let reveal = {};
   let pendingEnter = [];
   let pendingGrow = [];
   let pendingExit = [];
   let cancelReveal = [];
   const stopReveal = () => { cancelReveal.forEach((c) => c()); cancelReveal = []; };
+  function resetReveal() { stopReveal(); reveal = {}; societalStage = 'final'; }
   function startReveal() {
     stopReveal();
     const steps = REVEALS[playView.focus] ?? [];
     reveal = Object.fromEntries(steps.flatMap((step) => (step.keys ?? []).map((key) => [key, false])));
+    societalStage = playView.focus === 'societal' ? 'start' : 'final';
     const next = (i) => {
       if (i >= steps.length) return;
-      const { keys = [], enter = [], grow = [], exit = [], after = STAGGER_MS } = steps[i];
+      const { keys = [], stage, enter = [], grow = [], exit = [], after = STAGGER_MS } = steps[i];
       cancelReveal.push(delay(after, () => {
         for (const key of keys) reveal[key] = true;
+        if (stage) societalStage = stage;
         pendingEnter = enter;
         pendingGrow = grow;
         pendingExit = exit;
         render();
-        if (exit.length) {
-          // Let the fade play on the still-drawn layers, then drop them for good.
-          cancelReveal.push(delay(FADE_MS, () => { reveal.faded = true; render(); }));
-        }
         next(i + 1);
       }));
     };
@@ -142,16 +152,33 @@ export function initSubsidyPage(doc, win = window) {
 
   const sliders = wireShiftAndSlopeInputs(doc, () => render(), isValid);
 
-  // A subsidised CS/PS focus also draws its marginal band, so its legend entry shows too; the
-  // overlap view draws the lot.
+  // A subsidised CS/PS lens also draws its marginal band, so its legend entry shows too; the
+  // government perspective adds the deadweight loss beside the spending box.
   function updateLegend(focus, subsidised) {
     const shown = ['demand', 'supply', focus];
     if (subsidised && (focus === 'cs' || focus === 'ps')) shown.push(`marginal-${focus}`);
-    if (focus === 'overlap') shown.push('cs', 'ps', ...(subsidised ? ['marginal-cs', 'marginal-ps'] : []));
+    if (subsidised && focus === 'gov') shown.push('dwl');
+    if (subsidised && focus === 'societal') shown.push('marginal-cs', 'marginal-ps', 'gov', 'dwl');
+    // With a subsidy on, the CS/PS triangles are the free-market ones (the marginal bands are
+    // listed beside them), so the legend calls them "old" like their chips.
+    const split = subsidised && (focus === 'cs' || focus === 'ps');
     doc.querySelectorAll('.legend [data-legend]').forEach((item) => {
       const key = item.dataset.legend;
-      item.hidden = focus ? !shown.includes(key) : key === 'overlap';
+      item.hidden = focus ? !shown.includes(key) : false;
+      const text = item.lastChild;
+      if ((key === 'cs' || key === 'ps') && text) {
+        item.dataset.legendText ??= text.textContent;
+        text.textContent = split ? `Old ${item.dataset.legendText.toLowerCase()}` : item.dataset.legendText;
+      }
     });
+  }
+
+  // The Societal lens says what each stage of the build-up is, in the words Explain uses.
+  function societalNote(result, amount) {
+    if (['start', 'strips', 'box', 'boxHold'].includes(societalStage)) return `<strong>Government spending: ${fmtMoney(result.govCost)}.</strong> ${fmtMoney(amount)} on every loaf sold, so the dashed box is the government's whole bill. Where does it end up?`;
+    if (societalStage === 'mcs') return `<strong>Marginal consumer surplus: ${fmtMoney(result.marginalCS)}.</strong> Buyers pay less for every loaf, and that saving comes out of the government's box.`;
+    if (societalStage === 'mps') return `<strong>Marginal producer surplus: ${fmtMoney(result.marginalPS)}.</strong> The bakery receives more for every loaf: the second slice of the box.`;
+    return `<strong>Deadweight loss (DWL): ${fmtMoney(result.DWL)}.</strong> The corner nobody gets. Those extra loaves cost more to make than buyers value them at, so without the subsidy nobody would have traded them; buyers wouldn't have wanted them at that price, and no one gets a benefit to match.`;
   }
 
   // Play's render. Inputs on the Play controls (and the toggle's tween) keep firing it in
@@ -173,21 +200,34 @@ export function initSubsidyPage(doc, win = window) {
     const result = computeMarket({ ...market, intervention });
 
     const options = { showSurplusLabels: true, detail: chrome.getDetail(), focus, areaLabels: SUBSIDY_AREA_LABELS };
-    if (focus && (reveal.faded || Object.values(reveal).includes(false))) {
+    if (focus && Object.values(reveal).includes(false)) {
       const held = resolveLayers(result, options);
       // The Pc line tracks e2 throughout, so holding the prices only withholds the Pp line.
       for (const [key, drawn] of Object.entries(reveal)) {
         if (drawn) continue;
         if (key === 'prices') { if (held.delete('prices')) held.add('pricesCOnly'); } else held.delete(key);
       }
-      if (reveal.faded) FADED_LAYERS.forEach((name) => held.delete(name));
-      // The overlap stripes come in half by half with the band each belongs to.
-      options.overlapHalves = [['above', 'overlapAbove'], ['below', 'overlapBelow']].filter(([, key]) => reveal[key] !== false).map(([half]) => half);
       options.layers = [...held];
     }
     if (pendingEnter.length) { options.enter = pendingEnter; pendingEnter = []; }
-    if (pendingGrow.length) { options.grow = pendingGrow; pendingGrow = []; }
+    if (focus === 'societal' && subsidyActive) {
+      const held = resolveLayers(result, options);
+      const stage = SOCIETAL_STAGES[societalStage];
+      stage.drop.forEach((name) => held.delete(name));
+      stage.add.forEach((name) => held.add(name));
+      options.layers = [...held];
+      options.captions = {
+        strip: `1 loaf: ${fmtMoney(amount)}`,
+        box: `Government spending ${fmtMoney(result.govCost)}`, boxShort: `Gov ${fmtMoney(result.govCost)}`,
+        // The bands are named in words while they arrive; at the end the chips (which carry the
+        // figures) take their place, so the words are dropped to leave them room.
+        ...(societalStage === 'final' ? {} : { mcs: 'marginal CS', mps: 'marginal PS' }),
+      };
+      // From the first band on, the spending box's outline goes solid (Explain's "back to the box").
+      if (!['start', 'strips', 'box', 'boxHold'].includes(societalStage)) options.sequence = 'box';
+    }
     if (pendingExit.length) { options.exit = pendingExit; pendingExit = []; }
+    if (pendingGrow.length) { options.grow = pendingGrow; pendingGrow = []; }
     renderMarketChart(chart, result, options);
     updateLegend(focus, result.mode === 'subsidy');
 
@@ -202,7 +242,7 @@ export function initSubsidyPage(doc, win = window) {
     let note = '';
     if (result.noTrade) note = NO_TRADE_NOTE;
     else if (!subsidyActive && SUBSIDY_ONLY_FOCUS[focus]) note = `Turn the subsidy on to see ${SUBSIDY_ONLY_FOCUS[focus]}.`;
-    else if (!subsidyActive && focus === 'overlap') note = 'Turn the subsidy on to watch consumer and producer surplus grow into each other.';
+    else if (subsidyActive && focus === 'societal') note = societalNote(result, amount);
     else if (subsidyActive) note = `<strong>Deadweight loss (DWL): ${fmtMoney(result.DWL)}.</strong> The subsidy pushes output past the efficient quantity — the last few units cost more to produce than buyers value them at.`;
     doc.querySelector('#market-note').innerHTML = note;
   }
@@ -214,7 +254,7 @@ export function initSubsidyPage(doc, win = window) {
   });
   toggleCtl = wireInterventionToggle(subsidyToggle, render, { beforeOn: () => settleDown(subsidySlider, isValid), duration: 650 });
   subsidyToggle.addEventListener('change', () => {
-    if (subsidyToggle.checked) { startReveal(); render(); } else { stopReveal(); reveal = {}; }
+    if (subsidyToggle.checked) { startReveal(); render(); } else resetReveal();
   });
 
   // ---- Explain ----

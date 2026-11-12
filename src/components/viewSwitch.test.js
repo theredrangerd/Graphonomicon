@@ -19,18 +19,18 @@ describe('mountViewSwitch', () => {
     expect(bar.hidden).toBe(false);
   });
 
-  it('has the seven labelled chips', () => {
+  it('has the four subsidy chips, government perspective first like the tax page', () => {
     const { bar } = setup('explorer');
     expect([...bar.querySelectorAll('.focus-chip')].map((c) => c.textContent)).toEqual(
-      ['Consumer surplus', 'Producer surplus', 'Overlap', 'Government spending', 'Deadweight loss']);
+      ['Government perspective', 'Consumer lens', 'Producer lens', 'Societal lens']);
     expect(bar.textContent).toContain('Pick something to highlight:');
   });
 
-  it('clicking Overlap focuses it, clicking again clears it', () => {
+  it('clicking a lens focuses it, clicking again clears it', () => {
     const { bar, onChange } = setup('explorer');
-    const chip = bar.querySelector('[data-focus="overlap"]');
+    const chip = bar.querySelector('[data-focus="cs"]');
     chip.click();
-    expect(onChange).toHaveBeenLastCalledWith({ view: 'explorer', focus: 'overlap' });
+    expect(onChange).toHaveBeenLastCalledWith({ view: 'explorer', focus: 'cs' });
     expect(chip.getAttribute('aria-pressed')).toBe('true');
     chip.click();
     expect(onChange).toHaveBeenLastCalledWith({ view: 'explorer', focus: null });
@@ -47,7 +47,7 @@ describe('mountViewSwitch', () => {
 
   it('set() does not fire onChange', () => {
     const { api, onChange } = setup();
-    api.set({ view: 'explorer', focus: 'dwl' });
+    api.set({ view: 'explorer', focus: 'gov' });
     expect(onChange).not.toHaveBeenCalled();
   });
 });

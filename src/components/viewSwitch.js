@@ -1,12 +1,16 @@
 const VIEWS = [['ib', 'IB perfect'], ['explorer', 'Explorer']];
 // Each page's focus chips, in order: [focus id, chip label].
+// Subsidy mirrors the tax page: the government perspective (spending and the deadweight loss it
+// leaves), then one lens per side of the market (its free-market surplus and the marginal band
+// the subsidy adds), then the societal lens (just those two bands and the deadweight loss). The ids stay cs / ps / gov so shared links keep working.
 export const SUBSIDY_FOCUSES = Object.freeze([
-  ['cs', 'Consumer surplus'],
-  ['ps', 'Producer surplus'],
-  ['overlap', 'Overlap'],
-  ['gov', 'Government spending'],
-  ['dwl', 'Deadweight loss'],
+  ['gov', 'Government perspective'],
+  ['cs', 'Consumer lens'],
+  ['ps', 'Producer lens'],
+  ['societal', 'Societal lens'],
 ]);
+// Focus ids a shared link may still carry from before the lenses, and what they open now.
+export const SUBSIDY_FOCUS_ALIASES = Object.freeze({ dwl: 'gov', overlap: 'cs' });
 // The government perspective ('revenue' in URLs, kept so shared links work) builds the tax box; each lens is one side of the market: its surplus, its tax burden and its half of the DWL.
 export const TAX_FOCUSES = Object.freeze([
   ['revenue', 'Government perspective'],
