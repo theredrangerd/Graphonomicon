@@ -628,34 +628,76 @@ header.top .mode-link { position: absolute; right: 0; top: calc(clamp(36px, 5vw,
 .focus-chip:hover { border-color: var(--accent); color: var(--ink); }
 .focus-chip[aria-pressed="true"] { background: var(--accent-fill); border-color: var(--accent); color: var(--accent); font-weight: 600; }
 .focus-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-/* The subsidy lenses: four tinted buttons in a row (each lens its stakeholder's colour), the chosen one
-   bolder, and its question beneath. Tinted by the colours the chart already uses for that stakeholder. */
-.focus-bar--lenses { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+/* The subsidy lenses: one wall-chart plate. Four segments (each led by its stakeholder's colour square, the
+   chosen one filled solid in that colour), ruled apart in ink like the brand's other plates; beneath them the
+   chosen lens's question on a caption strip in the same colour. The container's ink shows through the gaps as
+   the rules, so the dividers stay right when the row wraps to two by two. */
+.focus-bar--lenses {
+  --rule: 2px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--rule);
+  margin: 12px 0 8px;
+  border: var(--rule) solid var(--brand-ink);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--brand-ink);
+}
 .focus-bar--lenses .focus-chip {
-  --lens: var(--ink-secondary);
-  padding: 9px 10px;
-  font-size: 13px;
-  border-color: color-mix(in srgb, var(--lens) 32%, var(--hairline));
-  background: color-mix(in srgb, var(--lens) 7%, var(--surface));
-  color: color-mix(in srgb, var(--lens) 75%, var(--ink));
+  --lens: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 11px 10px;
+  border: 0;
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  transition: background-color 0.15s, color 0.15s;
+}
+.focus-bar--lenses .focus-chip::before {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--lens);
 }
 .focus-bar--lenses .focus-chip[data-focus="gov"] { --lens: var(--gov); }
 .focus-bar--lenses .focus-chip[data-focus="cs"] { --lens: var(--demand); }
 .focus-bar--lenses .focus-chip[data-focus="ps"] { --lens: var(--supply); }
-.focus-bar--lenses .focus-chip:hover { border-color: var(--lens); color: var(--ink); }
+.focus-bar--lenses .focus-chip:hover { background: color-mix(in srgb, var(--lens) 10%, var(--surface)); color: var(--ink); border-color: transparent; }
 .focus-bar--lenses .focus-chip[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--lens) 88%, black);
+  color: #fff;
   font-weight: 700;
-  border-color: var(--lens);
-  background: color-mix(in srgb, var(--lens) 18%, var(--surface));
-  color: color-mix(in srgb, var(--lens) 70%, black);
 }
-.focus-bar--lenses .focus-chip:focus-visible { outline-color: var(--lens); }
-.focus-question { grid-column: 1 / -1; margin: 2px 0 0; font-size: 15px; font-weight: 600; color: var(--ink); }
+.focus-bar--lenses .focus-chip[aria-pressed="true"]::before { background: #fff; }
+.focus-bar--lenses .focus-chip:focus-visible { outline: 3px solid var(--lens); outline-offset: -5px; }
+.focus-bar--lenses .focus-chip[aria-pressed="true"]:focus-visible { outline-color: #fff; }
+.focus-question {
+  grid-column: 1 / -1;
+  --lens: var(--ink);
+  margin: 0;
+  padding: 11px 16px 11px 18px;
+  background: color-mix(in srgb, var(--lens) 9%, var(--surface));
+  box-shadow: inset 6px 0 0 var(--lens);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ink);
+}
 .focus-question[hidden] { display: none; }
-.focus-question[data-focus="gov"] { color: var(--gov-ink); }
-.focus-question[data-focus="cs"] { color: color-mix(in srgb, var(--demand) 75%, black); }
-.focus-question[data-focus="ps"] { color: color-mix(in srgb, var(--supply) 75%, black); }
+.focus-question[data-focus="gov"] { --lens: var(--gov); }
+.focus-question[data-focus="cs"] { --lens: var(--demand); }
+.focus-question[data-focus="ps"] { --lens: var(--supply); }
 @media (max-width: 640px) { .focus-bar--lenses { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) { .focus-bar--lenses .focus-chip { transition: none; } }
 
 .detail-popover__hint { margin: 10px 0 0; font-size: 12.5px; color: var(--ink-secondary); }
 

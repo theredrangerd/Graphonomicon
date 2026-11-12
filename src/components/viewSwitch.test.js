@@ -22,7 +22,7 @@ describe('mountViewSwitch', () => {
   it('has the four subsidy chips, government perspective first like the tax page', () => {
     const { bar } = setup('explorer');
     expect([...bar.querySelectorAll('.focus-chip')].map((c) => c.textContent)).toEqual(
-      ['Government perspective', 'Consumer lens', 'Producer lens', 'Societal lens']);
+      ['Government lens', 'Consumer lens', 'Producer lens', 'Societal lens']);
     expect(bar.textContent).toContain('Pick something to highlight:');
   });
 

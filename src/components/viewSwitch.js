@@ -12,7 +12,7 @@ export const SUBSIDY_QUESTIONS = Object.freeze({
 // leaves), then one lens per side of the market (its free-market surplus and the marginal band
 // the subsidy adds), then the societal lens (just those two bands and the deadweight loss). The ids stay cs / ps / gov so shared links keep working.
 export const SUBSIDY_FOCUSES = Object.freeze([
-  ['gov', 'Government perspective'],
+  ['gov', 'Government lens'],
   ['cs', 'Consumer lens'],
   ['ps', 'Producer lens'],
   ['societal', 'Societal lens'],
