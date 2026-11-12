@@ -14,7 +14,7 @@ import { mountViewSwitch, SUBSIDY_FOCUSES, SUBSIDY_FOCUS_ALIASES } from '../comp
 import { mountExplainCard } from '../components/explainCard.js';
 import { whenAnimationsDone } from '../lib/animationSettle.js';
 import { demandTween, explainMarket, stepDemand, fitsEveryExplainMarket, keepStepCardInView } from '../lib/explainRuntime.js';
-import { SUBSIDY_STEPS, LOAF_Q, LOAF_STEP, DOT_Q_MIN, DOT_Q_MAX, TARGET_Q, TARGET_TOLERANCE, snapLoaf, advanceSweep } from './subsidyExplainSteps.js';
+import { SUBSIDY_STEPS, LOAF_Q, LOAF_STEP, DOT_Q_MIN, DOT_Q_MAX, TARGET_Q, TARGET_TOLERANCE, snapLoaf, advanceSweep, EXPLAIN_SUBSIDY_MAX } from './subsidyExplainSteps.js';
 
 export const SUBSIDY_AREA_LABELS = 'full'; // 'full' | 'half' | 'none' — Ms. Patel request 3; flip after she confirms.
 
@@ -258,7 +258,6 @@ export function initSubsidyPage(doc, win = window) {
   // Always the default curves; the subsidy toggle doesn't matter here, only the step does.
 
   const demand = demandTween();
-  let sweptSliderLast = false; // the step just left had the slide-to-the-ends task
   const explainIntervention = (step) => (step.subsidy ? { type: 'subsidy', amount: +subsidySlider.value } : { type: 'none' });
 
   // The draggable cost dot (the "every point on S1 is one loaf" step): `pos` is where the dot
@@ -275,7 +274,7 @@ export function initSubsidyPage(doc, win = window) {
   let cancelSettle = () => {};
   // The revenue step's slide-down-and-back-up: has the subsidy slider reached $0, then the top.
   let sweep = { low: false, high: false };
-  const sweepRange = () => ({ min: +subsidySlider.min, max: +subsidySlider.max });
+  const sweepRange = () => ({ min: +subsidySlider.min, max: EXPLAIN_SUBSIDY_MAX });
 
   // The text always describes the step's own curves, even while the chart is still tweening to them.
   function explainContext(step) {
@@ -410,10 +409,6 @@ export function initSubsidyPage(doc, win = window) {
     armedWait?.resolve(); // a step we're leaving (or replaying) no longer waits
     armed = Boolean(step.trigger);
     armedWait = armed ? deferred() : null;
-    // The revenue step sends the slider to the top and leaves it there; later steps are drawn
-    // for the page's default subsidy, so put it back as the student moves on.
-    if (sweptSliderLast && !step.sliderHalo) subsidySlider.value = subsidySlider.defaultValue;
-    sweptSliderLast = Boolean(step.sliderHalo);
     if (step.sliderHalo) sweep = advanceSweep(sweep, +subsidySlider.value, sweepRange());
     // The dot rests at its starting loaf with the "drag me" hint. No redraw here: the step's own
     // (animated) render comes next and draws it, so its entry fade isn't wiped.
@@ -445,7 +440,7 @@ export function initSubsidyPage(doc, win = window) {
     },
     amount: +subsidySlider.value,
     min: +subsidySlider.min,
-    max: +subsidySlider.max,
+    max: EXPLAIN_SUBSIDY_MAX,
     getContext: () => explainContext(currentStep()),
     // A step with `leave` plays its exit on the chart (the step redrawn with those layers fading)
     // before the card moves on; the promise resolves when it has played.
