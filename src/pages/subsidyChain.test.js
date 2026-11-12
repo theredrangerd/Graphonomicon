@@ -73,6 +73,8 @@ describe('subsidyChain', () => {
     expect(tidy.exit).toEqual(expect.arrayContaining(['csTriangle', 'psTriangle']));
     expect(tidy.only).toEqual(expect.arrayContaining(['marginalCs', 'marginalPs']));
     expect(tidy.only).not.toContain('dwl');
+    expect(tidy.exit).toContain('govFill');
+    expect(leftover.only).not.toContain('govFill');
     expect(leftover.only).not.toContain('csTriangle');
     expect(leftover.enter).toContain('dwl');
   });

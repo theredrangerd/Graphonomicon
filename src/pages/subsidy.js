@@ -76,14 +76,15 @@ export function subsidyChain(focus) {
     const bothTriangles = ['csTriangle', 'psTriangle'];
     return [shift,
       thenLeave({ stage: 'box', only: [...boxTint, 'boxLabel'], enter: ['govFill', 'wedgeBox', 'boxLabel', 'pricesC', 'prices'] }),
-      { stage: 'cs', lens: 'cs', emphasis: 'consumers', only: [...boxTint, 'boxLabel', 'csTriangle', 'focusChip'], enter: ['csTriangle', 'focusChip'], exit: ['boxLabel'], after: 1000 },
-      { stage: 'mcs', lens: 'cs', emphasis: 'consumers', only: [...boxTint, 'csTriangle', 'marginalCs', 'focusChip'], enter: ['marginalCs', 'focusChip'], after: 1500 },
-      { stage: 'ps', lens: 'ps', emphasis: 'producers', only: [...boxTint, 'csTriangle', 'marginalCs', 'psTriangle', 'focusChip'], enter: ['psTriangle', 'focusChip'], after: 2000 },
-      { stage: 'mps', lens: 'ps', emphasis: 'producers', only: [...boxTint, 'csTriangle', 'marginalCs', 'psTriangle', 'marginalPs', 'focusChip'], enter: ['marginalPs', 'focusChip'], after: 1500 },
-      // The producers' chips fade with the triangles (the lens stays `ps` so they are still there to fade).
-      { stage: 'tidy', lens: 'ps', only: [...boxTint, ...bothTriangles, 'marginalCs', 'marginalPs', 'focusChip'], exit: [...bothTriangles, 'focusChip'], after: 1600 },
-      { stage: 'leftover', only: [...boxTint, 'marginalCs', 'marginalPs', 'dwl'], enter: ['dwl'], exit: ['govFill'], after: 1200 },
-      finish({ enter: ['focusChip'], after: 1800 })];
+      { stage: 'cs', lens: 'cs', emphasis: 'consumers', only: [...boxTint, 'boxLabel', 'csTriangle', 'focusChip'], enter: ['csTriangle', 'focusChip'], exit: ['boxLabel'], after: 800 },
+      { stage: 'mcs', lens: 'cs', emphasis: 'consumers', only: [...boxTint, 'csTriangle', 'marginalCs', 'focusChip'], enter: ['marginalCs', 'focusChip'], after: 1100 },
+      { stage: 'ps', lens: 'ps', emphasis: 'producers', only: [...boxTint, 'csTriangle', 'marginalCs', 'psTriangle', 'focusChip'], enter: ['psTriangle', 'focusChip'], after: 1500 },
+      { stage: 'mps', lens: 'ps', emphasis: 'producers', only: [...boxTint, 'csTriangle', 'marginalCs', 'psTriangle', 'marginalPs', 'focusChip'], enter: ['marginalPs', 'focusChip'], after: 1100 },
+      // Everything that was only there to explain goes at once: the old triangles, their chips and the box's tint
+      // (the outline stays), leaving the two marginal bands; then what is left of the box is the deadweight loss.
+      { stage: 'tidy', lens: 'ps', only: [...boxTint, ...bothTriangles, 'marginalCs', 'marginalPs', 'focusChip'], exit: [...bothTriangles, 'govFill', 'focusChip'], after: 1300 },
+      { stage: 'leftover', only: [...boxed, 'marginalCs', 'marginalPs', 'dwl'], enter: ['dwl'], after: 900 },
+      finish({ enter: ['focusChip'], after: 1300 })];
   }
   return [];
 }
