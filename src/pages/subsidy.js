@@ -19,7 +19,7 @@ import { SUBSIDY_STEPS, LOAF_Q, LOAF_STEP, DOT_Q_MIN, DOT_Q_MAX, TARGET_Q, TARGE
 export const SUBSIDY_AREA_LABELS = 'full'; // 'full' | 'half' | 'none' — Ms. Patel request 3; flip after she confirms.
 
 // Explorer focuses that only exist once the subsidy is on, and what the note calls them.
-const SUBSIDY_ONLY_FOCUS = { gov: 'government spending and the deadweight loss', cs: 'the marginal consumer surplus', ps: 'the marginal producer surplus', societal: 'the marginal surpluses and the deadweight loss' };
+const SUBSIDY_ONLY_FOCUS = { gov: 'government spending', cs: 'the marginal consumer surplus', ps: 'the marginal producer surplus', societal: 'the marginal surpluses and the deadweight loss' };
 
 export function initSubsidyPage(doc, win = window) {
   const { backHref, backLabel, siblings } = getFamilyNav('subsidy');
@@ -154,7 +154,6 @@ export function initSubsidyPage(doc, win = window) {
   function updateLegend(focus, subsidised) {
     const shown = ['demand', 'supply', focus];
     if (subsidised && (focus === 'cs' || focus === 'ps')) shown.push(`marginal-${focus}`);
-    if (subsidised && focus === 'gov') shown.push('dwl');
     if (subsidised && focus === 'societal') shown.push('marginal-cs', 'marginal-ps', 'gov', 'dwl');
     // With a subsidy on, the CS/PS triangles are the free-market ones (the marginal bands are
     // listed beside them), so the legend calls them "old" like their chips.
@@ -240,6 +239,7 @@ export function initSubsidyPage(doc, win = window) {
     if (result.noTrade) note = NO_TRADE_NOTE;
     else if (!subsidyActive && SUBSIDY_ONLY_FOCUS[focus]) note = `Turn the subsidy on to see ${SUBSIDY_ONLY_FOCUS[focus]}.`;
     else if (subsidyActive && focus === 'societal') note = societalNote(result, amount);
+    else if (subsidyActive && focus === 'gov') note = `<strong>Government spending: ${fmtMoney(result.govCost)}.</strong> ${fmtMoney(amount)} on every loaf sold, so the dashed box is the government's whole bill.`;
     else if (subsidyActive) note = `<strong>Deadweight loss (DWL): ${fmtMoney(result.DWL)}.</strong> The subsidy pushes output past the efficient quantity — the last few units cost more to produce than buyers value them at.`;
     doc.querySelector('#market-note').innerHTML = note;
   }

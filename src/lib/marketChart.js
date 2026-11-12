@@ -288,8 +288,6 @@ export function resolveLayers(result, { detail = 'full', layers, focus = null, s
     } else if (hasPoly) {
       on.add(FOCUS_LAYER[focus] ?? focus);
       if (focus === 'gov') on.add('wedgeBox');
-      // The subsidy's government perspective: the spending box and what it over-produces (DWL).
-      if (focus === 'gov' && result.mode === 'subsidy' && result.dwlPoly?.length >= 3) on.add('dwl');
       const spec = focusSpec(result, focus);
       if (spec.value > 0.005) on.add('focusChip');
     }
@@ -1490,11 +1488,6 @@ function drawFocusChip(layer, result, focus) {
   // A subsidised CS/PS also names its marginal band, so both areas read in the one view
   // (once the band is drawn).
   const band = result.mode === 'subsidy' ? MARGINAL_BANDS[focus] : null;
-  // The government perspective also names the deadweight loss beside the spending chip.
-  if (focus === 'gov' && layerOn.has('dwl')) {
-    const dwl = focusSpec(result, 'dwl');
-    placeFocusChip(g, dwl, 'dwl', dwl.poly);
-  }
   const surplusChips = g.childNodes.length;
   if (band && layerOn.has(band.layer)) {
     placeFocusChip(g, { label: band.label, value: result[band.value], colorVar: band.colorVar, textVar: 'ink' }, band.region, result[band.poly]);

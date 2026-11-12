@@ -222,7 +222,7 @@ describe('initSubsidyPage — Explain and Play', () => {
   it('offers the government perspective, the two lenses and the societal lens, and opens retired links on their replacements', () => {
     initSubsidyPage(document, fakeWin('subsidy.html?view=explorer&focus=dwl#play'));
     expect([...document.querySelectorAll('.focus-chip')].map((c) => c.dataset.focus)).toEqual(['gov', 'cs', 'ps', 'societal']);
-    expect($('.focus-chip[aria-pressed="true"]').dataset.focus).toBe('gov');
+    expect($('.focus-chip[aria-pressed="true"]').dataset.focus).toBe('societal');
     initSubsidyPage(document, fakeWin('subsidy.html?view=explorer&focus=overlap#play'));
     expect($('.focus-chip[aria-pressed="true"]').dataset.focus).toBe('cs');
   });
@@ -254,21 +254,21 @@ describe('initSubsidyPage — Explain and Play', () => {
     expect(shown).toEqual(['demand', 'supply', 'marginal-cs', 'marginal-ps', 'gov', 'dwl']);
   });
 
-  it('draws the deadweight loss in the government perspective once the subsidy is on', () => {
+  it('draws the spending box, and no deadweight loss, in the government perspective once the subsidy is on', () => {
     initSubsidyPage(document, fakeWin('subsidy.html?view=explorer&focus=gov#play'));
-    expect($('#chart [data-region="dwl"]')).toBeNull();
     toggleOn();
-    expect($('#chart [data-region="dwl"]')).not.toBeNull();
+    expect($('#chart [data-region="dwl"]')).toBeNull();
     expect($('#chart [data-region="subsidy-cost"]')).not.toBeNull();
     const shown = [...document.querySelectorAll('.legend [data-legend]')].filter((i) => !i.hidden).map((i) => i.dataset.legend);
-    expect(shown).toEqual(['demand', 'supply', 'gov', 'dwl']);
+    expect(shown).toEqual(['demand', 'supply', 'gov']);
+    expect($('#market-note').textContent).not.toContain('Deadweight');
     expect($('#market-note').textContent).not.toContain('Turn the subsidy on');
   });
 
   it('says to turn the subsidy on when the Explorer focus has nothing to show', () => {
     initSubsidyPage(document, fakeWin('subsidy.html?view=explorer&focus=gov#play'));
     expect($('#market-note').textContent).toContain('Turn the subsidy on');
-    expect($('#market-note').textContent).toContain('government spending and the deadweight loss');
+    expect($('#market-note').textContent).toContain('government spending');
     toggleOn();
     expect($('#market-note').textContent).not.toContain('Turn the subsidy on');
   });
