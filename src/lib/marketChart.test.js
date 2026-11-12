@@ -751,6 +751,16 @@ describe('focus', () => {
     renderMarketChart(svg, r(0), { detail: 'ib', focus: 'ps' });
     expect(svg.querySelector('.subsidy-arrow')).toBeNull();
   });
+  it('can draw the loaf arrows faint and dotless, for Play\'s shift', () => {
+    const layers = ['demand', 'supply', 'supply2', 'eq1', 'eq2', 'loafDrops'];
+    renderMarketChart(svg, r(), { detail: 'ib', focus: 'cs', layers });
+    expect(svg.querySelectorAll('.loaf-drops__one circle').length).toBeGreaterThan(0);
+    renderMarketChart(svg, r(), { detail: 'ib', focus: 'cs', layers, faintDrops: true });
+    const arrows = [...svg.querySelectorAll('.loaf-drops__one')];
+    expect(arrows.length).toBeGreaterThan(0);
+    expect(svg.querySelectorAll('.loaf-drops__one circle')).toHaveLength(0);
+    expect(arrows.every((a) => Number(a.getAttribute('opacity')) < 0.5)).toBe(true);
+  });
   it('can hold back the Pp line and symbol while keeping the Pc line that tracks e2', () => {
     const result = r();
     const layers = ['demand', 'supply', 'supply2', 'eq1', 'eq2', 'pricesCOnly', 'psTriangle'];

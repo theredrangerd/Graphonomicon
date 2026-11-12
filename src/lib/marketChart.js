@@ -1160,7 +1160,8 @@ function drawLoafDrop(layer, result, captions, q, armed = false, guides = true) 
 // Every loaf: the same drop from several points on S1. The arrow tips line up into S2,
 // which is why S2 is parallel to S1 and exactly the subsidy lower. On the step that brings
 // them in, the arrows draw down one after another.
-function drawLoafDrops(layer, result, skipQ = null) {
+// `faint` (Play's shift): just a whisper of an arrow, no dots, since S2 slides down with it.
+function drawLoafDrops(layer, result, skipQ = null, faint = false) {
   // Clipped to the plot, so an arrow whose tip would land below zero runs under the x axis and
   // is cut off there instead of vanishing.
   const g = el('g', { 'clip-path': 'url(#plotClip)' }, 'loaf-drops');
@@ -1172,7 +1173,8 @@ function drawLoafDrops(layer, result, skipQ = null) {
     if (cost > PMAX) return;
     const x = sx(q), yTop = sy(cost), yBot = sy(customer);
     const one = mark(el('g', {}, 'loaf-drops__one'), 'gov');
-    one.appendChild(el('circle', { cx: x, cy: yTop, r: 3.5, fill: 'var(--supply)' }));
+    if (!faint) one.appendChild(el('circle', { cx: x, cy: yTop, r: 3.5, fill: 'var(--supply)' }));
+    if (faint) one.setAttribute('opacity', '0.28');
     if (yBot - yTop > 12) one.appendChild(arrowMark(x, yTop + 4, x, yBot - 2, { width: 1.8, head: 8, color: 'var(--gov)' }));
     if (entering) {
       one.classList.add('layer-drop');
@@ -1180,7 +1182,7 @@ function drawLoafDrops(layer, result, skipQ = null) {
     }
     g.appendChild(one);
     // The same hollow blue dot the single loaf ends on: where the customer's price lands (S2).
-    if (yBot - yTop > 12 && customer >= 0) {
+    if (!faint && yBot - yTop > 12 && customer >= 0) {
       const tip = customerDot(x, yBot, 'loaf-drops__tip');
       if (entering) {
         tip.classList.add('loaf-drops__tip--enter');
@@ -1378,7 +1380,7 @@ function drawSubsidyTeachingMarks(layer, result, captions, options) {
     if (name) nameArea(layer, result.mode === 'subsidy' ? triPoly : plainPoly, captions[key], name, key);
   }
   if (result.mode !== 'subsidy') return;
-  if (layerOn.has('loafDrops')) drawLoafDrops(layer, result, layerOn.has('loafDrop') ? (options.loafQ ?? DEFAULT_LOAF_Q) : null);
+  if (layerOn.has('loafDrops')) drawLoafDrops(layer, result, layerOn.has('loafDrop') ? (options.loafQ ?? DEFAULT_LOAF_Q) : null, Boolean(options.faintDrops));
   if (layerOn.has('loafDrop')) drawLoafDrop(layer, result, captions, options.loafQ ?? DEFAULT_LOAF_Q, Boolean(options.loafArmed), options.loafGuides !== false);
   if (layerOn.has('priceBrackets')) drawPriceBrackets(layer, result, captions);
   if (layerOn.has('revenueDims')) drawRevenueDims(layer, result, captions);

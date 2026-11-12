@@ -224,6 +224,7 @@ export function initSubsidyPage(doc, win = window) {
       (step.add ?? []).forEach((name) => held.add(name));
       options.layers = [...held];
       options.captions = {};
+      options.faintDrops = true; // the line slides with the arrows, so they only need to hint at the drop
       if (focus === 'gov' || focus === 'societal') {
         Object.assign(options.captions, {
           strip: `1 loaf: ${fmtMoney(amount)}`,
