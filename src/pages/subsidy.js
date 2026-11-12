@@ -26,6 +26,9 @@ const SUBSIDY_ONLY_FOCUS = { gov: 'government spending', cs: 'the marginal consu
 // changed by `drop` and `add`; `enter`/`grow`/`exit` animate layers on that step (marketChart.js).
 const BASE = ['demand', 'supply', 'eq1'];
 const BASELINE = { cs: ['csTriangle', 'focusChip'], ps: ['psTriangle', 'focusChip'] }; // already there before the toggle
+// The step after the shift waits for the toggle's tween to finish: a tween frame landing after it would
+// re-render without the step's `enter` and cut its animation short.
+const TWEEN_SETTLE_MS = 150;
 const SHIFT_MS = 1000; // the arrows grow down and S2 and e2 slide with them (the toggle's tween, same length)
 const FINAL_PARTS = ['wedgeBox', 'marginalCs', 'marginalPs', 'dwl', 'focusChip'];
 export function subsidyChain(focus) {
@@ -37,7 +40,7 @@ export function subsidyChain(focus) {
   // on S2, with its line to the quantity axis) slides along. The page's toggle tween drives it, so no
   // layer enters here; the next step brings the arrows back out.
   const shift = { stage: 'shift', only: [...atE2, 'loafDrops'], after: 0 };
-  const thenLeave = (step) => ({ ...step, only: [...step.only, 'loafDrops'], exit: [...(step.exit ?? []), 'loafDrops'], after: SHIFT_MS });
+  const thenLeave = (step) => ({ ...step, only: [...step.only, 'loafDrops'], exit: [...(step.exit ?? []), 'loafDrops'], after: SHIFT_MS + TWEEN_SETTLE_MS });
   const finish = (extra = {}) => ({ stage: 'final', ...extra });
   if (focus === 'cs') {
     return [shift,
