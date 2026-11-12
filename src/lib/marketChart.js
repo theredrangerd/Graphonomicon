@@ -1287,7 +1287,8 @@ function drawPriceBrackets(layer, result, captions) {
 // right, so the box is seen being paid for loaf by loaf.
 // One strip, a quarter of the way along, is picked out and named (captions.strip) so
 // "a strip = one loaf" can be seen before the eye takes in the whole row.
-function drawGovStrips(fills, layer, result, captions) {
+// `fromRight`: the strips fill in from Q_subsidy back to the axis instead of from the axis out (Play's Government lens).
+function drawGovStrips(fills, layer, result, captions, fromRight = false) {
   const perUnit = Math.abs(result.Pp - result.Pc);
   if (!(perUnit > 0) || !(result.Q > 0)) return;
   const g = el('g', { 'data-region': result.mode === 'tax' ? 'tax-revenue' : 'subsidy-cost', 'data-layer': 'govStrips', 'data-mark': 'gov' }, 'region region--fill gov-strips');
@@ -1306,7 +1307,7 @@ function drawGovStrips(fills, layer, result, captions) {
     }, i === pick ? 'gov-strip gov-strip--pick' : 'gov-strip');
     if (entering) {
       r.classList.add('layer-enter');
-      r.style.setProperty('--d', String(Math.round((i / n) * 1400))); // ms at 1× pace
+      r.style.setProperty('--d', String(Math.round(((fromRight ? n - 1 - i : i) / n) * 1400))); // ms at 1× pace
     }
     g.appendChild(r);
   }
@@ -1912,7 +1913,7 @@ export function renderMarketChart(svg, result, options = {}) {
       govG.appendChild(el('polygon', { points: pts(result.wedgePoly), fill: 'var(--gov-fill)' }, 'gov-fill'));
       fills.appendChild(tag(govG, 'govFill'));
     }
-    if ((result.mode === 'subsidy' || isOpenTax(result)) && on.has('govStrips')) drawGovStrips(fills, layer, result, captions);
+    if ((result.mode === 'subsidy' || isOpenTax(result)) && on.has('govStrips')) drawGovStrips(fills, layer, result, captions, Boolean(options.stripsFromRight));
     if (result.mode === 'subsidy' && on.has('revenueBox')) drawRevenueBox(fills, layer, result, captions);
   }
 

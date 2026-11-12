@@ -773,6 +773,18 @@ describe('focus', () => {
     renderMarketChart(svg, r(), opts());
     expect(svg.querySelector('.ghost-out')).toBeNull();
   });
+  it('can fill the government strips from the right', () => {
+    const layers = ['demand', 'supply', 'supply2', 'eq1', 'eq2', 'govStrips'];
+    const delays = (opts) => {
+      renderMarketChart(svg, r(), { detail: 'ib', focus: 'gov', layers, enter: ['govStrips'], ...opts });
+      return [...svg.querySelectorAll('.gov-strip')].map((strip) => Number(strip.style.getPropertyValue('--d')));
+    };
+    const ltr = delays({}), rtl = delays({ stripsFromRight: true });
+    expect(ltr[0]).toBe(0);
+    expect(ltr.at(-1)).toBeGreaterThan(ltr[0]);
+    expect(rtl.at(-1)).toBeLessThan(rtl[0]);
+    expect(rtl.at(-1)).toBe(0);
+  });
   it('can draw the loaf arrows faint and dotless, for Play\'s shift', () => {
     const layers = ['demand', 'supply', 'supply2', 'eq1', 'eq2', 'loafDrops'];
     renderMarketChart(svg, r(), { detail: 'ib', focus: 'cs', layers });
