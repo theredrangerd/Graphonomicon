@@ -53,6 +53,47 @@ describe('attachRegionExplainers at every detail level', () => {
   });
 });
 
+describe('highlight survives a re-render', () => {
+  const base = { demand: 140, supply: 20, slopeD: 1, slopeS: 1 };
+  function setup() {
+    document.body.innerHTML = '';
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'market-chart');
+    document.body.appendChild(svg);
+    const draw = () => renderMarketChart(svg, computeMarket({ ...base, intervention: { type: 'subsidy', amount: 10 } }), { showSurplusLabels: true });
+    draw();
+    attachRegionExplainers(svg);
+    return { svg, draw };
+  }
+
+  // The toggle tween redraws every frame and the redraw replaces the nodes, so a hovered or
+  // tapped area would otherwise lose its highlight until the pointer next moves (the flash).
+  it('keeps the hovered area lit through a redraw', () => {
+    const { svg, draw } = setup();
+    svg.querySelector('[data-region="ps"]').dispatchEvent(new MouseEvent('pointerover', { bubbles: true }));
+    draw();
+    expect(svg.querySelector('[data-region="ps"]').classList.contains('region-hover')).toBe(true);
+  });
+
+  it('drops the highlight once the pointer has left, even across a redraw', () => {
+    const { svg, draw } = setup();
+    const ps = svg.querySelector('[data-region="ps"]');
+    ps.dispatchEvent(new MouseEvent('pointerover', { bubbles: true }));
+    ps.dispatchEvent(new MouseEvent('pointerout', { bubbles: true }));
+    draw();
+    expect(svg.querySelector('.region-hover')).toBeNull();
+  });
+
+  it('keeps a tapped area active, and tapping it again still closes the explainer', () => {
+    const { svg, draw } = setup();
+    svg.querySelector('[data-region="ps"]').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    draw();
+    expect(svg.querySelector('[data-region="ps"]').classList.contains('region-active')).toBe(true);
+    svg.querySelector('[data-region="ps"]').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(document.querySelector('.region-popover')).toBeNull();
+  });
+});
+
 describe('explainer context notes', () => {
   const base = { demand: 140, supply: 20, slopeD: 1, slopeS: 1 };
 
@@ -147,7 +188,7 @@ describe('subsidy explainers', () => {
     renderMarketChart(svg, computeMarket({ ...DEFAULT_MARKET, intervention: { type: 'subsidy', amount: 20 } }), { detail: 'ib' });
     attachRegionExplainers(svg);
     expect(svg.querySelector('[data-region="cs"]')).toBeNull();
-    for (const [key, pill, title] of [['cs-original', 'CS', 'Consumer Surplus (before the subsidy)'], ['ps-original', 'PS', 'Producer Surplus (before the subsidy)']]) {
+    for (const [key, pill, title] of [['cs-original', 'old CS', 'Consumer Surplus (before the subsidy)'], ['ps-original', 'old PS', 'Producer Surplus (before the subsidy)']]) {
       svg.querySelector(`[data-region="${key}"]`).dispatchEvent(new MouseEvent('click', { bubbles: true }));
       const pop = document.querySelector('.region-popover');
       expect(pop.querySelector('h4').textContent).toBe(title);

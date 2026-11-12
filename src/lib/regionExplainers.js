@@ -91,8 +91,8 @@ export const REGION_BADGES = {
   'bakery-revenue': 'Revenue',
   'marginal-cs': 'mCS',
   'marginal-ps': 'mPS',
-  'cs-original': 'CS',
-  'ps-original': 'PS',
+  'cs-original': 'old CS',
+  'ps-original': 'old PS',
 };
 
 function getContextNote(key, result) {
@@ -173,6 +173,21 @@ function getStatValue(key, result) {
 export function attachRegionExplainers(svg) {
   let popover = null;
   let activeRegion = null;
+  // Highlight state is kept by region key, not by node: renderMarketChart rebuilds every node
+  // on each draw (the toggle tween draws every frame), which would otherwise drop the class
+  // until the pointer next moved.
+  let hoverKey = null;
+
+  // Called by renderMarketChart after each draw: put the highlight back on the new nodes, and
+  // point activeRegion at the new node so tapping it again still closes its explainer.
+  svg._restoreRegionState = () => {
+    if (hoverKey) svg.querySelectorAll(`[data-region="${hoverKey}"]`).forEach((el) => el.classList.add('region-hover'));
+    if (!activeRegion) return;
+    const key = activeRegion.dataset.region;
+    const nodes = svg.querySelectorAll(`[data-region="${key}"]`);
+    nodes.forEach((el) => el.classList.add('region-active'));
+    if (nodes.length && !activeRegion.isConnected) activeRegion = nodes[0];
+  };
 
   // Works at every detail level: Clean / IB perfect drop the chips, but tapping a shaded
   // area still explains it.
@@ -289,6 +304,7 @@ export function attachRegionExplainers(svg) {
     const region = findRegion(e.target);
     if (region) {
       const key = region.dataset.region;
+      hoverKey = key;
       svg.querySelectorAll(`[data-region="${key}"]`).forEach((el) => el.classList.add('region-hover'));
     }
   });
@@ -296,6 +312,7 @@ export function attachRegionExplainers(svg) {
     const region = findRegion(e.target);
     if (region) {
       const key = region.dataset.region;
+      if (hoverKey === key) hoverKey = null;
       svg.querySelectorAll(`[data-region="${key}"]`).forEach((el) => el.classList.remove('region-hover'));
     }
   });
@@ -342,6 +359,7 @@ export function attachRegionExplainers(svg) {
   return {
     close() {
       closePopover();
+      hoverKey = null;
       svg.querySelectorAll('.region-hover').forEach((el) => el.classList.remove('region-hover'));
     },
   };

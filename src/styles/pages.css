@@ -852,6 +852,12 @@ input[type="range"]::-moz-range-thumb {
 .market-chart .layer-enter { animation: layer-enter 400ms ease-out both; }
 .market-chart .layer-grow { transform-box: fill-box; transform-origin: left center; animation: layer-grow 400ms ease-out 400ms both; }
 @keyframes layer-enter { from { opacity: 0; } }
+/* The cost dot seeps in slowly (dot, guides, tags); the card's words then fade in (500ms), and
+   only after that do the halo and the "drag me" hint arrive, together. */
+.market-chart .cost-dot.layer-enter { animation-duration: 900ms; animation-timing-function: ease-in-out; }
+body[data-mode="explain"] .market-chart .cost-dot.layer-enter { animation-duration: calc(var(--pace) * 700ms); }
+.market-chart .cost-dot.layer-enter .dot-target,
+.market-chart .cost-dot.layer-enter .drag-hint { animation: layer-enter calc(var(--pace) * 400ms) ease-in-out calc(var(--pace) * 1400ms + 600ms) both; }
 .market-chart .layer-exit { animation: layer-exit 700ms ease-in both; }
 @keyframes layer-exit { to { opacity: 0; } }
 /* Overlap view, one beat at a time. The Pp line is drawn out from the axis; consumer surplus wipes down out of Pe and producer surplus wipes up out of Pe, each revealing its true
@@ -884,6 +890,10 @@ body[data-mode="explain"] .market-chart [data-layer="marginalCs"] .layer-grow { 
 /* Subsidy Explain: each "every loaf" arrow draws down out of S1, one after another. */
 .market-chart .layer-drop { transform-box: fill-box; transform-origin: center top; animation: layer-drop calc(var(--pace) * 450ms) ease-in-out calc(var(--pace) * var(--d, 0) * 1ms) both; }
 @keyframes layer-drop { from { opacity: 0; transform: scaleY(0); } }
+/* Each arrow's blue tip dot appears once its arrow has landed (the arrow takes 450ms from its own delay). */
+.market-chart .loaf-drops__tip--enter { animation: layer-enter calc(var(--pace) * 300ms) ease-out calc(var(--pace) * (var(--d, 0) * 1ms + 450ms)) both; }
+.market-chart [data-layer="govFill"].layer-enter { animation-duration: calc(var(--pace) * 900ms); animation-timing-function: ease-in-out; }
+.market-chart .gov-strips.layer-exit, .market-chart .gov-strips__name.layer-exit { animation-duration: calc(var(--pace) * 900ms); animation-timing-function: ease-in-out; }
 .market-chart .gov-strip.layer-enter { animation-duration: calc(var(--pace) * 260ms); animation-delay: calc(var(--pace) * var(--d, 0) * 1ms); }
 body[data-mode="explain"] .market-chart .gov-strip.layer-enter { animation-duration: calc(var(--pace) * 260ms); }
 .market-chart .gov-strips:is(.region-hover, .region-active) .gov-strip:not(.gov-strip--pick) { fill-opacity: 0.35; }
@@ -943,6 +953,9 @@ body[data-mode] .market-chart .eq2-line.layer-enter { transform-box: fill-box; t
 .market-chart .loaf-drop__later { animation: layer-enter calc(var(--pace) * 500ms) ease-out calc(var(--pace) * 1700ms) both; }
 /* Two prices: the customer's bracket rises from the axis, then the government's part on top,
    then the arrow up to S1 with the Pp line and its axis symbol. */
+.market-chart .pb-total-label--grow { transform-box: fill-box; transform-origin: left center; animation: label-swell 800ms ease-out both; }
+.market-chart .pb-total-label--big { transform-box: fill-box; transform-origin: left center; transform: scale(1.7); }
+@keyframes label-swell { to { transform: scale(1.7); } }
 .market-chart .price-brackets--enter .pb-customer { transform-box: fill-box; transform-origin: center bottom; animation: rise calc(var(--pace) * 900ms) ease-in-out both; }
 .market-chart .price-brackets--enter .pb-customer-label { animation: layer-enter calc(var(--pace) * 400ms) ease-out calc(var(--pace) * 700ms) both; }
 .market-chart .price-brackets--enter .pb-gov { transform-box: fill-box; transform-origin: center bottom; animation: rise calc(var(--pace) * 800ms) ease-in-out calc(var(--pace) * 1300ms) both; }
@@ -961,6 +974,10 @@ body[data-mode] .market-chart .eq2-line.layer-enter { transform-box: fill-box; t
 .market-chart[data-hot="cost"] [data-mark]:not([data-mark~="cost"]),
 .market-chart[data-hot="gov"] [data-mark]:not([data-mark~="gov"]),
 .market-chart[data-hot="customer"] [data-mark]:not([data-mark~="customer"]),
+.market-chart[data-hot="cs"] [data-mark]:not([data-mark~="cs"]),
+.market-chart[data-hot="mcs"] [data-mark]:not([data-mark~="mcs"]),
+.market-chart[data-hot="ps"] [data-mark]:not([data-mark~="ps"]),
+.market-chart[data-hot="mps"] [data-mark]:not([data-mark~="mps"]),
 .market-chart[data-hot="pe"] [data-mark]:not([data-mark~="pe"]),
 .market-chart[data-hot="qe"] [data-mark]:not([data-mark~="qe"]),
 .market-chart[data-hot="qty"] [data-mark]:not([data-mark~="qty"]),
@@ -975,16 +992,45 @@ body[data-mode] .market-chart .eq2-line.layer-enter { transform-box: fill-box; t
 .market-chart[data-hot="qty"] line[data-mark~="qty"][stroke-dasharray] { stroke-dasharray: none; stroke-width: 2.4; stroke: var(--ink); stroke-opacity: 1; }
 .market-chart[data-hot="dwl"] line[data-mark~="dwl"][stroke-dasharray] { stroke-dasharray: none; stroke-width: 2.4; stroke: var(--dwl-line); stroke-opacity: 1; }
 .term { font-weight: 700; border-bottom: 2px solid currentColor; cursor: default; }
-.term--cost { color: var(--supply); }
+.term--cost, .term--ps, .term--mps { color: var(--supply); }
 .term--gov { color: var(--gov); }
-.term--customer { color: var(--demand); }
+.term--customer, .term--cs, .term--mcs { color: var(--demand); }
 .term--pe, .term--qe, .term--qty { color: var(--ink); }
 .term--dwl { color: var(--dwl-line); }
+/* Explain, "The subsidy grows consumer surplus" (data-seq="cs-grows") and its mirror for the bakery
+   (data-seq="ps-grows"): an arrow drops from S1 at every loaf (the existing loafDrops entry, S2 fading in
+   through their tips), then the arrows clear and e2 pops in. Consumers: the Pc line is drawn out from e2 to
+   the axis, then the extra band fills down from Pe to Pc. Bakery: an arrow rises from e2 to S1, the Pp line
+   is drawn out from its tip, then the extra band fills up from Pe to Pp. */
+body[data-mode] .market-chart:is([data-seq="cs-grows"], [data-seq="ps-grows"]) [data-layer="loafDrops"] { pointer-events: none; animation: layer-exit calc(var(--pace) * 400ms) ease-out calc(var(--pace) * 2300ms) both; }
+body[data-mode] .market-chart:is([data-seq="cs-grows"], [data-seq="ps-grows"]) .eq2-dot.layer-enter { animation-delay: calc(var(--pace) * 2500ms); }
+body[data-mode] .market-chart:is([data-seq="cs-grows"], [data-seq="ps-grows"]) .eq-label.layer-enter[data-layer="eq2"] { animation-delay: calc(var(--pace) * 2800ms); }
+body[data-mode] .market-chart:is([data-seq="cs-grows"], [data-seq="ps-grows"]) .eq2-line.layer-enter { animation-delay: calc(var(--pace) * 2900ms); }
+body[data-mode] .market-chart:is([data-seq="cs-grows"], [data-seq="ps-grows"]) .axis-symbol.layer-enter[data-layer="eq2"] { animation-delay: calc(var(--pace) * 3500ms); }
+body[data-mode] .market-chart[data-seq="cs-grows"] line.wedge-line.layer-enter[data-layer="pricesC"] { transform-box: fill-box; transform-origin: right center; animation: layer-grow calc(var(--pace) * 800ms) ease-in-out calc(var(--pace) * 3200ms) both; }
+body[data-mode] .market-chart[data-seq="cs-grows"] .axis-symbol.layer-enter[data-layer="pricesC"] { animation: layer-enter calc(var(--pace) * 400ms) ease-out calc(var(--pace) * 4000ms) both; }
+body[data-mode] .market-chart[data-seq="cs-grows"] [data-layer="marginalCs"].layer-enter { animation: wipe-down calc(var(--pace) * 800ms) cubic-bezier(0.4, 0, 0.25, 1) calc(var(--pace) * 4100ms) both; }
+body[data-mode] .market-chart[data-seq="ps-grows"] [data-layer="subsidyArrow"].layer-enter { transform-box: fill-box; transform-origin: center bottom; animation: rise calc(var(--pace) * 600ms) ease-in-out calc(var(--pace) * 3200ms) both; }
+body[data-mode] .market-chart[data-seq="ps-grows"] line.wedge-line.layer-enter[data-layer="prices"] { transform-box: fill-box; transform-origin: right center; animation: layer-grow calc(var(--pace) * 800ms) ease-in-out calc(var(--pace) * 3900ms) both; }
+body[data-mode] .market-chart[data-seq="ps-grows"] .axis-symbol.layer-enter[data-layer="prices"] { animation: layer-enter calc(var(--pace) * 400ms) ease-out calc(var(--pace) * 4700ms) both; }
+body[data-mode] .market-chart[data-seq="ps-grows"] [data-layer="marginalPs"].layer-enter { animation: wipe-up calc(var(--pace) * 800ms) cubic-bezier(0.4, 0, 0.25, 1) calc(var(--pace) * 4800ms) both; }
+/* Explain, "Back to the box" (data-seq="box"): the government's box outline goes solid purple, a little heavier. */
+body[data-mode] .market-chart[data-seq="box"] .wedge-outline { stroke-width: 3; stroke-dasharray: none; }
+.market-chart .dwl-unknown__mark { font-weight: 700; pointer-events: none; }
+/* Explain, "Both sides together" (data-seq="join"): the CS triangle fades in beside the PS one, the Pc line is
+   drawn out from e2, the blue band rises from Pc to meet the orange band at Pe, then both bands pulse once
+   (opacity only, nothing changes size) to say they're two halves of one stack. */
+@keyframes band-meet { 50% { opacity: 0.45; } }
+body[data-mode] .market-chart[data-seq="join"] line.wedge-line.layer-enter[data-layer="pricesC"] { transform-box: fill-box; transform-origin: right center; animation: layer-grow calc(var(--pace) * 800ms) ease-in-out calc(var(--pace) * 600ms) both; }
+body[data-mode] .market-chart[data-seq="join"] .axis-symbol.layer-enter[data-layer="pricesC"] { animation: layer-enter calc(var(--pace) * 400ms) ease-out calc(var(--pace) * 1400ms) both; }
+body[data-mode] .market-chart[data-seq="join"] [data-layer="marginalCs"].layer-enter { animation: wipe-up calc(var(--pace) * 900ms) cubic-bezier(0.4, 0, 0.25, 1) calc(var(--pace) * 1500ms) both; }
+body[data-mode] .market-chart[data-seq="join"] :is([data-layer="marginalCs"], [data-layer="marginalPs"]) polygon.wedge-fill { animation: band-meet calc(var(--pace) * 800ms) ease-in-out calc(var(--pace) * 2500ms) both; }
+@media (prefers-reduced-motion: reduce) { body[data-mode] .market-chart[data-seq] [data-layer="loafDrops"] { display: none; } body[data-mode] .market-chart[data-seq] * { animation: none !important; } }
 /* ...and S2 waits for the arrows to land before it fades in through their tips. */
 .market-chart:has(.layer-drop) [data-layer="supply2"].layer-enter { animation-delay: calc(var(--pace) * 1650ms); }
 .market-chart.is-dragging .cost-dot .teach-label { font-size: 22px; font-weight: 700; stroke-width: 6px; }
 .market-chart .teach-label { font-size: 13px; font-weight: 600; paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; pointer-events: none; }
-@media (prefers-reduced-motion: reduce) { .market-chart .drag-hint, .market-chart .drag-hint__bob, .market-chart .subsidise, .market-chart .subsidise-ring, .market-chart .drag-hint__chevron, .market-chart .cost-dot__ring, .market-chart .dot-target__ring, .market-chart .loaf-drop__arrow, .market-chart .loaf-drop__arrow-label, .market-chart .loaf-drop__later, .market-chart .price-brackets--enter *, .market-chart .eq2-dot.layer-enter, .market-chart .eq2-line.layer-enter, .market-chart .rev-dims--enter *, .market-chart .rev-box--enter *, .market-chart .rev-box__label--enter, .market-chart:has(.price-brackets--enter) .price-line--producer, .market-chart:has(.price-brackets--enter) .axis-symbol--pp, .market-chart:has(.price-brackets--enter) .subsidy-arrow, .market-chart .layer-drop, .market-chart .layer-exit, .market-chart .layer-enter, .market-chart .layer-grow, .market-chart [data-layer] .layer-grow, .market-chart[data-focus] [data-layer] .layer-grow, .market-chart[data-focus] .wedge-line.layer-grow, .market-chart[data-focus] .overlap-fill.layer-grow { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .market-chart .drag-hint, .market-chart .drag-hint__bob, .market-chart .subsidise, .market-chart .subsidise-ring, .market-chart .drag-hint__chevron, .market-chart .cost-dot__ring, .market-chart .dot-target__ring, .market-chart .loaf-drop__arrow, .market-chart .loaf-drop__arrow-label, .market-chart .loaf-drop__later, .market-chart .price-brackets--enter *, .market-chart .eq2-dot.layer-enter, .market-chart .eq2-line.layer-enter, .market-chart .rev-dims--enter *, .market-chart .rev-box--enter *, .market-chart .rev-box__label--enter, .market-chart:has(.price-brackets--enter) .price-line--producer, .market-chart:has(.price-brackets--enter) .axis-symbol--pp, .market-chart:has(.price-brackets--enter) .subsidy-arrow, .market-chart .layer-drop, .market-chart .loaf-drops__tip--enter, .market-chart .layer-exit, .market-chart .layer-enter, .market-chart .cost-dot.layer-enter .dot-target, .market-chart .cost-dot.layer-enter .drag-hint, .market-chart .pb-total-label--grow, .market-chart .layer-grow, .market-chart [data-layer] .layer-grow, .market-chart[data-focus] [data-layer] .layer-grow, .market-chart[data-focus] .wedge-line.layer-grow, .market-chart[data-focus] .overlap-fill.layer-grow { animation: none; } }
 
 /* Region badges (CS, PS, DWL) */
 .market-chart .region-badge {
@@ -1322,6 +1368,7 @@ body[data-mode] .market-chart .eq2-line.layer-enter { transform-box: fill-box; t
 .explain-card__count { margin: 0; font-size: 12px; color: var(--ink-secondary); letter-spacing: .04em; text-transform: uppercase; }
 .explain-card h3 { margin: 0; font-size: 18px; }
 .gov-ink { color: var(--gov-ink); }
+.dwl-ink { color: var(--dwl-ink); }
 .explain-card__text { margin: 0; line-height: 1.5; }
 .explain-card__think { margin: 0; --think-size: 1em; font-size: calc(var(--think-size) * (1 + var(--near, 0))); transition: font-size 120ms ease-out; font-style: italic; color: var(--ink-secondary); line-height: 1.45; }
 .explain-card__think:not(.explain-card__think--do)::before { content: "Think: "; font-style: normal; font-weight: 700; color: var(--gov); }
@@ -1343,8 +1390,20 @@ body[data-mode] .market-chart .eq2-line.layer-enter { transform-box: fill-box; t
    then fades in. */
 .explain-card > :is(.explain-card__text, .explain-card__think, .explain-card__readout, .explain-card__slider) { transition: opacity 500ms ease-out; }
 .explain-card--waiting > :is(.explain-card__text, .explain-card__think:not(.explain-card__think--do), .explain-card__readout, .explain-card__slider) { opacity: 0; pointer-events: none; transition: none; }
+.explain-card > .explain-card__think--delayed { opacity: 0; pointer-events: none; }
+.explain-card--waiting > .explain-card__think--with-slider { opacity: 0; pointer-events: none; transition: none; }
 .explain-card__slider[hidden] { display: none; }
+.explain-card__slider { position: relative; }
 .explain-slider { width: 100%; }
+.explain-card__slider-note { margin: 0; font-weight: 700; color: var(--supply); }
+.explain-card__slider-note[hidden] { display: none; }
+/* The halo on the slider's end that the student is asked to slide to (a step's sliderHalo),
+   the same dashed orange ring as the chart's dot target. */
+.explain-slider-halo { position: absolute; top: 50%; width: 32px; height: 32px; margin-top: -16px; border-radius: 50%; box-sizing: border-box; pointer-events: none; border: 2.5px dashed var(--supply); background: color-mix(in srgb, var(--supply) 16%, transparent); animation: target-pulse 1400ms ease-in-out infinite; }
+.explain-slider-halo[hidden] { display: none; }
+.explain-slider-halo[data-end="min"] { left: -8px; }
+.explain-slider-halo[data-end="max"] { right: -8px; }
+@media (prefers-reduced-motion: reduce) { .explain-slider-halo { animation: none; } }
 .explain-card__nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .explain-card__back-group { display: flex; gap: 8px; }
 .explain-card__dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
@@ -1588,3 +1647,9 @@ h1 .level-pill { font-size: 14px; vertical-align: middle; margin-left: 10px; let
 }
 /* Photo tiles carry their title on a paper band, so the old white fade-out isn't needed. */
 .bento--diagrams .bento__tile::before { background-image: none; }
+
+/* Explain mode: the chart's title names the policy being explained, with the word itself a little bigger. */
+.chart-title__word { font-size: 1.3em; }
+
+/* Digits the same width, so a changing number doesn't nudge the words around it. */
+.explain-card__text, .explain-card__readout { font-variant-numeric: tabular-nums; }
