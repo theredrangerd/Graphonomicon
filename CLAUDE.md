@@ -92,6 +92,10 @@ These are explicitly deferred, not oversights. Flag them to the user rather than
 - GitHub Pages deploy workflow (base path config, GitHub Actions) — needed before the site is live, not before local build/preview.
 - Macroeconomics / International / Development roadmaps — same exercise as Microeconomics' roadmap, deliberately deferred until Microeconomics is underway.
 
+## Removed features live in git history
+
+Removals are committed on their own, after a checkpoint commit that still has the old feature, with "REMOVED:" in the message naming the restore point. To bring one back, find it with `git log --grep REMOVED` and revert that commit or check out its parent. Keep this convention when committing future removals.
+
 ## Known environment gap
 
 This environment has previously lacked `git@github.com` SSH push access (publickey denied). Verify push access works before assuming a commit reached `origin/main`; if push fails, say so rather than reporting the change as shipped.
