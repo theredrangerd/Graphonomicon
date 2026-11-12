@@ -12,23 +12,27 @@ describe('subsidyChain', () => {
     expect(shift.stage).toBe('shift');
     expect(shift.only).toEqual(expect.arrayContaining(['loafDrops', 'supply2', 'eq2']));
     expect(shift.only).not.toContain('prices');
-    expect(shift.only).not.toContain('pricesCOnly');
     expect(shift.enter ?? []).toEqual([]);
     expect(shift.after).toBe(0);
+  });
+
+  it('carries the Pc line with e2 during the consumer and producer shifts, and not on the others', () => {
+    expect(subsidyChain('cs')[0].only).toContain('pricesCOnly');
+    expect(subsidyChain('ps')[0].only).toContain('pricesCOnly');
+    expect(subsidyChain('gov')[0].only).not.toContain('pricesCOnly');
+    expect(subsidyChain('societal')[0].only).not.toContain('pricesCOnly');
   });
 
   it.each(FOCUSES)('%s ends on the finished picture and takes the arrows back out after the shift', (focus) => {
     const chain = subsidyChain(focus);
     expect(chain.at(-1).stage).toBe('final');
     expect(chain[1].exit).toContain('loafDrops');
-    expect(chain[1].only).toContain('loafDrops');
+    expect([...(chain[1].only ?? []), ...(chain[1].add ?? [])]).toContain('loafDrops');
   });
 
-  it('gives the consumer lens only the Pc line after the shift, then the band', () => {
-    expect(stages('cs')).toEqual(['shift', 'pc', 'final']);
-    expect(subsidyChain('cs')[1].only).toContain('pricesCOnly');
-    expect(subsidyChain('cs')[1].only).not.toContain('prices');
-    expect(subsidyChain('cs')[1].only).not.toContain('marginalCs');
+  it('gives the consumer lens nothing between the shift and its band', () => {
+    expect(stages('cs')).toEqual(['shift', 'final']);
+    expect(subsidyChain('cs')[1].enter).toEqual(expect.arrayContaining(['marginalCs']));
   });
 
   it('gives the producer lens the arrow up to what the bakery receives, before the band', () => {

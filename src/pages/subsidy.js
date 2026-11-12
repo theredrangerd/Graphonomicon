@@ -39,17 +39,17 @@ export function subsidyChain(focus) {
   // One motion, not three: the arrows grow down from S1 as S2 slides down with them, and e2 (already
   // on S2, with its line to the quantity axis) slides along. The page's toggle tween drives it, so no
   // layer enters here; the next step brings the arrows back out.
-  const shift = { stage: 'shift', only: [...atE2, 'loafDrops'], after: 0 };
+  // The consumer and producer lenses carry the Pc line with e2 (it is e2's price on the demand curve).
+  const shift = { stage: 'shift', only: [...atE2, 'loafDrops', ...(focus === 'cs' || focus === 'ps' ? ['pricesCOnly'] : [])], after: 0 };
   const thenLeave = (step) => ({ ...step, only: [...step.only, 'loafDrops'], exit: [...(step.exit ?? []), 'loafDrops'], after: SHIFT_MS + TWEEN_SETTLE_MS });
   const finish = (extra = {}) => ({ stage: 'final', ...extra });
   if (focus === 'cs') {
     return [shift,
-      thenLeave({ stage: 'pc', only: [...atE2, 'pricesCOnly'], enter: ['pricesC'] }),
-      finish({ enter: ['marginalCs', 'focusChip'], after: 1000 })];
+      finish({ add: ['loafDrops'], exit: ['loafDrops'], enter: ['marginalCs', 'focusChip'], after: SHIFT_MS + TWEEN_SETTLE_MS })];
   }
   if (focus === 'ps') {
     return [shift,
-      thenLeave({ stage: 'received', only: [...atE2, 'prices', 'subsidyArrow'], enter: ['subsidyArrow', 'prices', 'pricesC'] }),
+      thenLeave({ stage: 'received', only: [...atE2, 'prices', 'subsidyArrow'], enter: ['subsidyArrow', 'prices'] }),
       finish({ enter: ['marginalPs', 'focusChip'], after: 1100 })];
   }
   const prices = thenLeave({ stage: 'prices', only: priced, enter: ['pricesC', 'prices'] });
