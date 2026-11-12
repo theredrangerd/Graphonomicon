@@ -266,6 +266,7 @@ export function initIndirectTaxPage(doc, win = window) {
       options.faintDrops = true; // the line rises with the arrows, so they only need to hint at the lift
       if (step.emphasis) options.emphasis = step.emphasis;
       options.captions = { lostLeft: 'Captured by the government (tax revenue)', lostRight: 'No longer traded: deadweight loss' };
+      options.lostNotesAt = SOCIETY; // the names sit under the whole grey gap
     }
     if (pendingExit.length) { options.exit = pendingExit; pendingExit = []; }
     if (focus === GOV_FOCUS) {

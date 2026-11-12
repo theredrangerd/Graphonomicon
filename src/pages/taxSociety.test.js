@@ -18,19 +18,24 @@ describe('taxSocietyChain', () => {
     expect(shift.after).toBe(0);
   });
 
-  it('then does the consumers and the producers in turn, each lost surplus named before it is split', () => {
-    expect(stages()).toEqual(['shift', 'cLost', 'cBurden', 'pLost', 'pBurden', 'tidy', 'final']);
-    const [, cLost, cBurden, pLost, pBurden] = taxSocietyChain();
-    expect([cLost.lens, cBurden.lens]).toEqual(['consumer-lens', 'consumer-lens']);
-    expect([pLost.lens, pBurden.lens]).toEqual(['producer-lens', 'producer-lens']);
-    expect([cLost.emphasis, pLost.emphasis]).toEqual(['consumers', 'producers']);
-    // the grey lost surplus comes first, then it takes its burden colour and its half of the loss
-    expect(cLost.only).toEqual(expect.arrayContaining(['lost', 'lostNote']));
-    expect(cLost.only).not.toContain('taxConsumer');
-    expect(cBurden.only).toEqual(expect.arrayContaining(['taxConsumer', 'dwlConsumer']));
-    expect(cBurden.exit).toEqual(expect.arrayContaining(['lost', 'lostNote']));
-    expect(pLost.only).not.toContain('taxProducer');
-    expect(pBurden.only).toEqual(expect.arrayContaining(['taxConsumer', 'taxProducer', 'dwlProducer']));
+  it('greys the whole gap at once, then divides it: consumers\' half, then producers\'', () => {
+    expect(stages()).toEqual(['shift', 'lost', 'cDivide', 'pDivide', 'tidy', 'final']);
+    const [, lost, cDivide, pDivide] = taxSocietyChain();
+    // both halves grey together, named, with no burden colour yet
+    expect(lost.only).toEqual(expect.arrayContaining(['lostConsumer', 'lostProducer', 'lostNote']));
+    expect(lost.only).not.toContain('taxConsumer');
+    expect(lost.only).not.toContain('taxProducer');
+    // consumers' half takes its colours while the producers' half is still grey (no white left behind)
+    expect(cDivide.lens).toBe('consumer-lens');
+    expect(cDivide.emphasis).toBe('consumers');
+    expect(cDivide.only).toEqual(expect.arrayContaining(['taxConsumer', 'dwlConsumer', 'lostProducer']));
+    expect(cDivide.exit).toContain('lostConsumer');
+    expect(cDivide.exit).not.toContain('lostProducer');
+    // then the producers'
+    expect(pDivide.lens).toBe('producer-lens');
+    expect(pDivide.emphasis).toBe('producers');
+    expect(pDivide.only).toEqual(expect.arrayContaining(['taxConsumer', 'taxProducer', 'dwlProducer']));
+    expect(pDivide.exit).toEqual(expect.arrayContaining(['lostProducer', 'lostNote']));
   });
 
   it('takes the arrows back out after the shift, and ends on the finished picture with the surplus gone', () => {
@@ -52,7 +57,7 @@ describe('taxSocietyChain', () => {
     for (const stage of stages().filter((s) => s !== 'shift')) expect(taxSocietyNote(stage, result, fmtMoney)).toMatch(/<strong>/);
     expect(taxSocietyNote('shift', result, fmtMoney)).toBe('');
     expect(result.consumerIncidence).toBeGreaterThan(0);
-    expect(taxSocietyNote('cBurden', result, fmtMoney)).toContain(fmtMoney(result.consumerIncidence));
+    expect(taxSocietyNote('cDivide', result, fmtMoney)).toContain(fmtMoney(result.consumerIncidence));
     expect(taxSocietyNote('final', result, fmtMoney)).toContain(fmtMoney(result.DWL));
     expect(taxSocietyNote('final', result, fmtMoney)).toContain('no longer traded');
   });

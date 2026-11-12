@@ -177,7 +177,7 @@ export const LAYERS = Object.freeze([
   'csTriangle', 'psTriangle', 'marginalCs', 'marginalPs', 'govFill', 'dwlUnknown',
   'subsidyBracket', 'subsidyArrow', 'taxBracket', 'badges', 'areaNames', 'focusChip',
   // Subsidy Explain teaching marks, never drawn by default (see drawSubsidyTeachingMarks).
-  'eq1Note', 'eq2Note', 'taxArrow', 'qtyBracket', 'taxHeight', 'lost', 'lostNote', 'costDot', 'loafDrop', 'loafDrops', 'priceBrackets', 'revenueDims', 'revenueBox', 'govStrips', 'boxWidth', 'boxLabel', 'readout',
+  'eq1Note', 'eq2Note', 'taxArrow', 'qtyBracket', 'taxHeight', 'lost', 'lostConsumer', 'lostProducer', 'lostNote', 'costDot', 'loafDrop', 'loafDrops', 'priceBrackets', 'revenueDims', 'revenueBox', 'govStrips', 'boxWidth', 'boxLabel', 'readout',
 ]);
 
 // Every Explorer focus the renderer knows. Each page offers its own subset (subsidy: cs, ps,
@@ -879,10 +879,46 @@ function drawLostSurplus(fills, layer, result, lens) {
   layer.appendChild(tag(split, 'lost'));
 }
 
+// The Society lens's lost surplus, a side at a time so the whole gap can be grey (no white left between the two)
+// and each side then takes its own colours: the burden band and its half of the deadweight loss, grey, with the
+// split at Qtax running from Pc down to Pe (consumers) or from Pe down to Pp (producers).
+function drawLostHalf(fills, layer, result, side) {
+  const consumer = side === 'consumer';
+  const polys = consumer ? [result.consumerWedgePoly, result.dwlConsumerPoly] : [result.producerWedgePoly, result.dwlProducerPoly];
+  if (!isOpenTax(result) || !(polys[0]?.length >= 3)) return;
+  const name = consumer ? 'lostConsumer' : 'lostProducer';
+  const g = el('g', {}, 'lost-surplus');
+  g.style.pointerEvents = 'none';
+  for (const poly of polys) {
+    if (!(poly?.length >= 3)) continue;
+    g.appendChild(el('polygon', { points: pts(poly), fill: 'var(--surface)' }));
+    g.appendChild(el('polygon', { points: pts(poly), fill: 'color-mix(in srgb, var(--ink) 22%, transparent)' }, 'lost-surplus__fill'));
+  }
+  fills.appendChild(tag(g, name));
+  const x = sx(result.Q);
+  const split = el('line', { x1: x, y1: sy(consumer ? result.Pc : result.Pstar), x2: x, y2: sy(consumer ? result.Pstar : result.Pp), stroke: 'var(--ink)', 'stroke-width': 2.4 }, 'lost-surplus__split');
+  split.style.pointerEvents = 'none';
+  layer.appendChild(tag(split, name));
+}
+
 // The two halves named, each on a short leader on the empty side of Pe (below it for the
 // consumer lens, above it for the producer lens). The right-hand note sits a line further out.
 function drawLostNotes(layer, result, lens, captions) {
   if (!captions.lostLeft && !captions.lostRight) return;
+  // The Society lens names the whole grey gap from below it: the box from under Pp, the loss from under its slanted edge.
+  if (lens === 'societal') {
+    const g = el('g', {}, 'lost-notes');
+    const xQ = sx(result.Q), xE = sx(result.Qstar), xMid = (xQ + xE) / 2;
+    const leader = (x, yFrom, text, anchor, extra) => {
+      const yText = yFrom + 26 + extra;
+      g.appendChild(el('line', { x1: x, y1: yFrom + 2, x2: x, y2: yText - 14, stroke: 'var(--ink)', 'stroke-width': 1.2 }));
+      g.appendChild(teachingLabel(anchor === 'start' ? x - 6 : x, yText, text, anchor));
+    };
+    if (captions.lostLeft) leader((sx(0) + xQ) / 2, sy(result.Pp), captions.lostLeft, 'middle', 0);
+    if (captions.lostRight) leader(xMid, sy(s1Cost(result, result.Q + (result.Qstar - result.Q) / 2)), captions.lostRight, 'start', 20);
+    layer.appendChild(tag(g, 'lostNote'));
+    return;
+  }
   const dir = lens === 'consumer-lens' ? 1 : -1;
   const yEdge = sy(result.Pstar);
   const g = el('g', {}, 'lost-notes');
@@ -1896,6 +1932,8 @@ export function renderMarketChart(svg, result, options = {}) {
       }
     }
     if (on.has('lost') && LENSES[focusId]) drawLostSurplus(fills, layer, result, focusId);
+    if (on.has('lostConsumer')) drawLostHalf(fills, layer, result, 'consumer');
+    if (on.has('lostProducer')) drawLostHalf(fills, layer, result, 'producer');
     // Explain: the corner of the box nobody has been given yet, drawn grey with a question mark
     // until the deadweight loss step names it. Sits under the DWL hatch so that step cross-fades.
     if (on.has('dwlUnknown') && result.dwlPoly?.length >= 3) {
@@ -2057,7 +2095,7 @@ export function renderMarketChart(svg, result, options = {}) {
     // is drawn at any detail level.
     if (result.mode === 'subsidy' && on.has('subsidyBracket')) drawWedgeBracket(layer, result, captions.bracket, detail);
     if (result.mode === 'subsidy' && on.has('subsidyArrow')) drawWedgeBracket(layer, result, captions.arrow, 'full', { arrow: true, chip: options.arrowChip !== false });
-    if (isOpenTax(result) && on.has('lostNote') && LENSES[focusId]) drawLostNotes(layer, result, focusId, captions);
+    if (isOpenTax(result) && on.has('lostNote') && (LENSES[focusId] || options.lostNotesAt)) drawLostNotes(layer, result, options.lostNotesAt ?? focusId, captions);
     if (isOpenTax(result) && on.has('taxArrow')) drawTaxArrow(layer, result, captions.taxArrow);
     if (isOpenTax(result) && on.has('qtyBracket')) drawQtyBracket(layer, result, captions.qtyBracket);
     if (isOpenTax(result) && on.has('taxHeight')) drawTaxHeight(layer, result, captions.taxHeight);
