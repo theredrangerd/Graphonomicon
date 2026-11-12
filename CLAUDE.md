@@ -36,6 +36,7 @@ This split is *why* the architecture below looks the way it does — don't propo
 - `src/pages/` — per-page logic (`home.js` + `home-entry.js`, `wip.js` + `wip-entry.js`); `*-entry.js` files are the Vite build entry points, `*.js` (no `-entry`) hold the testable logic.
 - `src/components/` — shared UI pieces: `chrome.js` (injects shared header/nav/hero markup into every page at load time), `bento.js` (the homepage unit grid), `search.js` (homepage search).
 - `src/lib/units.js` — unit/family/diagram data model (syllabus taxonomy, tier config, build status).
+- `src/lib/explainRuntime.js` — what every Explain walkthrough shares beyond the step card (`explainCard.js`): its curves (`explainMarket`, `EXPLAIN_DEMAND`), the demand-curve tween (`demandTween`), the slider-fits check and `keepStepCardInView`. A new Explain page uses these rather than copying them; its `follow(step, animate, draw)` callback must only draw, never call back into `follow`.
 - `src/styles/tokens.css` — shared design tokens (colors/fonts), carried over from `equilibrium-lab.html`'s original `:root` variables; `src/styles/pages.css` — shared page-level styles.
 - `vite.config.js` — multi-page build config; each real page must be registered under `build.rollupOptions.input` (see `main`/`wip` entries) or Vite won't emit it.
 - Tests are colocated (`*.test.js` next to the file it tests) using Vitest + jsdom; run with `npm run test`.
