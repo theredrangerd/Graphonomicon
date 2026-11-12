@@ -273,6 +273,16 @@ describe('initSubsidyPage — Explain and Play', () => {
     }
   });
 
+  it('"Show the exam diagram" clears the lens even with the subsidy on', () => {
+    initSubsidyPage(document, fakeWin('subsidy.html?view=explorer&focus=ps#play'));
+    toggleOn();
+    $('.focus-question__back').click();
+    expect($('.focus-chip[aria-pressed="true"]')).toBeNull();
+    expect($('.focus-question').textContent).toContain('IB exam diagram');
+    expect($('#chart [data-layer="supply2"]')).not.toBeNull(); // the subsidised exam diagram is drawn
+    expect($('#chart [data-layer="marginalPs"]')).not.toBeNull();
+  });
+
   it('says to turn the subsidy on when the Explorer focus has nothing to show', () => {
     initSubsidyPage(document, fakeWin('subsidy.html?view=explorer&focus=gov#play'));
     expect($('#market-note').textContent).toContain('Turn the subsidy on');

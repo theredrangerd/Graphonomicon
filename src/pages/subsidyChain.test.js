@@ -97,4 +97,9 @@ describe('subsidyChain', () => {
     expect(replay[1].after).toBe(300);
     expect(replay[0].only).toEqual(expect.arrayContaining(['supply2', 'eq2']));
   });
+
+  it('has nothing to replay for the exam diagram (no lens)', () => {
+    expect(subsidyChain(null)).toEqual([]);
+    expect(replayOf(subsidyChain(null))).toEqual([]);
+  });
 });
