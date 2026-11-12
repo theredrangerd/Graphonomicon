@@ -60,10 +60,9 @@ describe('SUBSIDY_STEPS', () => {
     expect(s.captions({ ...ctx, result: free, dotQ: 30 })).toMatchObject({ dotCostTag: '$40', dotQtyTag: 'loaf 30' });
     expect(s.think({ ...ctx, explored: false })).toContain('halo');
     expect(s.lockedLabel).toBe('Put the dot in the halo');
-    // The "drag me" hint shows until the student touches the dot, and not while it glides.
-    expect(s.captions({ ...ctx, result: free, touched: false, gliding: false }).dragHint).toBe('drag me');
-    expect(s.captions({ ...ctx, result: free, touched: true, gliding: false }).dragHint).toBeUndefined();
-    expect(s.captions({ ...ctx, result: free, touched: false, gliding: true }).dragHint).toBeUndefined();
+    // The "drag me" hint shows until the student touches the dot.
+    expect(s.captions({ ...ctx, result: free, touched: false }).dragHint).toBe('drag me');
+    expect(s.captions({ ...ctx, result: free, touched: true }).dragHint).toBeUndefined();
     // The dot is drawn where it is; the words name its whole-dollar loaf.
     expect(s.chartOptions({ ...ctx, dotQ: 45, dotPos: 44.2 })).toEqual({ dotQ: 44.2, dotTarget: 42, dotTargetTolerance: 4, dotTargetReached: false });
     expect(s.chartOptions({ ...ctx, explored: true }).dotTargetReached).toBe(true);

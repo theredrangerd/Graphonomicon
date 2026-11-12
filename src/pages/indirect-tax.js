@@ -1,7 +1,7 @@
 import { renderMiniHeader } from '../components/chrome.js';
 import { computeMarket } from '../lib/marketEngine.js';
 import { renderMarketChart, resolveLayers } from '../lib/marketChart.js';
-import { delay, tweenValue } from '../lib/animate.js';
+import { delay } from '../lib/animate.js';
 import { fmtMoney, fmtPrice, fmtQty, setStatusPill } from '../lib/format.js';
 import { getFamilyNav } from '../components/familyNav.js';
 import { wireShiftAndSlopeInputs, updateShiftAndSlopeLabels, wireInterventionToggle, readCurveParams, marketFits, guardSliders, settleDown, fillSharedStats, NO_TRADE_NOTE } from '../lib/pageControls.js';
@@ -13,6 +13,7 @@ import { mountModeLink } from '../components/modeSwitch.js';
 import { mountViewSwitch, TAX_FOCUSES, TAX_FOCUS_ALIASES } from '../components/viewSwitch.js';
 import { mountExplainCard } from '../components/explainCard.js';
 import { whenAnimationsDone } from '../lib/animationSettle.js';
+import { demandTween, explainMarket, stepDemand, fitsEveryExplainMarket, keepStepCardInView } from '../lib/explainRuntime.js';
 import { TAX_STEPS } from './indirectTaxExplainSteps.js';
 
 // 'full' | 'half' | 'none' — the tax's own copy of the subsidy's SUBSIDY_AREA_LABELS
@@ -24,14 +25,6 @@ const GOV_FOCUS = 'revenue'; // the "Government perspective" chip (id kept so sh
 const TAX_ONLY_FOCUS = {
   'consumer-lens': 'the consumer burden and deadweight loss', 'producer-lens': 'the producer burden and deadweight loss', [GOV_FOCUS]: 'tax revenue',
 };
-
-// Explain's curves: the page's default market, or (one step) a steeper, inelastic demand
-// curve pivoting through the same equilibrium. Values are demand-elasticity slider positions.
-const ZERO = { value: '0' };
-const DEMAND_SLIDER = { default: 0, inelastic: -0.5 };
-function explainMarket(demandSlider) {
-  return readCurveParams({ demandSlider: ZERO, supplySlider: ZERO, slopeDSlider: { value: String(demandSlider) }, slopeSSlider: ZERO }).market;
-}
 
 export function initIndirectTaxPage(doc, win = window) {
   const { backHref, backLabel, siblings } = getFamilyNav('indirect-tax');
@@ -301,7 +294,6 @@ export function initIndirectTaxPage(doc, win = window) {
   // Always a specific tax on the default curves (one step swaps in inelastic demand); the
   // Play toggle and tax-mode radios don't matter here, only the step does.
 
-  const stepDemand = (step) => DEMAND_SLIDER[step.demand ?? 'default'];
   const explainTax = (step) => (step.tax ? { type: 'tax', mode: 'specific', amount: +specificSlider.value } : { type: 'none' });
 
   // The step text always describes the step's own curves, even while the chart is still
@@ -310,32 +302,19 @@ export function initIndirectTaxPage(doc, win = window) {
     return { amount: +specificSlider.value, result: computeMarket({ ...explainMarket(stepDemand(step)), intervention: explainTax(step) }) };
   }
 
-  // Layout A reads like a slideshow: on a step change, if the step card has dropped below the
-  // viewport, bring the chart card to the top so chart + card share one screen. Slider ticks
-  // never scroll.
-  function keepStepCardInView() {
-    const view = doc.defaultView;
-    const chartCard = doc.querySelector('.chart-card');
-    const stepCard = doc.querySelector('#explain-card');
-    if (mode !== 'explain' || !view || typeof chartCard?.scrollIntoView !== 'function') return;
-    if (stepCard.getBoundingClientRect().bottom <= view.innerHeight) return;
-    const reduceMotion = view.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    chartCard.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' });
-  }
-
-  // Where the Explain chart's demand curve is now (slider units). A step that changes it
-  // tweens there, redrawing every frame so the fills, prices and labels move with the curve.
-  let demandNow = DEMAND_SLIDER.default;
-  let cancelDemandTween = () => {};
+  const demand = demandTween();
 
   function drawExplain(step, animate) {
+    if (mode !== 'explain') return;
+    const ctx = explainContext(step);
+    // Mid-tween the chart is on curves of its own; otherwise it's the step's, already computed.
+    const result = demand.settled(step) ? ctx.result : computeMarket({ ...explainMarket(demand.now()), intervention: explainTax(step) });
     const ib = step.view === 'ib';
-    const result = computeMarket({ ...explainMarket(demandNow), intervention: explainTax(step) });
     renderMarketChart(chart, result, {
       detail: ib ? 'ib' : 'clean',
       // The IB wrap-up draws the full IB perfect diagram, i.e. the default layer set.
       layers: ib ? undefined : step.layers,
-      captions: step.captions?.(explainContext(step)),
+      captions: step.captions?.(ctx),
       areaLabels: TAX_AREA_LABELS,
       ...(animate ? { enter: step.enter, grow: step.grow } : {}),
     });
@@ -343,22 +322,12 @@ export function initIndirectTaxPage(doc, win = window) {
 
   function renderExplain(step, { animate }) {
     if (mode !== 'explain') return;
-    cancelDemandTween();
-    cancelDemandTween = () => {};
-    const target = stepDemand(step);
-    if (!animate) demandNow = target;
-    drawExplain(step, animate);
-    if (target === demandNow) return;
-    cancelDemandTween = tweenValue({
-      from: demandNow, to: target, duration: 700,
-      onUpdate: (v) => { demandNow = v; if (mode === 'explain') drawExplain(step, false); },
-    });
+    demand.follow(step, animate, (first) => drawExplain(step, first));
   }
 
   // Explain's slider must keep both of its markets (default and inelastic demand) on the
   // chart and still trading.
-  const explainFits = (amount) => Object.values(DEMAND_SLIDER).every((k) => {
-    const market = explainMarket(k);
+  const explainFits = (amount) => fitsEveryExplainMarket((market) => {
     const tax = { type: 'tax', mode: 'specific', amount };
     return marketFits(market, tax) && !computeMarket({ ...market, intervention: tax }).closed;
   });
@@ -375,7 +344,7 @@ export function initIndirectTaxPage(doc, win = window) {
     onRender: (step, opts) => {
       explainers?.close();
       renderExplain(step, opts);
-      if (opts.animate) keepStepCardInView();
+      if (opts.animate) keepStepCardInView(doc);
     },
     onAmount: (amount) => { specificSlider.value = String(amount); },
     isValidAmount: explainFits,
@@ -419,9 +388,10 @@ export function initIndirectTaxPage(doc, win = window) {
         taxToggle.checked = false;
         taxToggle.dispatchEvent(new Event('change'));
       }
+      demand.reset(); // a fresh walkthrough starts on the default curves
       card.goTo(0);
     } else {
-      cancelDemandTween();
+      demand.stop();
       render();
       maybeTour();
     }

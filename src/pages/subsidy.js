@@ -4,7 +4,7 @@ import { renderMarketChart, resolveLayers, quantityAtClientX } from '../lib/mark
 import { delay, tweenValue } from '../lib/animate.js';
 import { fmtMoney, fmtPrice, setStatusPill } from '../lib/format.js';
 import { getFamilyNav } from '../components/familyNav.js';
-import { wireShiftAndSlopeInputs, updateShiftAndSlopeLabels, wireInterventionToggle, readCurveParams, marketFits, guardSliders, settleDown, fillSharedStats, NO_TRADE_NOTE, DEFAULT_MARKET } from '../lib/pageControls.js';
+import { wireShiftAndSlopeInputs, updateShiftAndSlopeLabels, wireInterventionToggle, readCurveParams, marketFits, guardSliders, settleDown, fillSharedStats, NO_TRADE_NOTE } from '../lib/pageControls.js';
 import { attachRegionExplainers } from '../lib/regionExplainers.js';
 import { FEEDBACK_FORM_URL } from '../lib/feedback.js';
 import { initGraphChrome, maybeAutoStartTour, interventionTourSteps } from '../components/graphChrome.js';
@@ -13,19 +13,13 @@ import { mountModeLink } from '../components/modeSwitch.js';
 import { mountViewSwitch, SUBSIDY_FOCUSES, SUBSIDY_FOCUS_ALIASES } from '../components/viewSwitch.js';
 import { mountExplainCard } from '../components/explainCard.js';
 import { whenAnimationsDone } from '../lib/animationSettle.js';
-import { SUBSIDY_STEPS, LOAF_Q, LOAF_STEP, TARGET_Q, TARGET_TOLERANCE, snapLoaf, advanceSweep } from './subsidyExplainSteps.js';
+import { demandTween, explainMarket, stepDemand, fitsEveryExplainMarket, keepStepCardInView } from '../lib/explainRuntime.js';
+import { SUBSIDY_STEPS, LOAF_Q, LOAF_STEP, DOT_Q_MIN, DOT_Q_MAX, TARGET_Q, TARGET_TOLERANCE, snapLoaf, advanceSweep } from './subsidyExplainSteps.js';
 
 export const SUBSIDY_AREA_LABELS = 'full'; // 'full' | 'half' | 'none' — Ms. Patel request 3; flip after she confirms.
 
 // Explorer focuses that only exist once the subsidy is on, and what the note calls them.
 const SUBSIDY_ONLY_FOCUS = { gov: 'government spending and the deadweight loss', cs: 'the marginal consumer surplus', ps: 'the marginal producer surplus', societal: 'the marginal surpluses and the deadweight loss' };
-
-// Explain's demand curve: slider positions, as the indirect-tax page does.
-const ZERO = { value: '0' };
-const DEMAND_SLIDER = { default: 0, inelastic: -0.5 };
-function explainMarket(demandSlider) {
-  return readCurveParams({ demandSlider: ZERO, supplySlider: ZERO, slopeDSlider: { value: String(demandSlider) }, slopeSSlider: ZERO }).market;
-}
 
 export function initSubsidyPage(doc, win = window) {
   const { backHref, backLabel, siblings } = getFamilyNav('subsidy');
@@ -263,46 +257,68 @@ export function initSubsidyPage(doc, win = window) {
   // ---- Explain ----
   // Always the default curves; the subsidy toggle doesn't matter here, only the step does.
 
-  // Explain's curves: the page's default market, or (the last step) a steeper, inelastic demand
-  // curve pivoting through the same equilibrium. Values are demand-elasticity slider positions.
-  const stepDemand = (step) => DEMAND_SLIDER[step.demand ?? 'default'];
+  const demand = demandTween();
   let sweptSliderLast = false; // the step just left had the slide-to-the-ends task
   const explainIntervention = (step) => (step.subsidy ? { type: 'subsidy', amount: +subsidySlider.value } : { type: 'none' });
-  // The text always describes the step's own curves, even while the chart is still tweening to them.
-  function explainResult(step) {
-    return computeMarket({ ...explainMarket(stepDemand(step)), intervention: explainIntervention(step) });
-  }
-  // Where the Explain chart's demand curve is now; a step that changes it tweens there, redrawing
-  // every frame so the bands, prices and labels move with the curve.
-  let demandNow = DEMAND_SLIDER.default;
-  let cancelDemandTween = () => {};
-  const chartResult = (step) => computeMarket({ ...explainMarket(demandNow), intervention: explainIntervention(step) });
 
-  // The draggable cost dot (the "every point on S1 is one loaf" step): where it is, and the
-  // student has reached the halo at TARGET_Q (Next unlocks then, and stays unlocked).
-  // `pos` is where the dot is drawn (smooth, it glides and follows the pointer); `q` is the
-  // whole loaf it's nearest, which the words and numbers name. `touched` hides the
-  // "drag me" hint once the student has taken the dot; `gliding` hides it during the intro.
+  // The draggable cost dot (the "every point on S1 is one loaf" step): `pos` is where the dot
+  // is drawn (smooth, it follows the pointer and eases onto a loaf on release); `q` is the
+  // whole loaf it's nearest, which the words and numbers name. `explored`: the student has
+  // reached the halo at TARGET_Q (Next unlocks then, and stays unlocked). `touched` hides the
+  // "drag me" hint once the student has taken the dot.
   // A step with `trigger` (step 4) waits on its Subsidise! button: `armed` while it hasn't been
   // pressed, with `armedWait` a promise the card's text-reveal waits behind (resolved on press, or
   // when the student leaves the step).
   let armed = false;
   let armedWait = null;
-  const dot = { q: LOAF_Q, pos: LOAF_Q, explored: false, touched: false, gliding: false };
+  const dot = { q: LOAF_Q, pos: LOAF_Q, explored: false, touched: false };
   let cancelSettle = () => {};
   // The revenue step's slide-down-and-back-up: has the subsidy slider reached $0, then the top.
   let sweep = { low: false, high: false };
   const sweepRange = () => ({ min: +subsidySlider.min, max: +subsidySlider.max });
 
+  // The text always describes the step's own curves, even while the chart is still tweening to them.
   function explainContext(step) {
     return {
-      amount: +subsidySlider.value, result: explainResult(step),
-      dotQ: dot.q, dotPos: dot.pos, explored: dot.explored, touched: dot.touched, gliding: dot.gliding,
+      amount: +subsidySlider.value,
+      result: computeMarket({ ...explainMarket(stepDemand(step)), intervention: explainIntervention(step) }),
+      dotQ: dot.q, dotPos: dot.pos, explored: dot.explored, touched: dot.touched,
       armed, sweepLow: sweep.low, sweepHigh: sweep.high,
     };
   }
 
   const currentStep = () => SUBSIDY_STEPS[card ? card.index() : 0];
+
+  // Draws one frame of a step. `animate` plays its entry; `exit` fades those layers out.
+  function drawExplain(step, { animate = false, exit } = {}) {
+    if (mode !== 'explain') return;
+    const ctx = explainContext(step);
+    // Mid-tween the chart is on curves of its own; otherwise it's the step's, already computed.
+    const result = demand.settled(step) ? ctx.result : computeMarket({ ...explainMarket(demand.now()), intervention: explainIntervention(step) });
+    const ib = step.view === 'ib';
+    // While a step waits on its button, its readout waits too, and the button is drawn.
+    const waiting = armed && step.trigger;
+    const captions = step.captions?.(ctx);
+    renderMarketChart(chart, result, {
+      detail: ib ? 'ib' : 'clean',
+      // The IB wrap-up draws the full IB perfect diagram, i.e. the default layer set.
+      layers: ib ? undefined : waiting ? step.layers.filter((l) => l !== 'readout') : step.layers,
+      captions: waiting ? { ...captions, readout: undefined, subsidiseButton: 'Subsidise!' } : captions,
+      ...(waiting ? { loafArmed: true } : {}),
+      areaLabels: SUBSIDY_AREA_LABELS,
+      reserveDimBands: true, // room outside the axes for the revenue step's dimension lines
+      arrowChip: false, // Explain's price brackets already carry the amount; no chip beside the arrow
+      ...(typeof step.chartOptions === 'function' ? step.chartOptions(ctx) : step.chartOptions),
+      ...(animate ? { enter: [...(step.enter ?? []), ...(step.fadeIn ?? [])], grow: step.grow } : {}),
+      ...(exit ? { exit } : {}),
+    });
+  }
+
+  // A step with its own demand curve (the inelastic one) tweens the chart there after it draws.
+  function renderExplain(step, { animate }) {
+    if (mode !== 'explain') return;
+    demand.follow(step, animate, (first) => drawExplain(step, { animate: first }));
+  }
 
   // Re-renders the current step in place (no entry animation), keeping keyboard focus on the
   // dot, since a render rebuilds it.
@@ -312,9 +328,8 @@ export function initSubsidyPage(doc, win = window) {
     if (hadFocus) chart.querySelector('.cost-dot__handle')?.focus();
   }
 
-  const DOT_LIMITS = [snapLoaf(0), snapLoaf(Infinity)];
   function moveDot(pos, byStudent) {
-    dot.pos = Math.min(DOT_LIMITS[1], Math.max(DOT_LIMITS[0], pos));
+    dot.pos = Math.min(DOT_Q_MAX, Math.max(DOT_Q_MIN, pos));
     const next = snapLoaf(dot.pos);
     if (byStudent) {
       dot.touched = true;
@@ -336,20 +351,6 @@ export function initSubsidyPage(doc, win = window) {
   function settleDot() {
     cancelSettle();
     cancelSettle = tweenValue({ from: dot.pos, to: dot.q, duration: 350, onUpdate: (p) => { dot.pos = p; redrawStep(); } });
-  }
-
-  // On arriving at the drag step (or replaying it), the dot rests at its starting loaf with the
-  // "drag me" hint. Progress toward the gate is kept once earned.
-  function placeDot() {
-    cancelSettle();
-    dot.touched = false;
-    dot.gliding = false;
-    dot.pos = Math.min(DOT_LIMITS[1], Math.max(DOT_LIMITS[0], LOAF_Q));
-    const crossed = snapLoaf(dot.pos) !== dot.q;
-    dot.q = snapLoaf(dot.pos);
-    // No redraw here: the step's own (animated) render comes next and draws the dot, so its
-    // entry fade isn't wiped by a second, un-animated render.
-    if (crossed) card.refresh();
   }
 
   // Dragging: pressing anywhere on the chart puts the dot at that loaf, and it follows the
@@ -389,62 +390,35 @@ export function initSubsidyPage(doc, win = window) {
     if (key && e.target.closest('.term, .readout__row, .explain-card__readout-row')) chart.dataset.hot = key;
   };
   const clearHot = () => { delete chart.dataset.hot; };
-  const explainCardEl = doc.querySelector('#explain-card');
-  for (const host of [explainCardEl, chart]) {
+  for (const host of [doc.querySelector('#explain-card'), chart]) {
     host.addEventListener('pointerover', setHot);
     host.addEventListener('pointerout', clearHot);
     host.addEventListener('focusin', setHot);
     host.addEventListener('focusout', clearHot);
   }
 
-  // Layout A reads like a slideshow: on a step change, if the step card has dropped below the
-  // viewport, bring the chart card to the top so chart + card share one screen. Slider ticks
-  // never scroll.
-  function keepStepCardInView() {
-    const view = doc.defaultView;
-    const chartCard = doc.querySelector('.chart-card');
-    const stepCard = doc.querySelector('#explain-card');
-    if (mode !== 'explain' || !view || typeof chartCard?.scrollIntoView !== 'function') return;
-    if (stepCard.getBoundingClientRect().bottom <= view.innerHeight) return;
-    const reduceMotion = view.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    chartCard.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' });
-  }
-
-  function renderExplain(step, { animate }) {
-    if (mode !== 'explain') return;
-    const ctx = explainContext(step);
-    const ib = step.view === 'ib';
-    const waiting = armed && step.trigger;
-    const captions = step.captions?.(ctx);
-    renderMarketChart(chart, chartResult(step), {
-      detail: ib ? 'ib' : 'clean',
-      // The IB wrap-up draws the full IB perfect diagram, i.e. the default layer set.
-      // While a step waits on its button, its readout waits too, and the button is drawn.
-      layers: ib ? undefined : waiting ? step.layers.filter((l) => l !== 'readout') : step.layers,
-      captions: waiting ? { ...captions, readout: undefined, subsidiseButton: 'Subsidise!' } : captions,
-      ...(waiting ? { loafArmed: true } : {}),
-      areaLabels: SUBSIDY_AREA_LABELS,
-      reserveDimBands: true, // room outside the axes for the revenue step's dimension lines
-      arrowChip: false, // Explain's price brackets already carry the amount; no chip beside the arrow
-      ...(typeof step.chartOptions === 'function' ? step.chartOptions(ctx) : step.chartOptions),
-      ...(animate ? { enter: [...(step.enter ?? []), ...(step.fadeIn ?? [])], grow: step.grow } : {}),
-    });
-    // A step with its own demand curve (the inelastic one) tweens the chart there after it draws.
-    cancelDemandTween();
-    cancelDemandTween = () => {};
-    const target = stepDemand(step);
-    if (!animate) demandNow = target;
-    if (target === demandNow) return;
-    cancelDemandTween = tweenValue({
-      from: demandNow, to: target, duration: 700,
-      onUpdate: (v) => { demandNow = v; if (mode === 'explain') renderExplain(step, { animate: false }); },
-    });
-  }
-
   function deferred() {
     let resolve;
     const promise = new Promise((r) => { resolve = r; });
     return { promise, resolve };
+  }
+
+  // Arriving on a step (or replaying it): reset whatever the step before left behind and set up
+  // this step's task. Progress toward a gate (the dot's halo, the sweep) is kept once earned.
+  function arriveAt(step) {
+    cancelSettle();
+    armedWait?.resolve(); // a step we're leaving (or replaying) no longer waits
+    armed = Boolean(step.trigger);
+    armedWait = armed ? deferred() : null;
+    // The revenue step sends the slider to the top and leaves it there; later steps are drawn
+    // for the page's default subsidy, so put it back as the student moves on.
+    if (sweptSliderLast && !step.sliderHalo) subsidySlider.value = subsidySlider.defaultValue;
+    sweptSliderLast = Boolean(step.sliderHalo);
+    if (step.sliderHalo) sweep = advanceSweep(sweep, +subsidySlider.value, sweepRange());
+    // The dot rests at its starting loaf with the "drag me" hint. No redraw here: the step's own
+    // (animated) render comes next and draws it, so its entry fade isn't wiped.
+    if (step.drag) Object.assign(dot, { q: LOAF_Q, pos: LOAF_Q, touched: false });
+    card?.refresh(); // the card painted before this; its Next lock and words depend on the above
   }
 
   // Pressing Subsidise!: draw the step as it normally arrives (the arrow drops, the labels follow),
@@ -472,7 +446,7 @@ export function initSubsidyPage(doc, win = window) {
     amount: +subsidySlider.value,
     min: +subsidySlider.min,
     max: +subsidySlider.max,
-    getContext: () => explainContext(SUBSIDY_STEPS[card ? card.index() : 0]),
+    getContext: () => explainContext(currentStep()),
     // A step with `leave` plays its exit on the chart (the step redrawn with those layers fading)
     // before the card moves on; the promise resolves when it has played.
     onLeave: (step) => {
@@ -480,39 +454,23 @@ export function initSubsidyPage(doc, win = window) {
       explainers?.close();
       clearHot();
       cancelSettle();
-      const ctx = explainContext(step);
-      renderMarketChart(chart, ctx.result, {
-        detail: 'clean', layers: step.layers, captions: step.captions?.(ctx), areaLabels: SUBSIDY_AREA_LABELS,
-        arrowChip: false, reserveDimBands: true, exit: step.leave.exit,
-      });
+      drawExplain(step, { exit: step.leave.exit });
       return new Promise((resolve) => { delay(step.leave.ms, resolve); });
     },
     onRender: (step, opts) => {
       explainers?.close();
       clearHot();
       chart.classList.toggle('is-draggable', Boolean(step.drag));
-      if (opts.animate) {
-        cancelSettle();
-        armedWait?.resolve(); // a step we're leaving (or replaying) no longer waits
-        armed = Boolean(step.trigger);
-        armedWait = armed ? deferred() : null;
-        card?.refresh(); // the card painted before this; its Next lock depends on `armed`
-      }
-      // The revenue step sends the slider to the top and leaves it there; later steps are drawn
-      // for the page's default subsidy, so put it back as the student moves on.
-      if (opts.animate && sweptSliderLast && !step.sliderHalo) { subsidySlider.value = subsidySlider.defaultValue; card?.refresh(); }
-      if (opts.animate) sweptSliderLast = Boolean(step.sliderHalo);
-      if (opts.animate && step.sliderHalo) { sweep = advanceSweep(sweep, +subsidySlider.value, sweepRange()); card?.refresh(); }
-      if (opts.animate && step.drag) placeDot();
+      if (opts.animate) arriveAt(step);
       renderExplain(step, opts);
-      if (opts.animate) keepStepCardInView();
+      if (opts.animate) keepStepCardInView(doc);
     },
     onAmount: (amount) => {
       subsidySlider.value = String(amount);
       if (currentStep().sliderHalo) sweep = advanceSweep(sweep, amount, sweepRange());
     },
     // Both of Explain's markets (default and inelastic demand) must stay on the chart.
-    isValidAmount: (amount) => Object.values(DEMAND_SLIDER).every((k) => marketFits(explainMarket(k), { type: 'subsidy', amount })),
+    isValidAmount: (amount) => fitsEveryExplainMarket((market) => marketFits(market, { type: 'subsidy', amount })),
     onFinish() {
       writeMode('play', win);
       applyMode('play');
@@ -554,9 +512,10 @@ export function initSubsidyPage(doc, win = window) {
         subsidyToggle.checked = false;
         subsidyToggle.dispatchEvent(new Event('change'));
       }
-      demandNow = DEMAND_SLIDER.default; // a fresh walkthrough starts on the default curves
+      demand.reset(); // a fresh walkthrough starts on the default curves
       card.goTo(0);
     } else {
+      demand.stop();
       render();
       maybeTour();
     }

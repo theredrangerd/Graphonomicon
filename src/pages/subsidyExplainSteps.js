@@ -12,8 +12,8 @@
 // step's readout (top-right of the chart) lists the same values in the same colours.
 // Research notes behind it: docs/superpowers/specs/2026-11-09-subsidy-explain-pedagogy-design.md.
 //
-// Context each step's functions get: { amount, result, dotQ, dotPos, explored, touched, gliding }
-// (see subsidy.js).
+// Context each step's functions get: { amount, result, dotQ, dotPos, explored, touched, armed,
+// sweepLow, sweepHigh } (see explainContext in subsidy.js).
 import { fmtMoney as fmtWhole } from '../lib/format.js';
 
 // Dollars, with cents only when there are some ($637.50, but $80), so every sum on screen
@@ -73,6 +73,11 @@ const s1s2 = { s1: S1, s2: S2 };
 // From the two-prices step on, students know what S1 and S2 mean, and the chart is busier
 // (brackets, arrow, labels), so those steps leave the curves as plain S1/S2.
 
+// The two marginal bands' names, wherever they're drawn.
+const BANDS = { mcs: 'marginal CS', mps: 'marginal PS' };
+// The subsidy arrow's chip, on the steps that turn it on.
+const arrowChip = (amount) => ({ arrow: `${fmtMoney(amount)} from gov` });
+
 const costAt = (result, q) => result.Smin + result.slopeS * q;
 
 // The loaf the drop step follows: the one the student left the dot on, nudged right if
@@ -87,6 +92,22 @@ function oneLoaf(ctx) {
   const cost = costAt(ctx.result, q);
   return { q, cost, customer: cost - ctx.amount };
 }
+
+// The followed loaf's three labels: what it costs, the government's part, the customer's.
+function loafCaptions(ctx) {
+  const { cost, customer } = oneLoaf(ctx);
+  return {
+    loafCost: `${fmtMoney(cost)} to bake`,
+    loafGov: `${fmtMoney(ctx.amount)} from government`,
+    loafCustomer: `${fmtMoney(customer)} from customer`,
+  };
+}
+
+// How the government's box is shared out: the bakery's and customers' bands.
+const shareRows = (result) => [
+  row('Bakery’s share', fmtMoney(result.marginalPS), 'mps'),
+  row('Customers’ share', fmtMoney(result.marginalCS), 'mcs'),
+];
 
 export const SUBSIDY_STEPS = [
   {
@@ -122,13 +143,13 @@ export const SUBSIDY_STEPS = [
     // The dot is drawn where it actually is (it glides and follows the pointer smoothly);
     // the words name the whole loaf it's nearest (dotQ).
     chartOptions: ({ dotQ, dotPos = dotQ, explored }) => ({ dotQ: dotPos, dotTarget: TARGET_Q, dotTargetTolerance: TARGET_TOLERANCE, dotTargetReached: Boolean(explored) }),
-    captions: ({ result, dotQ, touched, gliding, explored }) => {
+    captions: ({ result, dotQ, touched, explored }) => {
       const q = Math.round(dotQ);
       const cost = fmtMoney(costAt(result, q));
       return {
         s1: S1, dotLabel: `loaf ${q}: ${cost} to bake`, dotCostTag: cost, dotQtyTag: `loaf ${q}`,
-        // Until the student first takes the dot (and not while it's gliding on its own).
-        ...(!touched && !gliding ? { dragHint: 'drag me' } : {}),
+        // Until the student first takes the dot.
+        ...(!touched ? { dragHint: 'drag me' } : {}),
         ...(!explored ? { targetHint: 'put the dot here' } : {}),
       };
     },
@@ -151,9 +172,7 @@ export const SUBSIDY_STEPS = [
       const { cost, customer } = oneLoaf(ctx);
       return {
         s1: S1,
-        loafCost: `${fmtMoney(cost)} to bake`,
-        loafGov: `${fmtMoney(ctx.amount)} from government`,
-        loafCustomer: `${fmtMoney(customer)} from customer`,
+        ...loafCaptions(ctx),
         readout: [
           row('Cost to bake', fmtMoney(cost), 'cost'),
           row('Government pays', fmtMoney(ctx.amount), 'gov'),
@@ -171,16 +190,11 @@ export const SUBSIDY_STEPS = [
     slider: true, subsidy: true, layers: [...WITH_S2, 'loafDrop', 'loafDrops', 'readout'], enter: ['loafDrops', 'supply2'],
     // Just the arrow, dots and labels: the dashed guides have done their job.
     chartOptions: (ctx) => ({ loafQ: loafQ(ctx), loafGuides: false }),
-    captions: (ctx) => {
-      const { cost, customer } = oneLoaf(ctx);
-      return {
-        ...s1s2,
-        loafCost: `${fmtMoney(cost)} to bake`,
-        loafGov: `${fmtMoney(ctx.amount)} from government`,
-        loafCustomer: `${fmtMoney(customer)} from customer`,
-        readout: [row('Government pays, every loaf', fmtMoney(ctx.amount), 'gov')],
-      };
-    },
+    captions: (ctx) => ({
+      ...s1s2,
+      ...loafCaptions(ctx),
+      readout: [row('Government pays, every loaf', fmtMoney(ctx.amount), 'gov')],
+    }),
   },
   {
     id: 'equilibrium', headline: () => 'A new equilibrium, e2',
@@ -302,7 +316,7 @@ export const SUBSIDY_STEPS = [
     chartOptions: { sequence: 'cs-grows' },
     captions: ({ result }) => ({
       cs: 'CS before',
-      mcs: 'marginal CS',
+      mcs: BANDS.mcs,
       readout: [
         row('Customers paid (Pe)', fmtMoney(result.Pstar), 'pe'),
         row('Customers pay now (Pc)', fmtMoney(result.Pc), 'customer'),
@@ -331,9 +345,9 @@ export const SUBSIDY_STEPS = [
     // The arrow carries its amount (Explain turns the chip off by default).
     chartOptions: { sequence: 'ps-grows', arrowChip: true },
     captions: ({ amount, result }) => ({
-      arrow: `${fmtMoney(amount)} from gov`,
+      ...arrowChip(amount),
       ps: 'PS before',
-      mps: 'marginal PS',
+      mps: BANDS.mps,
       readout: [
         row('Bakery got (Pe)', fmtMoney(result.Pstar), 'pe'),
         row('Bakery gets now (Pp)', fmtMoney(result.Pp), 'cost'),
@@ -351,11 +365,10 @@ export const SUBSIDY_STEPS = [
     enter: ['csTriangle', 'marginalCs', 'readout'], fadeIn: ['pricesC'],
     chartOptions: { sequence: 'join', arrowChip: true },
     captions: ({ amount, result }) => ({
-      arrow: `${fmtMoney(amount)} from gov`,
+      ...arrowChip(amount),
       ps: 'PS before',
       cs: 'CS before',
-      mps: 'marginal PS',
-      mcs: 'marginal CS',
+      ...BANDS,
       readout: [
         row('Customers save, per loaf', fmtMoney(result.Pstar - result.Pc), 'mcs'),
         row('Bakery gains, per loaf', fmtMoney(result.Pp - result.Pstar), 'mps'),
@@ -375,13 +388,8 @@ export const SUBSIDY_STEPS = [
     // government purple, and the empty corner is grey with a "?" (`box` in pages.css) so it's clear what we're splitting up.
     enter: ['wedgeBox', 'dwlUnknown'], chartOptions: { sequence: 'box' },
     captions: ({ result }) => ({
-      mps: 'marginal PS',
-      mcs: 'marginal CS',
-      readout: [
-        row('Bakery’s share', fmtMoney(result.marginalPS), 'mps'),
-        row('Customers’ share', fmtMoney(result.marginalCS), 'mcs'),
-        row('Government spending', fmtMoney(result.govCost), 'gov'),
-      ],
+      ...BANDS,
+      readout: [...shareRows(result), row('Government spending', fmtMoney(result.govCost), 'gov')],
     }),
   },
   {
@@ -389,11 +397,9 @@ export const SUBSIDY_STEPS = [
     text: ({ result }) => `That corner sits above ${t('customer', 'demand')} and below ${t('cost', 'S1')}: each loaf here costs more to bake than customers think it’s worth, so with no subsidy nobody would trade them. The government’s money pushes them through anyway, and nobody gets a benefit to match: ${t('dwl', `deadweight loss, ${fmtMoney(result.DWL)}`)}. ${t('mps', 'Bakery’s share')} + ${t('mcs', 'customers’ share')} + ${t('dwl', 'deadweight loss')} = the whole ${t('gov', fmtMoney(result.govCost))}.`,
     slider: true, subsidy: true, layers: [...BOXED, 'marginalPs', 'marginalCs', 'dwlUnknown', 'dwl', 'readout'], enter: ['dwl', 'readout'],
     captions: ({ result }) => ({
-      mps: 'marginal PS',
-      mcs: 'marginal CS',
+      ...BANDS,
       readout: [
-        row('Bakery’s share', fmtMoney(result.marginalPS), 'mps'),
-        row('Customers’ share', fmtMoney(result.marginalCS), 'mcs'),
+        ...shareRows(result),
         row('Deadweight loss', fmtMoney(result.DWL), 'dwl'),
         row('Total: government spending', fmtMoney(result.govCost), 'gov'),
       ],

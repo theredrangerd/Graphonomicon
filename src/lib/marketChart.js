@@ -974,11 +974,33 @@ function teachingLabel(x, y, text, anchor = 'start', color = 'var(--ink)') {
   return t;
 }
 
-// What it costs to bake loaf q (a point on S1), and what the bakery still needs from the
-// customer once the government pays its share (the point on S2 straight below).
+// What it costs to bake loaf q: its point on S1.
+const s1Cost = (result, q) => result.Smin + result.slopeS * q;
+
+// Loaf q's cost, and what the bakery still needs from the customer once the government pays
+// its share (the point on S2 straight below).
 function loafPoint(result, q) {
-  const cost = result.Smin + result.slopeS * q;
+  const cost = s1Cost(result, q);
   return { cost, customer: cost - (result.Pp - result.Pc) };
+}
+
+// Where a loaf's price lands for the customer (on S2): a hollow blue dot.
+const customerDot = (x, y, cls) => mark(el('circle', { cx: x, cy: y, r: 5, fill: 'var(--surface)', stroke: 'var(--demand)', 'stroke-width': 2 }, cls), 'customer');
+
+// A dimension line from (x1, y1) to (x2, y2), horizontal or vertical, with a tick `tick` px
+// either side across each end. Appended to g, which is returned.
+function dimLine(g, x1, y1, x2, y2, tick, style) {
+  const [ax, ay] = x1 === x2 ? [tick, 0] : [0, tick];
+  g.appendChild(el('line', { x1, y1, x2, y2, ...style }));
+  for (const [x, y] of [[x1, y1], [x2, y2]]) g.appendChild(el('line', { x1: x - ax, y1: y - ay, x2: x + ax, y2: y + ay, ...style }));
+  return g;
+}
+
+// A teaching name centred in a polygon (a surplus triangle or marginal band), if it fits there.
+function nameArea(layer, poly, text, layerName, markKey) {
+  if (!text || !(poly?.length >= 3)) return;
+  const c = polygonCentroid(poly, placedLabels, { halfW: (text.length * CHAR_PX) / 2 + 2, halfH: 8, min: 0.9 });
+  if (c?.scale != null) layer.appendChild(mark(tag(teachingLabel(c.x, c.y + 5, text, 'middle'), layerName), markKey));
 }
 
 // Every teaching mark carries a `data-mark` naming what it stands for (the bakery's cost, the
@@ -993,8 +1015,7 @@ function mark(node, key) { node.setAttribute('data-mark', key); return node; }
 // axis (which loaf, what it costs), and a ring that says "grab me".
 const DRAG_CHAR_PX = 11; // average glyph width of the enlarged (22px) dragging labels
 function drawCostDot(layer, result, captions, q, target) {
-  const cost = result.Smin + result.slopeS * q;
-  const x = sx(q), y = sy(cost);
+  const x = sx(q), y = sy(s1Cost(result, q));
   const g = tag(el('g', {}, 'cost-dot'), 'costDot');
   const guide = { stroke: 'var(--supply)', 'stroke-width': 1.2, 'stroke-dasharray': '4,3' };
   if (target) drawDotTarget(g, result, captions, target);
@@ -1025,7 +1046,7 @@ function drawCostDot(layer, result, captions, q, target) {
 // The halo on S1 the student is asked to bring the dot to (a nudge, like a game's "go here"
 // marker): a pulsing ring with a short label under it. Once reached it settles into a solid ring.
 function drawDotTarget(g, result, captions, { q, tolerance, reached }) {
-  const x = sx(q), y = sy(result.Smin + result.slopeS * q);
+  const x = sx(q), y = sy(s1Cost(result, q));
   // Big enough to hold `tolerance` loaves either side along S1 (never smaller than the old 20px),
   // so a dot that looks inside the circle is inside it.
   const r = Math.max(20, tolerance * Math.hypot(plotW / QMAX, (result.slopeS * plotH) / PMAX));
@@ -1118,7 +1139,7 @@ function drawLoafDrop(layer, result, captions, q, armed = false, guides = true) 
     const arrow = mark(arrowMark(x, yTop + 6, x, yBot - 6, { width: 2.4, color: 'var(--gov)' }), 'gov');
     if (entering) arrow.classList.add('loaf-drop__arrow');
     g.appendChild(arrow);
-    g.appendChild(later(mark(el('circle', { cx: x, cy: yBot, r: 5, fill: 'var(--surface)', stroke: 'var(--demand)', 'stroke-width': 2 }), 'customer')));
+    g.appendChild(later(customerDot(x, yBot)));
   }
   g.appendChild(mark(el('circle', { cx: x, cy: yTop, r: 5, fill: 'var(--supply)' }), 'cost qty'));
   if (captions.loafCost) g.appendChild(mark(teachingLabel(x - 10, yTop - 9, captions.loafCost, 'end', 'var(--supply)'), 'cost'));
@@ -1160,7 +1181,7 @@ function drawLoafDrops(layer, result, skipQ = null) {
     g.appendChild(one);
     // The same hollow blue dot the single loaf ends on: where the customer's price lands (S2).
     if (yBot - yTop > 12 && customer >= 0) {
-      const tip = mark(el('circle', { cx: x, cy: yBot, r: 5, fill: 'var(--surface)', stroke: 'var(--demand)', 'stroke-width': 2 }, 'loaf-drops__tip'), 'customer');
+      const tip = customerDot(x, yBot, 'loaf-drops__tip');
       if (entering) {
         tip.classList.add('loaf-drops__tip--enter');
         tip.style.setProperty('--d', String(i * 250));
@@ -1185,16 +1206,10 @@ function drawRevenueDims(layer, result, captions) {
   const entering = layerEnter.has('revenueDims');
   // Height: left of the tick labels and price symbols, from the x axis level up to Pp.
   const hx = 46;
-  const h = mark(el('g', {}, 'rev-dim rev-dim--height'), 'cost');
-  h.appendChild(el('line', { x1: hx, y1: yBase, x2: hx, y2: yTop, stroke: 'var(--supply)', ...stroke }));
-  h.appendChild(el('line', { x1: hx - 5, y1: yTop, x2: hx + 5, y2: yTop, stroke: 'var(--supply)', ...stroke }));
-  h.appendChild(el('line', { x1: hx - 5, y1: yBase, x2: hx + 5, y2: yBase, stroke: 'var(--supply)', ...stroke }));
+  const h = dimLine(mark(el('g', {}, 'rev-dim rev-dim--height'), 'cost'), hx, yBase, hx, yTop, 5, { stroke: 'var(--supply)', ...stroke });
   // Width: under the Q symbols, from 0 out to Q.
   const wy = yBase + BRACKET_DROP;
-  const w = mark(el('g', {}, 'rev-dim rev-dim--width'), 'qty');
-  w.appendChild(el('line', { x1: x0, y1: wy, x2: x1, y2: wy, stroke: 'var(--ink)', ...stroke }));
-  w.appendChild(el('line', { x1: x0, y1: wy - 5, x2: x0, y2: wy + 5, stroke: 'var(--ink)', ...stroke }));
-  w.appendChild(el('line', { x1, y1: wy - 5, x2: x1, y2: wy + 5, stroke: 'var(--ink)', ...stroke }));
+  const w = dimLine(mark(el('g', {}, 'rev-dim rev-dim--width'), 'qty'), x0, wy, x1, wy, 5, { stroke: 'var(--ink)', ...stroke });
   // Outside the plot, so these skip teachingLabel (which keeps labels inside it).
   const outside = (x, y, text, color, extra = {}) => {
     const t = el('text', { x: x.toFixed(1), y: y.toFixed(1), fill: color, ...extra }, 'teach-label');
@@ -1248,14 +1263,7 @@ function drawPriceBrackets(layer, result, captions) {
   // draws it at that size (captions.totalBig) so it doesn't snap back.
   const leaving = layerExit.has('priceBrackets');
   const g = el('g', { 'data-layer': 'priceBrackets' }, entering ? 'price-brackets price-brackets--enter' : 'price-brackets');
-  const bracket = (yA, yB, color, cls, key) => {
-    const b = mark(el('g', {}, `price-bracket ${cls}`), key);
-    const s = { stroke: color, 'stroke-width': 2.4, 'stroke-linecap': 'round' };
-    b.appendChild(el('line', { x1: x, y1: yA, x2: x, y2: yB, ...s }));
-    b.appendChild(el('line', { x1: x - 5, y1: yA, x2: x + 5, y2: yA, ...s }));
-    b.appendChild(el('line', { x1: x - 5, y1: yB, x2: x + 5, y2: yB, ...s }));
-    return b;
-  };
+  const bracket = (yA, yB, color, cls, key) => dimLine(mark(el('g', {}, `price-bracket ${cls}`), key), x, yA, x, yB, 5, { stroke: color, 'stroke-width': 2.4, 'stroke-linecap': 'round' });
   g.appendChild(bracket(y0 - 1, yc + 2, 'var(--demand)', 'pb-customer', 'customer'));
   if (yc - yp > 4) g.appendChild(bracket(yc - 2, yp, 'var(--gov)', 'pb-gov', 'gov'));
   // Labels right of the brackets; on a phone they don't fit, and the readout carries them.
@@ -1314,11 +1322,7 @@ function drawGovStrips(fills, layer, result, captions) {
 // reads straight off the picture alongside the height bracket at Q_subsidy.
 function drawBoxWidth(layer, result, captions) {
   const x0 = sx(0), x1 = sx(result.Q), y = sy(result.Pc) + 14;
-  const stroke = { stroke: 'var(--gov)', 'stroke-width': 1.4 };
-  const g = mark(el('g', {}, 'box-width'), 'gov');
-  g.appendChild(el('line', { x1: x0 + 2, y1: y, x2: x1, y2: y, ...stroke }));
-  g.appendChild(el('line', { x1: x0 + 2, y1: y - 4, x2: x0 + 2, y2: y + 4, ...stroke }));
-  g.appendChild(el('line', { x1, y1: y - 4, x2: x1, y2: y + 4, ...stroke }));
+  const g = dimLine(mark(el('g', {}, 'box-width'), 'gov'), x0 + 2, y, x1, y, 4, { stroke: 'var(--gov)', 'stroke-width': 1.4 });
   if (captions.width) g.appendChild(teachingLabel((x0 + x1) / 2, y + 17, captions.width, 'middle', 'var(--gov)'));
   layer.appendChild(tag(g, 'boxWidth'));
 }
@@ -1366,15 +1370,12 @@ function drawReadout(layer, rows) {
 function drawSubsidyTeachingMarks(layer, result, captions, options) {
   if (layerOn.has('costDot')) drawCostDot(layer, result, captions, options.dotQ ?? DEFAULT_LOAF_Q, options.dotTarget == null ? null : { q: options.dotTarget, tolerance: options.dotTargetTolerance ?? 0, reached: Boolean(options.dotTargetReached) });
   // A surplus triangle's name (before the subsidy: the plain CS / PS region).
-  for (const [key, plain, tri, plainPoly, triPoly, m] of [
-    ['cs', 'cs', 'csTriangle', result.csPoly, result.csTrianglePoly, 'cs'],
-    ['ps', 'ps', 'psTriangle', result.psPoly, result.psTrianglePoly, 'ps'],
+  for (const [key, tri, plainPoly, triPoly] of [
+    ['cs', 'csTriangle', result.csPoly, result.csTrianglePoly],
+    ['ps', 'psTriangle', result.psPoly, result.psTrianglePoly],
   ]) {
-    const name = layerOn.has(tri) ? tri : layerOn.has(plain) ? plain : null;
-    const poly = result.mode === 'subsidy' ? triPoly : plainPoly;
-    if (!captions[key] || !name || !(poly?.length >= 3)) continue;
-    const c = polygonCentroid(poly, placedLabels, { halfW: (captions[key].length * CHAR_PX) / 2 + 2, halfH: 8, min: 0.9 });
-    if (c?.scale != null) layer.appendChild(mark(tag(teachingLabel(c.x, c.y + 5, captions[key], 'middle'), name), m));
+    const name = layerOn.has(tri) ? tri : layerOn.has(key) ? key : null;
+    if (name) nameArea(layer, result.mode === 'subsidy' ? triPoly : plainPoly, captions[key], name, key);
   }
   if (result.mode !== 'subsidy') return;
   if (layerOn.has('loafDrops')) drawLoafDrops(layer, result, layerOn.has('loafDrop') ? (options.loafQ ?? DEFAULT_LOAF_Q) : null);
@@ -1384,10 +1385,8 @@ function drawSubsidyTeachingMarks(layer, result, captions, options) {
   if (layerOn.has('boxWidth')) drawBoxWidth(layer, result, captions);
   if (layerOn.has('boxLabel')) drawBoxLabel(layer, result, captions);
   // A marginal band's name, centred in it, once the band is drawn.
-  for (const [key, layerName, poly, m] of [['mps', 'marginalPs', result.marginalPsPoly, 'mps'], ['mcs', 'marginalCs', result.marginalCsPoly, 'mcs']]) {
-    if (!captions[key] || !layerOn.has(layerName)) continue;
-    const c = polygonCentroid(poly, placedLabels, { halfW: (captions[key].length * CHAR_PX) / 2 + 2, halfH: 8, min: 0.9 });
-    if (c?.scale != null) layer.appendChild(mark(tag(teachingLabel(c.x, c.y + 5, captions[key], 'middle'), layerName), m));
+  for (const [key, layerName, poly] of [['mps', 'marginalPs', result.marginalPsPoly], ['mcs', 'marginalCs', result.marginalCsPoly]]) {
+    if (layerOn.has(layerName)) nameArea(layer, poly, captions[key], layerName, key);
   }
 }
 
