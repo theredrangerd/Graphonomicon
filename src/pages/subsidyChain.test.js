@@ -53,8 +53,19 @@ describe('subsidyChain', () => {
     expect(subsidyChain('gov')[3].only).not.toContain('govFill');
   });
 
-  it("keeps the societal lens's build-up after the shift and the two prices", () => {
-    expect(stages('societal')).toEqual(['shift', 'prices', 'strips', 'box', 'boxHold', 'mcs', 'mps', 'unknown', 'dwl', 'final']);
+  it('plays the society lens quickly: the box, then consumers\' share, producers\' share, and what is left as deadweight loss', () => {
+    expect(stages('societal')).toEqual(['shift', 'box', 'consumers', 'producers', 'leftover', 'final']);
+    const [, box, consumers, producers, leftover] = subsidyChain('societal');
+    expect(box.only).toEqual(expect.arrayContaining(['govFill', 'wedgeBox']));
+    expect(box.only).not.toContain('marginalCs');
+    expect(consumers.only).toContain('marginalCs');
+    expect(consumers.only).not.toContain('marginalPs');
+    expect(consumers.emphasis).toBe('demand');
+    expect(producers.only).toEqual(expect.arrayContaining(['marginalCs', 'marginalPs']));
+    expect(producers.only).not.toContain('dwl');
+    expect(producers.emphasis).toBe('supply');
+    expect(leftover.enter).toContain('dwl');
+    expect(leftover.exit).toContain('govFill');
   });
 
   it('keeps the consumer and producer baseline triangles on screen during the shift', () => {

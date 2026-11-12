@@ -1776,6 +1776,8 @@ export function renderMarketChart(svg, result, options = {}) {
   if (focusId) svg.dataset.focus = focusId; else delete svg.dataset.focus;
   // A named entry sequence for the Explain steps whose marks arrive one after another (pages.css, [data-seq]).
   if (options.sequence) svg.dataset.seq = options.sequence; else delete svg.dataset.seq;
+  // A curve a step is pointing at ('demand' | 'supply'): pages.css thickens it (Play's Society lens).
+  if (options.emphasis) svg.dataset.emphasis = options.emphasis; else delete svg.dataset.emphasis;
 
   if (!result.noTrade) {
     // All shaded regions go in one group clipped to the plot area, so a region whose true

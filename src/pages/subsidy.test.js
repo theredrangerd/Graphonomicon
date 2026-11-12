@@ -244,7 +244,7 @@ describe('initSubsidyPage — Explain and Play', () => {
     expect($('#chart .wedge-outline')).not.toBeNull();
     expect($('#chart .gov-strips')).toBeNull();
     expect($('#chart [data-layer="govFill"]')).toBeNull();
-    expect($('#market-note').textContent).toContain('nobody would have traded');
+    expect($('#market-note').textContent).toContain('captured by nobody');
   });
 
   it('Societal lens lists only what it shows in the legend', () => {

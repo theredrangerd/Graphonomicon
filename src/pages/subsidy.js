@@ -30,7 +30,6 @@ const BASELINE = { cs: ['csTriangle', 'focusChip'], ps: ['psTriangle', 'focusChi
 // re-render without the step's `enter` and cut its animation short.
 const TWEEN_SETTLE_MS = 150;
 const SHIFT_MS = 1000; // the arrows grow down and S2 and e2 slide with them (the toggle's tween, same length)
-const FINAL_PARTS = ['wedgeBox', 'marginalCs', 'marginalPs', 'dwl', 'focusChip'];
 export function subsidyChain(focus) {
   const keep = [...BASE, ...(BASELINE[focus] ?? [])];
   const withS2 = [...keep, 'supply2'];
@@ -68,17 +67,16 @@ export function subsidyChain(focus) {
       finish({ enter: ['focusChip'], after: 800 })];
   }
   if (focus === 'societal') {
-    // Explain's build-up: the box, which hands its money out as marginal CS, then marginal PS, then
-    // the grey corner ("?") that turns out to be deadweight loss, and last the chips.
-    return [shift, prices,
-      { stage: 'strips', drop: FINAL_PARTS, add: ['govStrips'], enter: ['govStrips'], after: 1000 },
-      { stage: 'box', drop: FINAL_PARTS.slice(1), add: ['govStrips', 'govFill', 'boxLabel'], enter: ['govFill', 'wedgeBox', 'boxLabel'], exit: ['govStrips'], after: 2000 },
-      { stage: 'boxHold', drop: FINAL_PARTS.slice(1), add: ['govFill', 'boxLabel'], after: 1100 },
-      { stage: 'mcs', drop: ['marginalPs', 'dwl', 'focusChip'], add: ['govFill', 'boxLabel'], enter: ['marginalCs'], exit: ['govFill', 'boxLabel'], after: 2200 },
-      { stage: 'mps', drop: ['dwl', 'focusChip'], enter: ['marginalPs'], after: 2000 },
-      { stage: 'unknown', drop: ['dwl', 'focusChip'], add: ['dwlUnknown'], enter: ['dwlUnknown'], after: 2000 },
-      { stage: 'dwl', drop: ['focusChip'], add: ['dwlUnknown'], enter: ['dwl'], after: 2400 },
-      finish({ enter: ['focusChip'], after: 1600 })];
+    // Who captures the government's money, quickly: the spending box appears, then the part of it under
+    // the demand curve goes to consumers, the part above the original supply curve to producers, and what
+    // neither side captures is the deadweight loss.
+    const boxed = [...priced, 'wedgeBox'];
+    return [shift,
+      thenLeave({ stage: 'box', only: [...boxed, 'govFill', 'boxLabel'], enter: ['govFill', 'wedgeBox', 'boxLabel'] }),
+      { stage: 'consumers', only: [...boxed, 'govFill', 'boxLabel', 'marginalCs'], enter: ['marginalCs'], exit: ['boxLabel'], emphasis: 'demand', after: 1000 },
+      { stage: 'producers', only: [...boxed, 'govFill', 'marginalCs', 'marginalPs'], enter: ['marginalPs'], emphasis: 'supply', after: 1800 },
+      { stage: 'leftover', only: [...boxed, 'govFill', 'marginalCs', 'marginalPs', 'dwl'], enter: ['dwl'], exit: ['govFill'], after: 1800 },
+      finish({ enter: ['focusChip'], after: 2000 })];
   }
   return [];
 }
@@ -191,14 +189,14 @@ export function initSubsidyPage(doc, win = window) {
     });
   }
 
-  // The Societal lens says what each stage of the build-up is, in the words Explain uses.
+  // The Society lens says what each stage of the build-up is.
   function societalNote(result, amount) {
     const stage = chainStep?.stage ?? 'final';
-    if (['shift', 'prices'].includes(stage)) return '';
-    if (['strips', 'box', 'boxHold'].includes(stage)) return `<strong>Government spending: ${fmtMoney(result.govCost)}.</strong> ${fmtMoney(amount)} on every loaf sold, so the dashed box is the government's whole bill. Where does it end up?`;
-    if (stage === 'mcs') return `<strong>Marginal consumer surplus: ${fmtMoney(result.marginalCS)}.</strong> Buyers pay less for every loaf, and that saving comes out of the government's box.`;
-    if (stage === 'mps') return `<strong>Marginal producer surplus: ${fmtMoney(result.marginalPS)}.</strong> The bakery receives more for every loaf: the second slice of the box.`;
-    return `<strong>Deadweight loss (DWL): ${fmtMoney(result.DWL)}.</strong> The corner nobody gets. Those extra loaves cost more to make than buyers value them at, so without the subsidy nobody would have traded them; buyers wouldn't have wanted them at that price, and no one gets a benefit to match.`;
+    if (stage === 'shift') return '';
+    if (stage === 'box') return `<strong>Government spending: ${fmtMoney(result.govCost)}.</strong> ${fmtMoney(amount)} on every loaf sold, so the dashed box is the government's whole bill. Who captures it?`;
+    if (stage === 'consumers') return `<strong>Consumers: ${fmtMoney(result.marginalCS)}.</strong> The part of the box under the demand curve is value buyers get back: they pay less than they were willing to.`;
+    if (stage === 'producers') return `<strong>Producers: ${fmtMoney(result.marginalPS)}.</strong> The part above the original supply curve is extra revenue for the bakery over its cost.`;
+    return `<strong>Deadweight loss (DWL): ${fmtMoney(result.DWL)}.</strong> What's left of the box is captured by nobody: those extra loaves cost more to make than buyers value them at.`;
   }
 
   // Play's render. Inputs on the Play controls (and the toggle's tween) keep firing it in
@@ -239,8 +237,9 @@ export function initSubsidyPage(doc, win = window) {
         // The bands are named in words while they arrive; at the end the chips (which carry the
         // figures) take their place, so the words are dropped to leave them room.
         if (step.stage !== 'final') Object.assign(options.captions, { mcs: 'marginal CS', mps: 'marginal PS' });
-        // From the first band on, the spending box's outline goes solid (Explain's "back to the box").
-        if (!['shift', 'prices', 'strips', 'box', 'boxHold'].includes(step.stage)) options.sequence = 'box';
+        // From the first split on, the spending box's outline goes solid (Explain's "back to the box").
+        if (!['shift', 'box'].includes(step.stage)) options.sequence = 'box';
+        if (step.emphasis) options.emphasis = step.emphasis;
       }
     }
     if (pendingEnter.length) { options.enter = pendingEnter; pendingEnter = []; }
