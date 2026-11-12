@@ -275,6 +275,7 @@ export const SUBSIDY_STEPS = [
     text: ({ amount }) => `Each thin strip is one loaf: ${t('gov', `${fmtMoney(amount)} tall`)}, from Pc up to Pp, paid by the government. There’s one strip for ${t('qty', 'every loaf sold')}, all the way out to Q<sub>subsidy</sub>.`,
     slider: true, subsidy: true, layers: [...PRICED, 'govStrips', 'readout'], enter: ['govStrips', 'readout'],
     fadeIn: ['pricesC'], // Pc, left out of the revenue step, comes back as the strips' floor
+    chartOptions: { stripsFromRight: true }, // the budget fills in from Q_subsidy back to the axis, as in Play's Government lens
     captions: ({ amount, result }) => ({
       strip: `1 loaf: ${fmtMoney(amount)}`,
       readout: [row('Government pays per loaf', fmtMoney(amount), 'gov'), row('Loaves sold', loaves(result.Q), 'qty')],

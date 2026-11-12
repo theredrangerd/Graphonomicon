@@ -142,6 +142,7 @@ describe('SUBSIDY_STEPS', () => {
     expect(caps.customer).toBeUndefined();
     expect(caps.gov).toBeUndefined();
     expect(SUBSIDY_STEPS.find((s) => s.id === 'strips').fadeIn).toEqual(['pricesC']);
+    expect(SUBSIDY_STEPS.find((s) => s.id === 'strips').chartOptions).toEqual({ stripsFromRight: true });
   });
 
   it('revenue step: Next stays locked until the slider has gone to the bottom and back to the top, with a halo on the end to go to', () => {
