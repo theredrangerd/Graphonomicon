@@ -42,3 +42,7 @@ Government perspective, quantity beat (2026-11-12): after the tax arrow, a purpl
 Government perspective, axes (2026-11-12): the x-axis bracket now names only the quantity ("52.5 units traded"). A purple bracket left of the price axis (`taxHeight`, Pp to Pc, rotated label "$20 tax", or "8% tax ($20)" for ad valorem) follows it, and the arrow's own label drops at that moment. The page reserves both bands (`reserveGapBand`, `reserveDimBands`).
 
 Strips → box (2026-11-12): the strips no longer vanish when the solid box arrives. The box (`govFill`) fades in over 0.9 s while the strips and their "1 unit" label fade out (`exit: ['govStrips']`); the strips are dropped from the DOM only after that fade has finished.
+
+## Play is Explorer only (2026-11-12)
+
+The IB perfect | Explorer switch is gone from the indirect tax page: a bare URL opens Play on Explorer with no lens picked, and the focus bar (Government perspective / Consumer lens / Producer lens) is always visible. `mountViewSwitch(..., { ibView: false })` skips the segmented control, `readPlayView(..., 'explorer')` makes Explorer the default, and the tour's last step points at the focus bar (`interventionTourSteps({ explorerOnly: true })`). Subsidy and price ceiling/floor keep the switch. The Explain wrap-up still draws the IB perfect diagram.

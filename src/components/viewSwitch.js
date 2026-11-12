@@ -39,7 +39,8 @@ export const FLOOR_FOCUSES = Object.freeze([
 
 // IB perfect | Explorer segmented control, plus the focus bar (inserted right after the
 // chart head) of chips that pick one area to highlight in Explorer. DOM + callbacks only.
-export function mountViewSwitch(chartHead, { view, focus, focuses = SUBSIDY_FOCUSES, onChange }) {
+// `ibView: false` drops the IB perfect option: the page is Explorer only and shows just the focus bar.
+export function mountViewSwitch(chartHead, { view, focus, focuses = SUBSIDY_FOCUSES, ibView = true, onChange }) {
   const doc = chartHead.ownerDocument;
   const root = doc.createElement('div');
   root.className = 'view-switch seg';
@@ -47,7 +48,7 @@ export function mountViewSwitch(chartHead, { view, focus, focuses = SUBSIDY_FOCU
   root.setAttribute('aria-label', 'Graph view');
   root.innerHTML = VIEWS.map(([v, label]) =>
     `<label class="seg__opt"><input type="radio" name="play-view" value="${v}"><span>${label}</span></label>`).join('');
-  chartHead.append(root);
+  if (ibView) chartHead.append(root);
 
   const bar = doc.createElement('div');
   bar.className = 'focus-bar';
@@ -69,7 +70,7 @@ export function mountViewSwitch(chartHead, { view, focus, focuses = SUBSIDY_FOCU
     paint();
   };
   const user = (next) => { set(next); onChange({ ...state }); };
-  set({ view, focus });
+  set({ view: ibView ? view : 'explorer', focus });
 
   root.addEventListener('change', (e) => {
     if (e.target.name === 'play-view') user({ view: e.target.value, focus: state.focus });

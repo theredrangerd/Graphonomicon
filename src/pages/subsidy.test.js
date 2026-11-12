@@ -179,12 +179,13 @@ describe('initSubsidyPage — Explain and Play', () => {
     expect(SUBSIDY_AREA_LABELS).toBe('full');
   });
 
-  it('lands a bare URL in Play on IB perfect, with the view switch and no detail gear', () => {
+  it('lands a bare URL in Play on Explorer, with the focus bar, no IB perfect option and no detail gear', () => {
     initSubsidyPage(document, fakeWin('subsidy.html'));
     expect(document.body.dataset.mode).toBe('play');
     expect($('.detail-gear')).toBeNull();
-    expect($('.view-switch')).not.toBeNull();
+    expect($('.view-switch')).toBeNull();
     expect($('.mode-switch')).not.toBeNull();
+    expect($('.focus-bar').hidden).toBe(false);
     expect($('#chart').dataset.detail).toBe('ib');
     expect($('#chart [data-region="subsidy-overlap"]')).toBeNull();
   });
@@ -213,7 +214,6 @@ describe('initSubsidyPage — Explain and Play', () => {
   it('keeps the view in the URL when the student switches it', () => {
     const win = fakeWin('subsidy.html#play');
     initSubsidyPage(document, win);
-    $('.view-switch input[value="explorer"]').click();
     $('.focus-chip[data-focus="ps"]').click();
     expect(win.location.search).toBe('?view=explorer&focus=ps');
   });

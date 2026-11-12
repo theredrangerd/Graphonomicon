@@ -199,11 +199,12 @@ describe('initIndirectTaxPage — Explain and Play', () => {
     expect(TAX_AREA_LABELS).toBe('full');
   });
 
-  it('lands a bare URL in Play on IB perfect, with the view switch and no detail gear', () => {
+  it('lands a bare URL in Play on Explorer, with the focus bar, no IB perfect option and no detail gear', () => {
     initIndirectTaxPage(document, fakeWin('indirect-tax.html'));
     expect(document.body.dataset.mode).toBe('play');
     expect($('.detail-gear')).toBeNull();
-    expect($('.view-switch')).not.toBeNull();
+    expect($('.view-switch')).toBeNull();
+    expect($('.focus-bar').hidden).toBe(false);
     expect($('#chart').dataset.detail).toBe('ib');
     expect([...document.querySelectorAll('.focus-chip')].map((c) => c.dataset.focus)).toEqual(['revenue', 'consumer-lens', 'producer-lens']);
   });
@@ -289,7 +290,6 @@ describe('initIndirectTaxPage — Explain and Play', () => {
   it('draws the lens, then its chips, when a focus is picked with the tax already on', () => {
     initIndirectTaxPage(document, fakeWin('indirect-tax.html#play'));
     toggleTax();
-    $('.view-switch input[value="explorer"]').click();
     $('.focus-chip[data-focus="producer-lens"]').click();
     expect(regions().sort()).toEqual(['dwl', 'ps', 'tax-producer']);
     expect(chipTexts()[0]).toMatch(/^PS/);

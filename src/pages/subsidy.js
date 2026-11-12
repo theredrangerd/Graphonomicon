@@ -38,14 +38,14 @@ export function initSubsidyPage(doc, win = window) {
   let explainers;
   let card; // the Explain step card, mounted below
   let mode = readMode(win);
-  let playView = readPlayView(win, SUBSIDY_FOCUSES.map(([id]) => id), SUBSIDY_FOCUS_ALIASES);
+  let playView = readPlayView(win, SUBSIDY_FOCUSES.map(([id]) => id), SUBSIDY_FOCUS_ALIASES, 'explorer');
 
-  // No detail gear on this page: Play's IB perfect / Explorer switch replaces it, and the
+  // No detail gear on this page, and Play is Explorer only (no IB perfect option); the
   // chart is always drawn at the IB level.
   const chrome = initGraphChrome(doc, {
     chartHead,
     detailSettings: false,
-    steps: (detail) => interventionTourSteps({ policyName: 'subsidy', sliderNoun: 'subsidy', clickableRegions: true, viewSwitch: true }, detail),
+    steps: (detail) => interventionTourSteps({ policyName: 'subsidy', sliderNoun: 'subsidy', clickableRegions: true, explorerOnly: true }, detail),
     onDetailChange: () => {},
   });
   const modeSwitch = mountModeSwitch(chartHead, {
@@ -56,6 +56,7 @@ export function initSubsidyPage(doc, win = window) {
     view: playView.view,
     focus: playView.focus,
     focuses: SUBSIDY_FOCUSES,
+    ibView: false,
     onChange(next) {
       playView = next;
       writePlayView(next, win);

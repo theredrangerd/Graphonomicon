@@ -49,14 +49,14 @@ export function initIndirectTaxPage(doc, win = window) {
   let explainers;
   let card; // the Explain step card, mounted below
   let mode = readMode(win);
-  let playView = readPlayView(win, TAX_FOCUSES.map(([id]) => id), TAX_FOCUS_ALIASES);
+  let playView = readPlayView(win, TAX_FOCUSES.map(([id]) => id), TAX_FOCUS_ALIASES, 'explorer');
 
-  // No detail gear on this page: Play's IB perfect / Explorer switch replaces it, and the
+  // No detail gear on this page, and Play is Explorer only (no IB perfect option); the
   // chart is always drawn at the IB level.
   const chrome = initGraphChrome(doc, {
     chartHead,
     detailSettings: false,
-    steps: (detail) => interventionTourSteps({ policyName: 'tax', sliderNoun: 'tax', clickableRegions: true, viewSwitch: true }, detail),
+    steps: (detail) => interventionTourSteps({ policyName: 'tax', sliderNoun: 'tax', clickableRegions: true, explorerOnly: true }, detail),
     onDetailChange: () => {},
   });
   const modeSwitch = mountModeSwitch(chartHead, {
@@ -67,6 +67,7 @@ export function initIndirectTaxPage(doc, win = window) {
     view: playView.view,
     focus: playView.focus,
     focuses: TAX_FOCUSES,
+    ibView: false,
     onChange(next) {
       const prevFocus = playView.focus;
       playView = next;

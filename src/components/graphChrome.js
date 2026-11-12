@@ -45,7 +45,7 @@ export function maybeAutoStartTour(chrome, win = window) {
 // The standard walkthrough for an intervention page (price ceiling, floor, tax, subsidy).
 // The "tap a shaded area" step only appears on pages whose regions are clickable (they stay
 // clickable at every detail level).
-export function interventionTourSteps({ policyName, sliderNoun, clickableRegions, viewSwitch = false }) {
+export function interventionTourSteps({ policyName, sliderNoun, clickableRegions, viewSwitch = false, explorerOnly = false }) {
   return [
     {
       target: '.toggle-row--primary',
@@ -63,7 +63,13 @@ export function interventionTourSteps({ policyName, sliderNoun, clickableRegions
       title: 'Tap a shaded area',
       text: 'to see what it means and how big it is.',
     }] : []),
-    viewSwitch
+    explorerOnly
+      ? {
+        target: '.focus-bar',
+        title: 'Pick something to highlight.',
+        text: 'Choose an area to see it on its own, one at a time.',
+      }
+      : viewSwitch
       ? {
         target: '.view-switch',
         title: 'Switch views.',
