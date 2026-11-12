@@ -760,6 +760,8 @@ describe('focus', () => {
     expect(arrows.length).toBeGreaterThan(0);
     expect(svg.querySelectorAll('.loaf-drops__one circle')).toHaveLength(0);
     expect(arrows.every((a) => Number(a.getAttribute('opacity')) < 0.5)).toBe(true);
+    renderMarketChart(svg, r(), { detail: 'ib', focus: 'cs', layers, faintDrops: true, exit: ['loafDrops'] });
+    expect(svg.querySelector('[data-layer="loafDrops"]').classList.contains('layer-exit')).toBe(true);
   });
   it('can hold back the Pp line and symbol while keeping the Pc line that tracks e2', () => {
     const result = r();

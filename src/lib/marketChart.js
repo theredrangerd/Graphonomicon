@@ -1192,6 +1192,7 @@ function drawLoafDrops(layer, result, skipQ = null, faint = false) {
     }
   });
   g.setAttribute('data-layer', 'loafDrops');
+  if (layerExit.has('loafDrops')) g.classList.add('layer-exit'); // Play's shift: the arrows fade once S2 has landed
   layer.appendChild(g);
 }
 
