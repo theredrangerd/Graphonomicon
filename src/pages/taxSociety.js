@@ -19,11 +19,14 @@ export function taxSocietyChain() {
   // The grey gap is drawn from the first frame of the tween, growing exactly as the surplus shrinks, so it appears
   // the moment the line is pushed up.
   const grey = ['lostConsumer', 'lostProducer'];
-  const shift = { stage: 'shift', only: [...shifted, ...surplus, ...grey, 'loafDrops'], after: 0 };
+  // The tax per unit as a bracket outside the y axis (Pp to Pc), growing with the tax, so what the grey is from is
+  // clear from the start. It sits in the margin the page reserves, so it never moves the plot.
+  const bracket = ['taxHeight'];
+  const shift = { stage: 'shift', only: [...shifted, ...surplus, ...grey, ...bracket, 'loafDrops'], after: 0 };
   const thenLeave = (step) => ({ ...step, only: [...step.only, 'loafDrops'], exit: [...(step.exit ?? []), 'loafDrops'], after: SHIFT_MS + TWEEN_SETTLE_MS });
   // The whole gap the tax opened goes grey at once (no white left between the two halves), split at Qtax into what
   // the government collects and what is no longer traded; then each party's half takes its own colours in turn.
-  const base = [...priced, ...surplus];
+  const base = [...priced, ...surplus, ...bracket];
   const lost = [...grey, 'lostNote'];
   return [
     shift,

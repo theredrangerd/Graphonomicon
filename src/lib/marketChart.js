@@ -262,7 +262,7 @@ export function resolveLayers(result, { detail = 'full', layers, focus = null, s
       }
       // The tax's Society lens: the two burden bands (which together are the revenue box) and the deadweight loss.
       if (isOpenTax(result)) {
-        for (const name of ['taxConsumer', 'taxProducer']) on.add(name);
+        for (const name of ['taxConsumer', 'taxProducer', 'taxHeight']) on.add(name);
         if (result.dwlPoly?.length >= 3) on.add('dwl');
         on.add('focusChip');
       }

@@ -773,6 +773,18 @@ describe('focus', () => {
     renderMarketChart(svg, r(), opts());
     expect(svg.querySelector('.ghost-out')).toBeNull();
   });
+  it("adding the tax's price-axis bracket (taxHeight) does not move the plot", () => {
+    const taxed = computeMarket({ ...base, intervention: { type: 'tax', mode: 'specific', amount: 20 } });
+    const layers = ['demand', 'supply', 'supply2', 'eq1', 'eq2', 'prices'];
+    const plot = () => ({ clip: svg.querySelector('#plotClip rect')?.outerHTML, view: svg.getAttribute('viewBox'), size: `${svg.getAttribute('width')}x${svg.getAttribute('height')}` });
+    const opts = { detail: 'ib', focus: 'societal', reserveGapBand: true, reserveDimBands: true, growForBands: true };
+    renderMarketChart(svg, taxed, { ...opts, layers });
+    const without = plot();
+    renderMarketChart(svg, taxed, { ...opts, layers: [...layers, 'taxHeight'], captions: { taxHeight: '$20 tax' } });
+    expect(svg.querySelector('.tax-height')).not.toBeNull();
+    expect(plot()).toEqual(without);
+  });
+
   it('can fill the government strips from the right', () => {
     const layers = ['demand', 'supply', 'supply2', 'eq1', 'eq2', 'govStrips'];
     const delays = (opts) => {

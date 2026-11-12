@@ -15,6 +15,9 @@ describe('taxSocietyChain', () => {
     expect(shift.only).toEqual(expect.arrayContaining(['loafDrops', 'supply2', 'eq2', 'cs', 'ps']));
     // the grey gap appears as soon as the line is pushed up, growing as the surplus shrinks
     expect(shift.only).toEqual(expect.arrayContaining(['lostConsumer', 'lostProducer']));
+    // ...with the tax per unit bracketed outside the y axis from the start, and kept all the way through
+    expect(shift.only).toContain('taxHeight');
+    for (const step of taxSocietyChain().filter((s) => s.only)) expect(step.only).toContain('taxHeight');
     expect(shift.only).not.toContain('lostNote');
     expect(shift.only).not.toContain('prices');
     expect(shift.enter ?? []).toEqual([]);

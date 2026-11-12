@@ -265,7 +265,12 @@ export function initIndirectTaxPage(doc, win = window) {
       options.focus = step.lens ?? SOCIETY; // the chips of the party being shown
       options.faintDrops = true; // the line rises with the arrows, so they only need to hint at the lift
       if (step.emphasis) options.emphasis = step.emphasis;
-      options.captions = { lostLeft: 'Captured by the government (tax revenue)', lostRight: 'No longer traded: deadweight loss' };
+      const perUnit = fmtMoney(result.Pc - result.Pp);
+      const taxName = kind === 'advalorem' ? `${advaloremSlider.value}% tax` : `${perUnit} tax`;
+      options.captions = {
+        lostLeft: 'Captured by the government (tax revenue)', lostRight: 'No longer traded: deadweight loss',
+        taxHeight: kind === 'advalorem' ? `${taxName} (${perUnit})` : taxName,
+      };
       options.lostNotesAt = SOCIETY; // the names sit under the whole grey gap
     }
     if (pendingExit.length) { options.exit = pendingExit; pendingExit = []; }
