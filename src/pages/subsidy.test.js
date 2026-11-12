@@ -265,6 +265,14 @@ describe('initSubsidyPage — Explain and Play', () => {
     expect($('#market-note').textContent).not.toContain('Turn the subsidy on');
   });
 
+  it("animates each lens's last step in (the chain hands its enter list to the chart)", () => {
+    for (const [focus, layer] of [['cs', 'marginalCs'], ['ps', 'marginalPs'], ['gov', 'focusChip']]) {
+      initSubsidyPage(document, fakeWin(`subsidy.html?view=explorer&focus=${focus}#play`));
+      toggleOn();
+      expect($(`#chart [data-layer="${layer}"].layer-enter`), `${focus} -> ${layer}`).not.toBeNull();
+    }
+  });
+
   it('says to turn the subsidy on when the Explorer focus has nothing to show', () => {
     initSubsidyPage(document, fakeWin('subsidy.html?view=explorer&focus=gov#play'));
     expect($('#market-note').textContent).toContain('Turn the subsidy on');

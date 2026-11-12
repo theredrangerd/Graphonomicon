@@ -1976,7 +1976,7 @@ export function renderMarketChart(svg, result, options = {}) {
       layer.appendChild(tag(curveName(captions.s1, 'S', '1', { x: p1.x, y: p1.y, fill: 'var(--supply)', 'text-anchor': 'end', ...(s1Muted ? { 'fill-opacity': '0.6' } : {}) }), 'supply'));
     }
     if (on.has('supply2')) {
-      layer.appendChild(tag(el('line', { x1: sx(s2Seg[0][0]), y1: sy(s2Seg[0][1]), x2: sx(s2Seg[1][0]), y2: sy(s2Seg[1][1]), stroke: 'var(--supply)', 'stroke-width': 2.5, 'stroke-linecap': 'round' }, 'supply-curve-shifted'), 'supply2'));
+      layer.appendChild(tag(el('line', { x1: sx(s2Seg[0][0]), y1: sy(s2Seg[0][1]), x2: sx(s2Seg[1][0]), y2: sy(s2Seg[1][1]), stroke: 'var(--supply)', 'stroke-width': 2.5, 'stroke-linecap': 'round', pathLength: 1 }, 'supply-curve-shifted'), 'supply2'));
       const p2 = supplyPos(s2Seg, captions.s2 ?? 'S2', s2Lower === true);
       layer.appendChild(tag(curveName(captions.s2, 'S', '2', { x: p2.x, y: p2.y, fill: 'var(--supply)', 'text-anchor': 'end' }), 'supply2'));
     }

@@ -35,8 +35,8 @@ export function subsidyChain(focus) {
   const priced = [...atE2, 'prices'];
   const opening = [
     { stage: 'arrows', only: [...keep, 'loafDrops'], enter: ['loafDrops'], after: 0 },
-    { stage: 'shift', only: [...withS2, 'loafDrops'], enter: ['supply2'], after: 1050 },
-    { stage: 'e2', only: [...atE2, 'loafDrops', ...(focus === 'ps' ? ['pricesCOnly'] : [])], enter: ['eq2'], exit: ['loafDrops'], after: 750 },
+    { stage: 'shift', only: [...withS2, 'loafDrops'], enter: ['supply2'], after: 1050 }, // S2 is drawn through the arrow tips once they've landed
+    { stage: 'e2', only: [...atE2, 'loafDrops', ...(focus === 'ps' ? ['pricesCOnly'] : [])], enter: ['eq2'], exit: ['loafDrops'], after: 1000 },
   ];
   const finish = (extra = {}) => ({ stage: 'final', ...extra });
   if (focus === 'cs') {
@@ -235,6 +235,7 @@ export function initSubsidyPage(doc, win = window) {
         if (!['arrows', 'shift', 'e2', 'prices', 'strips', 'box', 'boxHold'].includes(step.stage)) options.sequence = 'box';
       }
     }
+    if (pendingEnter.length) { options.enter = pendingEnter; pendingEnter = []; }
     if (pendingExit.length) { options.exit = pendingExit; pendingExit = []; }
     if (pendingGrow.length) { options.grow = pendingGrow; pendingGrow = []; }
     renderMarketChart(chart, result, options);
