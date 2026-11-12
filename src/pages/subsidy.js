@@ -81,8 +81,8 @@ export function subsidyChain(focus) {
       { stage: 'ps', lens: 'ps', emphasis: 'producers', only: [...boxTint, 'csTriangle', 'marginalCs', 'psTriangle', 'focusChip'], enter: ['psTriangle', 'focusChip'], after: 2000 },
       { stage: 'mps', lens: 'ps', emphasis: 'producers', only: [...boxTint, 'csTriangle', 'marginalCs', 'psTriangle', 'marginalPs', 'focusChip'], enter: ['marginalPs', 'focusChip'], after: 1500 },
       // The producers' chips fade with the triangles (the lens stays `ps` so they are still there to fade).
-      { stage: 'tidy', lens: 'ps', only: [...boxTint, ...bothTriangles, 'marginalCs', 'marginalPs', 'focusChip'], exit: [...bothTriangles, 'focusChip'], after: 2000 },
-      { stage: 'leftover', only: [...boxTint, 'marginalCs', 'marginalPs', 'dwl'], enter: ['dwl'], exit: ['govFill'], after: 1500 },
+      { stage: 'tidy', lens: 'ps', only: [...boxTint, ...bothTriangles, 'marginalCs', 'marginalPs', 'focusChip'], exit: [...bothTriangles, 'focusChip'], after: 1600 },
+      { stage: 'leftover', only: [...boxTint, 'marginalCs', 'marginalPs', 'dwl'], enter: ['dwl'], exit: ['govFill'], after: 1200 },
       finish({ enter: ['focusChip'], after: 1800 })];
   }
   return [];

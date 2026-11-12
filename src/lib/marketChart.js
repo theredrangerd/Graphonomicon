@@ -2062,7 +2062,8 @@ export function renderMarketChart(svg, result, options = {}) {
 
 // What an emphasis step ghosts back: everything that isn't the emphasised party's. The chart is rebuilt on every
 // step, so a mark's ghosting is a class: `ghost` holds it faint, and it fades only on the step the emphasis begins
-// (`ghost-in`) or ends (`ghost-out`), never again on a rebuild that keeps it as it was.
+// (`ghost-in`) or ends (`ghost-out`), never again on a rebuild that keeps it as it was; a ghost that is leaving
+// (exit) just fades on from where it is.
 const GHOSTED = {
   consumers: ['supply', 'supply2', 'govFill', 'wedgeBox'],
   producers: ['demand', 'supply2', 'govFill', 'wedgeBox', 'csTriangle', 'marginalCs'],
@@ -2074,6 +2075,6 @@ function ghostLayers(svg, was, now) {
     if (node.parentElement.closest('[data-layer]')) return; // the outermost node of a layer carries it
     const name = node.getAttribute('data-layer');
     if (nowSet.has(name)) node.classList.add('ghost', ...(wasSet.has(name) ? [] : ['ghost-in']));
-    else if (wasSet.has(name)) node.classList.add('ghost-out');
+    else if (wasSet.has(name)) node.classList.add(layerExit.has(name) ? 'ghost' : 'ghost-out'); // a mark leaving fades from its ghost, not back up to full first
   });
 }

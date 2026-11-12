@@ -764,6 +764,12 @@ describe('focus', () => {
     renderMarketChart(svg, r(), opts());
     expect(svg.querySelector('.ghost')).toBeNull();
     expect(svg.querySelector('[data-layer="supply"].ghost-out')).not.toBeNull();
+    // ...except a mark that is leaving: it fades on from its ghost rather than back up to full first.
+    renderMarketChart(svg, r(), opts('consumers'));
+    renderMarketChart(svg, r(), { ...opts(), exit: ['supply'] });
+    expect(svg.querySelector('[data-layer="supply"].ghost')).not.toBeNull();
+    expect(svg.querySelector('[data-layer="supply"].ghost-out')).toBeNull();
+    expect(svg.querySelector('[data-layer="supply"].layer-exit')).not.toBeNull();
     renderMarketChart(svg, r(), opts());
     expect(svg.querySelector('.ghost-out')).toBeNull();
   });
