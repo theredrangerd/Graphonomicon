@@ -279,8 +279,9 @@ describe('initSubsidyPage — Explain and Play', () => {
     $('.focus-question__back').click();
     expect($('.focus-chip[aria-pressed="true"]')).toBeNull();
     expect($('.focus-question').textContent).toContain('IB exam diagram');
-    expect($('#chart [data-layer="supply2"]')).not.toBeNull(); // the subsidised exam diagram is drawn
-    expect($('#chart [data-layer="marginalPs"]')).not.toBeNull();
+    // ...and the chart is redrawn as the whole diagram, not left on the lens
+    expect($('#chart').dataset.focus).toBeUndefined();
+    expect($('#chart [data-layer="supply2"]')).not.toBeNull();
   });
 
   it('says to turn the subsidy on when the Explorer focus has nothing to show', () => {
