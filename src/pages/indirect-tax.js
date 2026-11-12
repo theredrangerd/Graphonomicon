@@ -15,6 +15,8 @@ import { mountExplainCard } from '../components/explainCard.js';
 import { whenAnimationsDone } from '../lib/animationSettle.js';
 import { demandTween, explainMarket, stepDemand, fitsEveryExplainMarket, keepStepCardInView } from '../lib/explainRuntime.js';
 import { TAX_STEPS } from './indirectTaxExplainSteps.js';
+import { replayOf } from '../lib/chain.js';
+import { taxSocietyChain, taxSocietyNote, SHIFT_MS } from './taxSociety.js';
 
 // 'full' | 'half' | 'none' — the tax's own copy of the subsidy's SUBSIDY_AREA_LABELS
 // (Ms. Patel request 3): half names only the two burdens. Flip after she confirms.
@@ -22,8 +24,10 @@ export const TAX_AREA_LABELS = 'full';
 
 // Explorer focuses that only exist once the tax is on, and what the note calls them.
 const GOV_FOCUS = 'revenue'; // the "Government perspective" chip (id kept so shared links work)
+const SOCIETY = 'societal'; // the Societal lens: who bears the tax, then what is lost (see taxSociety.js)
 const TAX_ONLY_FOCUS = {
   'consumer-lens': 'the consumer burden and deadweight loss', 'producer-lens': 'the producer burden and deadweight loss', [GOV_FOCUS]: 'tax revenue',
+  [SOCIETY]: 'the burdens and the deadweight loss',
 };
 
 export function initIndirectTaxPage(doc, win = window) {
@@ -148,11 +152,32 @@ export function initIndirectTaxPage(doc, win = window) {
   let pendingGrow = [];
   let pendingExit = [];
   let cancelReveal = [];
-  const stopReveal = () => { cancelReveal.forEach((c) => c()); cancelReveal = []; };
+  let chainStep = null; // the Societal lens's step being shown; null = the finished picture
+  const stopReveal = () => { cancelReveal.forEach((c) => c()); cancelReveal = []; chainStep = null; };
+  const SOCIETY_CHAIN = taxSocietyChain();
+  // The Societal lens plays its own chain (taxSociety.js), one step per entry. Picked with the tax already on
+  // (`replay`) there is no shift to show, so it starts from the shifted picture without the arrows.
+  function startSociety(replay) {
+    stopReveal();
+    reveal = {}; // nothing a previous lens held back applies here
+    const steps = replay ? replayOf(SOCIETY_CHAIN) : SOCIETY_CHAIN;
+    const run = (i) => {
+      const step = steps[i];
+      chainStep = step;
+      pendingEnter = step.enter ?? [];
+      pendingGrow = step.grow ?? [];
+      pendingExit = step.exit ?? [];
+      render();
+      if (step.stage === 'final') chainStep = null; // from here on a slider drag shows the finished picture
+      else cancelReveal.push(delay(steps[i + 1].after, () => run(i + 1)));
+    };
+    run(0);
+  }
   // `lead`: how long before the first step. A focus picked with the tax already on starts at
   // once; the toggle waits for its own tween.
   // `from`: the step to open on; earlier steps are shown as already done.
   function startReveal(lead = 0, from = 0) {
+    if (playView.focus === SOCIETY) { startSociety(lead === 0); return; }
     stopReveal();
     const steps = REVEALS[playView.focus] ?? [];
     stripsMerged = false;
@@ -189,7 +214,7 @@ export function initIndirectTaxPage(doc, win = window) {
   const sliders = wireShiftAndSlopeInputs(doc, () => render(), isValid);
 
   // The legend keeps demand, supply and the focused area; revenue draws both burdens inside its box.
-  const LEGEND_FOR = { 'consumer-lens': ['cs', 'tax-consumer', 'dwl'], 'producer-lens': ['ps', 'tax-producer', 'dwl'], [GOV_FOCUS]: ['revenue'] };
+  const LEGEND_FOR = { 'consumer-lens': ['cs', 'tax-consumer', 'dwl'], 'producer-lens': ['ps', 'tax-producer', 'dwl'], [GOV_FOCUS]: ['revenue'], [SOCIETY]: ['tax-consumer', 'tax-producer', 'dwl'] };
   function updateLegend(focus) {
     const shown = ['demand', 'supply', ...(LEGEND_FOR[focus] ?? [focus])];
     doc.querySelectorAll('.legend [data-legend]').forEach((item) => {
@@ -231,6 +256,17 @@ export function initIndirectTaxPage(doc, win = window) {
     if (focus === 'consumer-lens' || focus === 'producer-lens') {
       options.captions = { lostLeft: 'Captured by the government (tax revenue)', lostRight: 'No longer traded: deadweight loss' };
     }
+    const step = focus === SOCIETY && taxActive && !result.noTrade && !result.closed ? chainStep : null;
+    if (step) {
+      const held = step.only ? new Set(step.only) : resolveLayers(result, { ...options, focus: SOCIETY });
+      (step.drop ?? []).forEach((name) => held.delete(name));
+      (step.add ?? []).forEach((name) => held.add(name));
+      options.layers = [...held];
+      options.focus = step.lens ?? SOCIETY; // the chips of the party being shown
+      options.faintDrops = true; // the line rises with the arrows, so they only need to hint at the lift
+      if (step.emphasis) options.emphasis = step.emphasis;
+      options.captions = { lostLeft: 'Captured by the government (tax revenue)', lostRight: 'No longer traded: deadweight loss' };
+    }
     if (pendingExit.length) { options.exit = pendingExit; pendingExit = []; }
     if (focus === GOV_FOCUS) {
       const perUnit = fmtMoney(result.Pc - result.Pp);
@@ -265,6 +301,8 @@ export function initIndirectTaxPage(doc, win = window) {
       note = `<strong>No units are traded.</strong> The tax is at least as big as the gap between the most any buyer will pay and the least any seller will accept, so the market shuts down and all ${fmtMoney(result.DWL)} of surplus is lost.`;
     } else if (!taxActive && TAX_ONLY_FOCUS[focus]) {
       note = `Turn the tax on to see ${TAX_ONLY_FOCUS[focus]}.`;
+    } else if (taxActive && focus === SOCIETY) {
+      note = taxSocietyNote(chainStep?.stage ?? 'final', result, fmtMoney);
     } else if (taxActive) {
       // The lost units run from Q to Q*: buyers value them between P* and Pc, and they
       // cost sellers between Pp and P* — worth more than they cost, but not worth Pc.
@@ -285,7 +323,7 @@ export function initIndirectTaxPage(doc, win = window) {
     settleActiveSlider();
     render();
   }));
-  toggleCtl = wireInterventionToggle(taxToggle, render, { beforeOn: settleActiveSlider, duration: 650, holdOn: () => (playView.focus === GOV_FOCUS ? DOT_MS : 0) });
+  toggleCtl = wireInterventionToggle(taxToggle, render, { beforeOn: settleActiveSlider, duration: () => (playView.focus === SOCIETY ? SHIFT_MS : 650), holdOn: () => (playView.focus === GOV_FOCUS ? DOT_MS : 0) });
   taxToggle.addEventListener('change', () => {
     if (taxToggle.checked) startReveal(TOGGLE_MS + (playView.focus === GOV_FOCUS ? DOT_MS : 0)); else { stopReveal(); reveal = {}; lostDone = true; }
   });

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { subsidyChain, replayOf } from './subsidy.js';
+import { subsidyChain } from './subsidy.js';
+import { replayOf } from '../lib/chain.js';
 
 const stages = (focus) => subsidyChain(focus).map((step) => step.stage);
 const FOCUSES = ['gov', 'cs', 'ps', 'societal'];

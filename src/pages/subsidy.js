@@ -2,6 +2,7 @@ import { renderMiniHeader } from '../components/chrome.js';
 import { computeMarket } from '../lib/marketEngine.js';
 import { renderMarketChart, resolveLayers, quantityAtClientX } from '../lib/marketChart.js';
 import { delay, tweenValue } from '../lib/animate.js';
+import { replayOf } from '../lib/chain.js';
 import { fmtMoney, fmtPrice, setStatusPill } from '../lib/format.js';
 import { getFamilyNav } from '../components/familyNav.js';
 import { wireShiftAndSlopeInputs, updateShiftAndSlopeLabels, wireInterventionToggle, readCurveParams, marketFits, guardSliders, settleDown, fillSharedStats, NO_TRADE_NOTE } from '../lib/pageControls.js';
@@ -88,16 +89,6 @@ export function subsidyChain(focus) {
       finish({ after: 1300 })];
   }
   return [];
-}
-
-// The chain for a lens picked while the subsidy is already on: S2 and e2 are already there, so no arrows.
-// The shifted picture comes up at once, then the lens's own steps follow shortly after.
-const without = (names, drop) => names?.filter((name) => name !== drop);
-export function replayOf(chain) {
-  if (!chain.length) return []; // no lens (the exam diagram) has no chain
-  const bare = (step) => ({ ...step, only: without(step.only, 'loafDrops'), add: without(step.add, 'loafDrops'), exit: without(step.exit, 'loafDrops') });
-  const [shifted, ...rest] = chain.map(bare);
-  return rest.length ? [shifted, { ...rest[0], after: 300 }, ...rest.slice(1)] : [shifted];
 }
 
 export function initSubsidyPage(doc, win = window) {

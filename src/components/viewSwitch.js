@@ -28,6 +28,7 @@ export const TAX_FOCUSES = Object.freeze([
   ['revenue', 'Government perspective'],
   ['consumer-lens', 'Consumer lens'],
   ['producer-lens', 'Producer lens'],
+  ['societal', 'Societal lens'],
 ]);
 // Focus ids a shared link may still carry from before the lenses, and what they open now.
 export const TAX_FOCUS_ALIASES = Object.freeze({

@@ -260,6 +260,12 @@ export function resolveLayers(result, { detail = 'full', layers, focus = null, s
         if (result.dwlPoly?.length >= 3) on.add('dwl');
         on.add('focusChip');
       }
+      // The tax's Society lens: the two burden bands (which together are the revenue box) and the deadweight loss.
+      if (isOpenTax(result)) {
+        for (const name of ['taxConsumer', 'taxProducer']) on.add(name);
+        if (result.dwlPoly?.length >= 3) on.add('dwl');
+        on.add('focusChip');
+      }
       return on;
     }
     if (focus === 'overlap') {
@@ -1170,20 +1176,25 @@ function drawLoafDrops(layer, result, skipQ = null, faint = false) {
   DROP_QS.forEach((q, i) => {
     // The student's own loaf (still drawn, as it was, by the loafDrop layer) has its arrow already.
     if (skipQ != null && Math.abs(q - skipQ) < DROP_QS[0] / 2) return;
-    const { cost, customer } = loafPoint(result, q);
-    if (cost > PMAX) return;
+    // A subsidy's arrows go down from S1 to S2; a tax's go up (S2 is S1 plus the tax, which for an ad valorem tax grows with q).
+    const taxed = result.mode === 'tax';
+    const s2 = shiftedSupplyParams(result);
+    const { cost, customer } = taxed ? { cost: s1Cost(result, q), customer: s2.Smin + s2.slopeS * q } : loafPoint(result, q);
+    if (cost > PMAX || (taxed && customer > PMAX)) return;
     const x = sx(q), yTop = sy(cost), yBot = sy(customer);
     const one = mark(el('g', {}, 'loaf-drops__one'), 'gov');
     if (!faint) one.appendChild(el('circle', { cx: x, cy: yTop, r: 3.5, fill: 'var(--supply)' }));
     if (faint) one.setAttribute('opacity', '0.28');
-    if (yBot - yTop > 12) one.appendChild(arrowMark(x, yTop + 4, x, yBot - 2, { width: 1.8, head: 8, color: 'var(--gov)' }));
+    if (taxed) {
+      if (yTop - yBot > 12) one.appendChild(arrowMark(x, yTop - 4, x, yBot + 2, { width: 1.8, head: 8, color: 'var(--gov)' }));
+    } else if (yBot - yTop > 12) one.appendChild(arrowMark(x, yTop + 4, x, yBot - 2, { width: 1.8, head: 8, color: 'var(--gov)' }));
     if (entering) {
       one.classList.add('layer-drop');
       one.style.setProperty('--d', String(i * 250)); // ms at 1× pace; pages.css scales it
     }
     g.appendChild(one);
     // The same hollow blue dot the single loaf ends on: where the customer's price lands (S2).
-    if (!faint && yBot - yTop > 12 && customer >= 0) {
+    if (!faint && !taxed && yBot - yTop > 12 && customer >= 0) {
       const tip = customerDot(x, yBot, 'loaf-drops__tip');
       if (entering) {
         tip.classList.add('loaf-drops__tip--enter');
@@ -1382,6 +1393,8 @@ function drawSubsidyTeachingMarks(layer, result, captions, options) {
     const name = layerOn.has(tri) ? tri : layerOn.has(key) ? key : null;
     if (name) nameArea(layer, result.mode === 'subsidy' ? triPoly : plainPoly, captions[key], name, key);
   }
+  // A tax's arrows (the Society lens's shift) go up from S1; it has no other teaching marks.
+  if (result.mode === 'tax' && layerOn.has('loafDrops')) { drawLoafDrops(layer, result, null, Boolean(options.faintDrops)); return; }
   if (result.mode !== 'subsidy') return;
   if (layerOn.has('loafDrops')) drawLoafDrops(layer, result, layerOn.has('loafDrop') ? (options.loafQ ?? DEFAULT_LOAF_Q) : null, Boolean(options.faintDrops));
   if (layerOn.has('loafDrop')) drawLoafDrop(layer, result, captions, options.loafQ ?? DEFAULT_LOAF_Q, Boolean(options.loafArmed), options.loafGuides !== false);
@@ -1475,11 +1488,16 @@ function drawFocusChip(layer, result, focus) {
     return;
   }
   if (focus === 'societal') {
-    for (const [layerName, id, label, value, poly, colorVar, textVar] of [
+    const chips = result.mode === 'tax' ? [
+      ['taxConsumer', 'consumer-burden', 'CB', result.consumerIncidence, result.consumerWedgePoly, 'burden-consumer'],
+      ['taxProducer', 'producer-burden', 'PB', result.producerIncidence, result.producerWedgePoly, 'burden-producer'],
+      ['dwl', 'dwl', 'DWL', result.DWL, result.dwlPoly, 'dwl-line'],
+    ] : [
       ['marginalCs', 'marginal-cs', 'mCS', result.marginalCS, result.marginalCsPoly, 'demand-alt', 'ink'],
       ['marginalPs', 'marginal-ps', 'mPS', result.marginalPS, result.marginalPsPoly, 'supply-alt', 'ink'],
       ['dwl', 'dwl', 'DWL', result.DWL, result.dwlPoly, 'dwl-line'],
-    ]) {
+    ];
+    for (const [layerName, id, label, value, poly, colorVar, textVar] of chips) {
       if (layerOn.has(layerName)) placeFocusChip(g, { label, value, colorVar, textVar }, id, poly);
     }
     if (g.childNodes.length) layer.appendChild(tag(g, 'focusChip'));
@@ -2066,8 +2084,8 @@ export function renderMarketChart(svg, result, options = {}) {
 // (`ghost-in`) or ends (`ghost-out`), never again on a rebuild that keeps it as it was; a ghost that is leaving
 // (exit) just fades on from where it is.
 const GHOSTED = {
-  consumers: ['supply', 'supply2', 'govFill', 'wedgeBox'],
-  producers: ['demand', 'supply2', 'govFill', 'wedgeBox', 'csTriangle', 'marginalCs'],
+  consumers: ['supply', 'supply2', 'govFill', 'wedgeBox', 'ps', 'taxProducer', 'dwlProducer'],
+  producers: ['demand', 'supply2', 'govFill', 'wedgeBox', 'csTriangle', 'marginalCs', 'cs', 'taxConsumer', 'dwlConsumer'],
 };
 function ghostLayers(svg, was, now) {
   const wasSet = new Set(GHOSTED[was] ?? []), nowSet = new Set(GHOSTED[now] ?? []);

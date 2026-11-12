@@ -206,7 +206,7 @@ describe('initIndirectTaxPage — Explain and Play', () => {
     expect($('.view-switch')).toBeNull();
     expect($('.focus-bar').hidden).toBe(false);
     expect($('#chart').dataset.detail).toBe('ib');
-    expect([...document.querySelectorAll('.focus-chip')].map((c) => c.dataset.focus)).toEqual(['revenue', 'consumer-lens', 'producer-lens']);
+    expect([...document.querySelectorAll('.focus-chip')].map((c) => c.dataset.focus)).toEqual(['revenue', 'consumer-lens', 'producer-lens', 'societal']);
   });
 
   it('draws the IB perfect tax diagram with the quantity axis reading Qe and Qtax', () => {
@@ -247,6 +247,28 @@ describe('initIndirectTaxPage — Explain and Play', () => {
     expect($('#chart [data-layer="dwlConsumer"]')).toBeNull();
     expect(chipTexts().map((t) => t.split(' ')[0]).slice(0, 2)).toEqual(['PS', 'PB']);
     expect(shownLegend()).toEqual(['demand', 'supply', 'ps', 'tax-producer', 'dwl']);
+  });
+
+  it('societal lens, tax on: the two burdens and the whole deadweight loss, with a chip each, and no surplus left over', () => {
+    initIndirectTaxPage(document, fakeWin('indirect-tax.html?view=explorer&focus=societal#play'));
+    expect($('#market-note').textContent).toContain('Turn the tax on to see the burdens and the deadweight loss');
+    toggleTax();
+    expect(regions().sort()).toEqual(['dwl', 'tax-consumer', 'tax-producer']);
+    expect($('#chart [data-layer="dwl"]')).not.toBeNull();
+    expect($('#chart [data-layer="dwlConsumer"]')).toBeNull();
+    expect($('#chart [data-layer="cs"]')).toBeNull();
+    expect($('#chart [data-layer="loafDrops"]')).toBeNull(); // the arrows were only for the shift
+    expect(chipTexts().map((t) => t.split(' ')[0]).slice(0, 2)).toEqual(['CB', 'PB']);
+    expect(shownLegend()).toEqual(['demand', 'supply', 'tax-consumer', 'tax-producer', 'dwl']);
+    expect($('#market-note').textContent).toContain('no longer traded');
+  });
+
+  it('switching to another lens with the tax on does not bring the arrows back', () => {
+    initIndirectTaxPage(document, fakeWin('indirect-tax.html?view=explorer&focus=consumer-lens#play'));
+    toggleTax();
+    $('.focus-chip[data-focus="societal"]').click();
+    expect($('#chart [data-layer="loafDrops"]')).toBeNull();
+    expect($('.focus-chip[aria-pressed="true"]').dataset.focus).toBe('societal');
   });
 
   it('opens an old ?focus=cs link on the consumer lens', () => {

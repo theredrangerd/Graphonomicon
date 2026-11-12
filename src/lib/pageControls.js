@@ -162,7 +162,7 @@ export function wireInterventionToggle(toggle, render, { beforeOn, duration, hol
       cancelAnim = tweenValue({
         from: fraction,
         to: toggle.checked ? 1 : 0,
-        ...(duration ? { duration } : {}),
+        ...(duration ? { duration: typeof duration === 'function' ? duration() : duration } : {}), // a page may vary it by lens
         onUpdate(v) { fraction = v; render(); },
         onComplete() { cancelAnim = null; },
       });
