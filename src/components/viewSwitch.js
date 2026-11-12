@@ -1,4 +1,12 @@
 const VIEWS = [['ib', 'IB perfect'], ['explorer', 'Explorer']];
+// What each subsidy lens asks, shown above the graph while it's selected: each lens is one
+// stakeholder, and the question is the one an IB evaluation turns on.
+export const SUBSIDY_QUESTIONS = Object.freeze({
+  gov: "What is the impact on the government's budget?",
+  cs: 'What is the impact on consumers?',
+  ps: 'What is the impact on producers?',
+  societal: 'What is the impact on society?',
+});
 // Each page's focus chips, in order: [focus id, chip label].
 // Subsidy mirrors the tax page: the government perspective (spending and the deadweight loss it
 // leaves), then one lens per side of the market (its free-market surplus and the marginal band
@@ -40,7 +48,9 @@ export const FLOOR_FOCUSES = Object.freeze([
 // IB perfect | Explorer segmented control, plus the focus bar (inserted right after the
 // chart head) of chips that pick one area to highlight in Explorer. DOM + callbacks only.
 // `ibView: false` drops the IB perfect option: the page is Explorer only and shows just the focus bar.
-export function mountViewSwitch(chartHead, { view, focus, focuses = SUBSIDY_FOCUSES, ibView = true, onChange }) {
+// `questions` (focus id -> text) turns the bar into a row of tinted lens buttons with no prompt; the
+// selected lens's question shows beneath it, above the graph.
+export function mountViewSwitch(chartHead, { view, focus, focuses = SUBSIDY_FOCUSES, ibView = true, questions = null, onChange }) {
   const doc = chartHead.ownerDocument;
   const root = doc.createElement('div');
   root.className = 'view-switch seg';
@@ -51,9 +61,9 @@ export function mountViewSwitch(chartHead, { view, focus, focuses = SUBSIDY_FOCU
   if (ibView) chartHead.append(root);
 
   const bar = doc.createElement('div');
-  bar.className = 'focus-bar';
-  bar.innerHTML = `<span class="focus-bar__prompt">Pick something to highlight:</span>${focuses.map(([id, label]) =>
-    `<button type="button" class="focus-chip" data-focus="${id}" aria-pressed="false">${label}</button>`).join('')}`;
+  bar.className = questions ? 'focus-bar focus-bar--lenses' : 'focus-bar';
+  bar.innerHTML = `${questions ? '' : '<span class="focus-bar__prompt">Pick something to highlight:</span>'}${focuses.map(([id, label]) =>
+    `<button type="button" class="focus-chip" data-focus="${id}" aria-pressed="false">${label}</button>`).join('')}${questions ? '<p class="focus-question" aria-live="polite" hidden></p>' : ''}`;
   chartHead.after(bar);
 
   const radios = [...root.querySelectorAll('input[name="play-view"]')];
@@ -64,6 +74,12 @@ export function mountViewSwitch(chartHead, { view, focus, focuses = SUBSIDY_FOCU
     radios.forEach((r) => { r.checked = r.value === state.view; });
     bar.hidden = state.view !== 'explorer';
     chips.forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.focus === state.focus)));
+    const question = bar.querySelector('.focus-question');
+    if (question) {
+      question.textContent = questions[state.focus] ?? '';
+      question.dataset.focus = state.focus ?? '';
+      question.hidden = !questions[state.focus];
+    }
   };
   const set = ({ view: v, focus: f = null }) => {
     state = { view: v, focus: v === 'explorer' ? f : null };

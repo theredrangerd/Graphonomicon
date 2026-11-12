@@ -26,6 +26,24 @@ describe('mountViewSwitch', () => {
     expect(bar.textContent).toContain('Pick something to highlight:');
   });
 
+  it('with questions, drops the prompt and shows the chosen lens\'s question above the graph', () => {
+    document.body.innerHTML = '<div class="chart-head"></div>';
+    const head = document.querySelector('.chart-head');
+    const api = mountViewSwitch(head, { view: 'explorer', focus: null, questions: { cs: 'What is the impact on consumers?', ps: 'What is the impact on producers?' }, onChange: () => {} });
+    const bar = document.querySelector('.focus-bar');
+    expect(bar.textContent).not.toContain('Pick something to highlight');
+    expect(bar.classList.contains('focus-bar--lenses')).toBe(true);
+    const question = bar.querySelector('.focus-question');
+    expect(question.hidden).toBe(true);
+    bar.querySelector('[data-focus="cs"]').click();
+    expect(question.hidden).toBe(false);
+    expect(question.textContent).toBe('What is the impact on consumers?');
+    api.set({ view: 'explorer', focus: 'ps' });
+    expect(question.textContent).toBe('What is the impact on producers?');
+    bar.querySelector('[data-focus="ps"]').click();
+    expect(question.hidden).toBe(true);
+  });
+
   it('clicking a lens focuses it, clicking again clears it', () => {
     const { bar, onChange } = setup('explorer');
     const chip = bar.querySelector('[data-focus="cs"]');

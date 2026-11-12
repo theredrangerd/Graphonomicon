@@ -628,6 +628,34 @@ header.top .mode-link { position: absolute; right: 0; top: calc(clamp(36px, 5vw,
 .focus-chip:hover { border-color: var(--accent); color: var(--ink); }
 .focus-chip[aria-pressed="true"] { background: var(--accent-fill); border-color: var(--accent); color: var(--accent); font-weight: 600; }
 .focus-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* The subsidy lenses: four tinted buttons in a row (each lens its stakeholder's colour), the chosen one
+   bolder, and its question beneath. Tinted by the colours the chart already uses for that stakeholder. */
+.focus-bar--lenses { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.focus-bar--lenses .focus-chip {
+  --lens: var(--ink-secondary);
+  padding: 9px 10px;
+  font-size: 13px;
+  border-color: color-mix(in srgb, var(--lens) 32%, var(--hairline));
+  background: color-mix(in srgb, var(--lens) 7%, var(--surface));
+  color: color-mix(in srgb, var(--lens) 75%, var(--ink));
+}
+.focus-bar--lenses .focus-chip[data-focus="gov"] { --lens: var(--gov); }
+.focus-bar--lenses .focus-chip[data-focus="cs"] { --lens: var(--demand); }
+.focus-bar--lenses .focus-chip[data-focus="ps"] { --lens: var(--supply); }
+.focus-bar--lenses .focus-chip:hover { border-color: var(--lens); color: var(--ink); }
+.focus-bar--lenses .focus-chip[aria-pressed="true"] {
+  font-weight: 700;
+  border-color: var(--lens);
+  background: color-mix(in srgb, var(--lens) 18%, var(--surface));
+  color: color-mix(in srgb, var(--lens) 70%, black);
+}
+.focus-bar--lenses .focus-chip:focus-visible { outline-color: var(--lens); }
+.focus-question { grid-column: 1 / -1; margin: 2px 0 0; font-size: 15px; font-weight: 600; color: var(--ink); }
+.focus-question[hidden] { display: none; }
+.focus-question[data-focus="gov"] { color: var(--gov-ink); }
+.focus-question[data-focus="cs"] { color: color-mix(in srgb, var(--demand) 75%, black); }
+.focus-question[data-focus="ps"] { color: color-mix(in srgb, var(--supply) 75%, black); }
+@media (max-width: 640px) { .focus-bar--lenses { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 .detail-popover__hint { margin: 10px 0 0; font-size: 12.5px; color: var(--ink-secondary); }
 
