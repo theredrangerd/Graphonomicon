@@ -1777,6 +1777,7 @@ export function renderMarketChart(svg, result, options = {}) {
   // A named entry sequence for the Explain steps whose marks arrive one after another (pages.css, [data-seq]).
   if (options.sequence) svg.dataset.seq = options.sequence; else delete svg.dataset.seq;
   // A curve a step is pointing at ('demand' | 'supply'): pages.css thickens it (Play's Society lens).
+  const prevEmphasis = svg.dataset.emphasis;
   if (options.emphasis) svg.dataset.emphasis = options.emphasis; else delete svg.dataset.emphasis;
 
   if (!result.noTrade) {
@@ -2053,6 +2054,25 @@ export function renderMarketChart(svg, result, options = {}) {
   // No numbers on an exam diagram: drawAxisSymbols sets tick visibility per render, so
   // this has to run after it.
   if (detail === 'ib') svg.querySelectorAll('.tick-label').forEach((tick) => tick.setAttribute('visibility', 'hidden'));
+  ghostLayers(svg, prevEmphasis, options.emphasis);
   // The nodes above are new: restore any hover/tap highlight the old ones carried.
   svg._restoreRegionState?.();
+}
+
+// What an emphasis step ghosts back: everything that isn't the emphasised party's. The chart is rebuilt on every
+// step, so a mark's ghosting is a class: `ghost` holds it faint, and it fades only on the step the emphasis begins
+// (`ghost-in`) or ends (`ghost-out`), never again on a rebuild that keeps it as it was.
+const GHOSTED = {
+  consumers: ['supply', 'supply2', 'govFill', 'wedgeBox'],
+  producers: ['demand', 'supply2', 'govFill', 'wedgeBox', 'csTriangle', 'marginalCs'],
+};
+function ghostLayers(svg, was, now) {
+  const wasSet = new Set(GHOSTED[was] ?? []), nowSet = new Set(GHOSTED[now] ?? []);
+  if (!wasSet.size && !nowSet.size) return;
+  svg.querySelectorAll('[data-layer]').forEach((node) => {
+    if (node.parentElement.closest('[data-layer]')) return; // the outermost node of a layer carries it
+    const name = node.getAttribute('data-layer');
+    if (nowSet.has(name)) node.classList.add('ghost', ...(wasSet.has(name) ? [] : ['ghost-in']));
+    else if (wasSet.has(name)) node.classList.add('ghost-out');
+  });
 }

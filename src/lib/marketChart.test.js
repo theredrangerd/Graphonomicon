@@ -751,6 +751,23 @@ describe('focus', () => {
     renderMarketChart(svg, r(0), { detail: 'ib', focus: 'ps' });
     expect(svg.querySelector('.subsidy-arrow')).toBeNull();
   });
+  it('fades ghosted marks only when an emphasis begins or ends, not on a rebuild that keeps it', () => {
+    const layers = ['demand', 'supply', 'supply2', 'eq1', 'eq2', 'wedgeBox', 'govFill'];
+    const opts = (emphasis) => ({ detail: 'ib', focus: 'cs', layers, ...(emphasis ? { emphasis } : {}) });
+    renderMarketChart(svg, r(), opts());
+    expect(svg.querySelector('.ghost')).toBeNull();
+    renderMarketChart(svg, r(), opts('consumers'));
+    expect(svg.querySelector('[data-layer="supply"].ghost.ghost-in')).not.toBeNull();
+    expect(svg.querySelector('[data-layer="demand"].ghost')).toBeNull();
+    renderMarketChart(svg, r(), opts('consumers'));
+    expect(svg.querySelector('[data-layer="supply"].ghost')).not.toBeNull();
+    expect(svg.querySelector('.ghost-in')).toBeNull();
+    renderMarketChart(svg, r(), opts());
+    expect(svg.querySelector('.ghost')).toBeNull();
+    expect(svg.querySelector('[data-layer="supply"].ghost-out')).not.toBeNull();
+    renderMarketChart(svg, r(), opts());
+    expect(svg.querySelector('.ghost-out')).toBeNull();
+  });
   it('can draw the loaf arrows faint and dotless, for Play\'s shift', () => {
     const layers = ['demand', 'supply', 'supply2', 'eq1', 'eq2', 'loafDrops'];
     renderMarketChart(svg, r(), { detail: 'ib', focus: 'cs', layers });

@@ -1154,10 +1154,12 @@ body[data-mode] .market-chart[data-seq="join"] :is([data-layer="marginalCs"], [d
 @media (prefers-reduced-motion: reduce) { body[data-mode] .market-chart[data-seq] [data-layer="loafDrops"] { display: none; } body[data-mode] .market-chart[data-seq] * { animation: none !important; } }
 /* Society lens: while a step is about one party (data-emphasis), everything that isn't theirs steps back to a
    ghost, and the curve their surplus hangs from is thickened (S1, muted once S2 is there, comes back to full). */
-.market-chart[data-emphasis] [data-layer] { transition: opacity 0.35s; }
-.market-chart[data-emphasis="consumers"] :is([data-layer="supply"], [data-layer="supply2"], [data-layer="govFill"], [data-layer="wedgeBox"]) { opacity: 0.14; }
+.market-chart .ghost { opacity: 0.14; }
+.market-chart .ghost-in { animation: ghost-in 0.45s ease-out both; }
+.market-chart .ghost-out { animation: ghost-out 0.45s ease-out both; }
+@keyframes ghost-in { from { opacity: 1; } }
+@keyframes ghost-out { from { opacity: 0.14; } }
 .market-chart[data-emphasis="consumers"] line.demand-curve { stroke-width: 4.5; }
-.market-chart[data-emphasis="producers"] :is([data-layer="demand"], [data-layer="supply2"], [data-layer="govFill"], [data-layer="wedgeBox"], [data-layer="csTriangle"], [data-layer="marginalCs"]) { opacity: 0.14; }
 .market-chart[data-emphasis="producers"] line.supply-curve { stroke-width: 4; stroke-opacity: 1; stroke-dasharray: none; }
 body[data-mode="play"] .market-chart [data-layer="govFill"].layer-enter { animation-duration: 450ms; }
 /* Play: each lens step is drawn, so the student sees how one mark leads to the next: the Pc and Pp lines are

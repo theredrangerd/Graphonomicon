@@ -75,12 +75,13 @@ export function subsidyChain(focus) {
     const boxTint = [...boxed, 'govFill'];
     const bothTriangles = ['csTriangle', 'psTriangle'];
     return [shift,
-      thenLeave({ stage: 'box', only: [...boxTint, 'boxLabel'], enter: ['govFill', 'wedgeBox', 'boxLabel'] }),
+      thenLeave({ stage: 'box', only: [...boxTint, 'boxLabel'], enter: ['govFill', 'wedgeBox', 'boxLabel', 'pricesC', 'prices'] }),
       { stage: 'cs', lens: 'cs', emphasis: 'consumers', only: [...boxTint, 'boxLabel', 'csTriangle', 'focusChip'], enter: ['csTriangle', 'focusChip'], exit: ['boxLabel'], after: 1000 },
       { stage: 'mcs', lens: 'cs', emphasis: 'consumers', only: [...boxTint, 'csTriangle', 'marginalCs', 'focusChip'], enter: ['marginalCs', 'focusChip'], after: 1500 },
       { stage: 'ps', lens: 'ps', emphasis: 'producers', only: [...boxTint, 'csTriangle', 'marginalCs', 'psTriangle', 'focusChip'], enter: ['psTriangle', 'focusChip'], after: 2000 },
       { stage: 'mps', lens: 'ps', emphasis: 'producers', only: [...boxTint, 'csTriangle', 'marginalCs', 'psTriangle', 'marginalPs', 'focusChip'], enter: ['marginalPs', 'focusChip'], after: 1500 },
-      { stage: 'tidy', only: [...boxTint, ...bothTriangles, 'marginalCs', 'marginalPs'], exit: bothTriangles, after: 2000 },
+      // The producers' chips fade with the triangles (the lens stays `ps` so they are still there to fade).
+      { stage: 'tidy', lens: 'ps', only: [...boxTint, ...bothTriangles, 'marginalCs', 'marginalPs', 'focusChip'], exit: [...bothTriangles, 'focusChip'], after: 2000 },
       { stage: 'leftover', only: [...boxTint, 'marginalCs', 'marginalPs', 'dwl'], enter: ['dwl'], exit: ['govFill'], after: 1500 },
       finish({ enter: ['focusChip'], after: 1800 })];
   }
