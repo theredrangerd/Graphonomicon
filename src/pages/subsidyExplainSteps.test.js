@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SUBSIDY_STEPS, LOAF_Q, loafQ, snapLoaf } from './subsidyExplainSteps.js';
+import { advanceSweep, SUBSIDY_STEPS, LOAF_Q, loafQ, snapLoaf } from './subsidyExplainSteps.js';
 import { LAYERS } from '../lib/marketChart.js';
 import { computeMarket } from '../lib/marketEngine.js';
 import { DEFAULT_MARKET } from '../lib/pageControls.js';
@@ -13,16 +13,17 @@ const step = (id) => SUBSIDY_STEPS.find((s) => s.id === id);
 const plain = (html) => html.replace(/<[^>]+>/g, '');
 
 describe('SUBSIDY_STEPS', () => {
-  it('has the 14 steps in order: why S2 is lower, the two prices, revenue as an area, the box, then where the money goes', () => {
+  it('has the 19 steps in order: why S2 is lower, the two prices, revenue as an area, the box, then where the money goes', () => {
     expect(SUBSIDY_STEPS.map((s) => s.id)).toEqual([
       'demand', 'supply', 'cost of a loaf', 'one loaf', 'every loaf', 'equilibrium',
-      'two prices', 'revenue', 'strips', 'government', 'producer', 'consumer', 'deadweight loss', 'wrap']);
+      'two prices', 'revenue', 'strips', 'government', 'consumer surplus', 'consumer', 'producer surplus', 'producer', 'both sides', 'box shares', 'deadweight loss', 'wrap', 'inelastic']);
   });
   it('never drops supply (S1 never moves) before the IB wrap-up', () => {
-    SUBSIDY_STEPS.slice(1, -1).forEach((s) => expect(s.layers).toContain('supply'));
+    SUBSIDY_STEPS.slice(1, -2).forEach((s) => expect(s.layers).toContain('supply'));
     const last = SUBSIDY_STEPS.at(-1);
     expect(last.view).toBe('ib');
     expect(last.finish).toBe(true);
+    expect(last.demand).toBe('inelastic');
   });
   it('only uses known layer names, and enter/grow are subsets of layers', () => {
     SUBSIDY_STEPS.forEach((s) => {
@@ -33,7 +34,12 @@ describe('SUBSIDY_STEPS', () => {
   });
   it('steps 1-3 have no subsidy; from "one loaf" on, the slider and subsidy are on', () => {
     expect(SUBSIDY_STEPS.slice(0, 3).every((s) => s.subsidy === false && s.slider === false)).toBe(true);
-    expect(SUBSIDY_STEPS.slice(3).every((s) => s.subsidy && s.slider)).toBe(true);
+    expect(SUBSIDY_STEPS.slice(3).filter((s) => !['consumer surplus', 'producer surplus'].includes(s.id)).every((s) => s.subsidy && s.slider)).toBe(true);
+    // "Consumer surplus before the subsidy" steps back to the free market, with no slider.
+    expect(step('consumer surplus').subsidy).toBe(false);
+    expect(step('consumer surplus').layers).toContain('cs');
+    expect(step('producer surplus').subsidy).toBe(false);
+    expect(step('producer surplus').layers).toContain('ps');
   });
   it('names supply "S1 = what it costs to make" from step 2, with Pe and Qe in the readout', () => {
     const c = step('supply').captions({ ...ctx, result: free });
@@ -105,7 +111,10 @@ describe('SUBSIDY_STEPS', () => {
     });
   });
   it('splits the box into shares that add up exactly to government spending', () => {
-    ['producer', 'consumer', 'deadweight loss'].forEach((id) => expect(step(id).layers).toContain('wedgeBox'));
+    ['box shares', 'deadweight loss'].forEach((id) => expect(step(id).layers).toContain('wedgeBox'));
+    expect(step('box shares').layers).not.toContain('dwl'); // the corner is still empty here
+    expect(step('producer').layers).not.toContain('wedgeBox'); // step 14 mirrors step 12: no box
+    expect(step('consumer').layers).not.toContain('wedgeBox'); // step 12 is about customers, no box
     expect(plain(step('producer').text(ctx))).toContain('$10 more');
     expect(plain(step('consumer').text(ctx))).toContain('$10 less');
     expect(plain(step('deadweight loss').text(ctx))).toContain('the whole $1,350');
@@ -114,11 +123,11 @@ describe('SUBSIDY_STEPS', () => {
   it('colours every term with a known mark key', () => {
     SUBSIDY_STEPS.forEach((s) => {
       const html = s.text({ ...ctx, result: s.subsidy ? result : free });
-      for (const [, key] of html.matchAll(/data-mark="([^"]+)"/g)) expect(['cost', 'gov', 'customer', 'pe', 'qe', 'qty', 'dwl']).toContain(key);
+      for (const [, key] of html.matchAll(/data-mark="([^"]+)"/g)) expect(['cost', 'gov', 'customer', 'cs', 'mcs', 'ps', 'mps', 'pe', 'qe', 'qty', 'dwl']).toContain(key);
     });
   });
   it('asks students to predict before the reveal on three steps (plus the drag step’s instruction)', () => {
-    expect(SUBSIDY_STEPS.filter((s) => s.think).map((s) => s.id)).toEqual(['cost of a loaf', 'every loaf', 'two prices', 'revenue']);
+    expect(SUBSIDY_STEPS.filter((s) => s.think).map((s) => s.id)).toEqual(['cost of a loaf', 'every loaf', 'two prices', 'revenue', 'box shares']);
   });
 
   it('leaves "one loaf, two prices" by fading everything but the bakery total, and the revenue step shows only Pp', () => {
@@ -134,5 +143,29 @@ describe('SUBSIDY_STEPS', () => {
     expect(caps.customer).toBeUndefined();
     expect(caps.gov).toBeUndefined();
     expect(SUBSIDY_STEPS.find((s) => s.id === 'strips').fadeIn).toEqual(['pricesC']);
+  });
+
+  it('revenue step: Next stays locked until the slider has gone to the bottom and back to the top, with a halo on the end to go to', () => {
+    const rev = SUBSIDY_STEPS.find((s) => s.id === 'revenue');
+    const range = { min: 0, max: 60 };
+    expect(rev.gate({})).toBe(false);
+    expect(rev.sliderHalo({})).toBe('min');
+    let sweep = advanceSweep({ low: false, high: false }, 60, range); // the top first doesn't count
+    expect(sweep).toEqual({ low: false, high: false });
+    sweep = advanceSweep(sweep, 0, range);
+    expect(sweep).toEqual({ low: true, high: false });
+    expect(rev.sliderHalo({ sweepLow: true })).toBe('max');
+    expect(rev.think({ sweepLow: true })).toMatch(/back up/);
+    expect(rev.sliderNote({ amount: 60 })).toBe('');
+    expect(rev.sliderNote({ amount: 0, sweepLow: true })).toMatch(/no subsidy/);
+    expect(rev.sliderNote({ amount: 60, sweepLow: true, sweepHigh: true })).toMatch(/how much more money the producer gets/);
+    sweep = advanceSweep(sweep, 30, range);
+    expect(sweep.high).toBe(false);
+    sweep = advanceSweep(sweep, 60, range);
+    expect(sweep).toEqual({ low: true, high: true });
+    const ctx = { sweepLow: true, sweepHigh: true };
+    expect(rev.gate(ctx)).toBe(true);
+    expect(rev.sliderHalo(ctx)).toBeNull();
+    expect(rev.think(ctx)).toMatch(/how much of this rectangle/);
   });
 });

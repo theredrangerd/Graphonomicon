@@ -1,4 +1,4 @@
-// The 14-step Explain walkthrough for the subsidy page. Each step's `layers` is the complete
+// The 19-step Explain walkthrough for the subsidy page. Each step's `layers` is the complete
 // set drawn at that step (not a diff); `enter` lists the layers that fade in on it.
 //
 // The order follows the three places students get lost (owner, 2026-11-09):
@@ -40,6 +40,16 @@ export const TARGET_TOLERANCE = 4;
 export const LOAF_STEP = 1;
 export const snapLoaf = (q) => Math.min(DOT_Q_MAX, Math.max(DOT_Q_MIN, Math.round(q / LOAF_STEP) * LOAF_STEP));
 
+// The revenue step asks the student to slide the subsidy down to $0 and back up to the top of
+// the slider (a halo marks the end to go to). Progress is kept once earned, like the dot's.
+// "The top" counts within SWEEP_REACH of the slider's max, so a step short of it still counts.
+export const SWEEP_REACH = 1;
+export function advanceSweep(sweep, amount, { min, max }) {
+  const low = Boolean(sweep.low) || amount <= min;
+  const high = Boolean(sweep.high) || (low && amount >= max - SWEEP_REACH);
+  return { low, high };
+}
+
 // Loaves are counted, so show whole numbers bare and halves with one decimal.
 const loaves = (v) => (Math.abs(v - Math.round(v)) < 0.05 ? String(Math.round(v)) : v.toFixed(1));
 
@@ -48,6 +58,8 @@ const t = (key, text) => `<span class="term term--${key}" data-mark="${key}" tab
 const row = (label, value, mark) => ({ label, value, mark });
 // A government figure in a headline: the subsidy arrow's purple, very dark (purple means government).
 const govInk = (text) => `<span class="gov-ink">${text}</span>`;
+// Deadweight loss in a headline: the DWL red, very dark.
+const dwlInk = (text) => `<span class="dwl-ink">${text}</span>`;
 
 const BASE = ['demand', 'supply', 'eq1'];
 const WITH_S2 = [...BASE, 'supply2'];
@@ -102,6 +114,9 @@ export const SUBSIDY_STEPS = [
       : 'Drag the orange dot along S1 and put it in the halo.'),
     gate: ({ explored }) => explored,
     lockedLabel: 'Put the dot in the halo',
+    // Order: headline at once, the dot seeps in, then the words, then the "drag me" hint and the
+    // halo together (pages.css times them). The instruction waits to see if the student needs it.
+    textAfter: '.cost-dot', textDelay: 300, thinkDelay: 6100,
     drag: true,
     slider: false, subsidy: false, layers: [...BASE, 'costDot'], enter: ['costDot'],
     // The dot is drawn where it actually is (it glides and follows the pointer smoothly);
@@ -148,11 +163,24 @@ export const SUBSIDY_STEPS = [
     },
   },
   {
-    id: 'every loaf', headline: () => 'Every loaf drops by the same amount: that’s S2',
+    id: 'every loaf', headline: () => 'The cost drops by the same amount at every point on S1',
     text: ({ amount }) => `Do the same for every loaf: each one drops by ${t('gov', fmtMoney(amount))}, so the points line up into a new line, ${t('customer', 'S2')}: what customers now need to pay. ${t('cost', 'S1')} stays where it was, because baking costs exactly what it did.`,
     think: () => 'Before you click Next: where will S2 cross demand?',
-    slider: true, subsidy: true, layers: [...WITH_S2, 'loafDrops', 'readout'], enter: ['loafDrops', 'supply2'],
-    captions: ({ amount }) => ({ ...s1s2, readout: [row('Government pays, every loaf', fmtMoney(amount), 'gov')] }),
+    // The student's loaf from the step before stays exactly as it was, arrow and all; the other
+    // loaves' arrows draw in around it, and S2 follows.
+    slider: true, subsidy: true, layers: [...WITH_S2, 'loafDrop', 'loafDrops', 'readout'], enter: ['loafDrops', 'supply2'],
+    // Just the arrow, dots and labels: the dashed guides have done their job.
+    chartOptions: (ctx) => ({ loafQ: loafQ(ctx), loafGuides: false }),
+    captions: (ctx) => {
+      const { cost, customer } = oneLoaf(ctx);
+      return {
+        ...s1s2,
+        loafCost: `${fmtMoney(cost)} to bake`,
+        loafGov: `${fmtMoney(ctx.amount)} from government`,
+        loafCustomer: `${fmtMoney(customer)} from customer`,
+        readout: [row('Government pays, every loaf', fmtMoney(ctx.amount), 'gov')],
+      };
+    },
   },
   {
     id: 'equilibrium', headline: () => 'A new equilibrium, e2',
@@ -169,8 +197,8 @@ export const SUBSIDY_STEPS = [
     think: ({ amount }) => `The government pays ${fmtMoney(amount)} on every loaf sold. How much does it pay altogether?`,
     slider: true, subsidy: true, layers: [...PRICED, 'priceBrackets', 'subsidyArrow', 'readout'], enter: ['prices', 'priceBrackets', 'readout'],
     // Next doesn't cut straight to the revenue step: first the customer's and government's
-    // figures, Pc, the arrow and the readout fade, while the two coloured brackets and "bakery
-    // gets" stay (see onLeave in subsidy.js).
+    // figures, Pc, the arrow and the readout fade, while the two coloured brackets stay and
+    // "bakery gets" swells (see onLeave in subsidy.js).
     leave: { exit: ['priceBrackets', 'pricesC', 'subsidyArrow', 'readout'], ms: 1150 },
     captions: ({ amount, result }) => ({
       customer: `customer pays ${fmtMoney(result.Pc)}`,
@@ -187,9 +215,23 @@ export const SUBSIDY_STEPS = [
     // Area as revenue: the idea the box and the bands in the next steps lean on. Built slowly:
     // the height (price) rises, the width (quantity) sweeps across, the rectangle fills in,
     // then it is named. The bakery's revenue is Pp × Q (what it receives per loaf, times loaves).
-    id: 'revenue', headline: () => 'Revenue is an area',
+    id: 'revenue', headline: () => 'Revenue is an area: P × Q = R',
     text: ({ result }) => `Revenue is ${t('cost', 'price')} × ${t('qty', 'quantity')}: what a seller takes in. On a graph, that’s an area: height is the price, width is the quantity. The bakery gets ${t('cost', `${fmtMoney(result.Pp)} a loaf`)} and sells ${t('qty', `${loaves(result.Q)} loaves`)}, so its revenue is ${t('cost', fmtMoney(result.Pp * result.Q))}.`,
-    think: () => 'Before you click Next: how much of this rectangle do customers pay, and how much does the government?',
+    // Next is locked until the student has slid the subsidy to $0 and back up: while the
+    // government's part disappears and returns, the rectangle shows who pays for what.
+    think: ({ sweepLow, sweepHigh }) => {
+      if (sweepHigh) return 'Before you click Next: how much of this rectangle do customers pay, and how much does the government?';
+      return sweepLow ? 'Now slide the subsidy back up to the top.' : 'See what happens when the government gives a $0 subsidy per unit.';
+    },
+    gate: ({ sweepHigh }) => Boolean(sweepHigh),
+    lockedLabel: 'Slide the subsidy down, then up',
+    // A line under the slider that answers the student's move: at $0 it names what they're
+    // looking at; once they've been back to the top it points at the bakery's gain.
+    sliderNote: ({ amount, sweepLow, sweepHigh }) => {
+      if (sweepHigh) return 'Think about how much more money the producer gets.';
+      return sweepLow && amount <= 0 ? 'This is what the market looks like with no subsidy.' : '';
+    },
+    sliderHalo: ({ sweepLow, sweepHigh }) => (sweepHigh ? null : sweepLow ? 'max' : 'min'),
     // Pp only: the bakery's side of the story. Pc comes back with the strips, which need it.
     // The two-prices brackets carry over with no figures (blue = customer, purple = government):
     // their colours hint at the answer to the question above. "Bakery gets" stays as the anchor.
@@ -198,6 +240,7 @@ export const SUBSIDY_STEPS = [
       const revenue = fmtMoney(result.Pp * result.Q);
       return {
         total: `bakery gets ${fmtMoney(result.Pp)}`,
+        totalBig: true, // the size step 7's exit swelled it to
         revPrice: `price ${fmtMoney(result.Pp)}`,
         revQty: `quantity ${loaves(result.Q)}`,
         revBox: `Revenue = ${fmtMoney(result.Pp)} × ${loaves(result.Q)} = ${revenue}`,
@@ -238,24 +281,27 @@ export const SUBSIDY_STEPS = [
     }),
   },
   {
-    id: 'producer', headline: () => 'Where the money goes: the bakery',
-    text: ({ result }) => `The bakery now gets ${t('cost', fmtMoney(result.Pp))} a loaf instead of ${t('pe', fmtMoney(result.Pstar))}: ${t('cost', `${fmtMoney(result.Pp - result.Pstar)} more`)}. This band is the bakery’s share of the box, its marginal producer surplus.`,
-    slider: true, subsidy: true, layers: [...BOXED, 'marginalPs', 'readout'], enter: ['marginalPs', 'readout'], grow: ['marginalPs'],
+    // Back to the customers' side, before the subsidy: what consumer surplus is, with nothing
+    // else on the chart, so the next step can show it growing.
+    id: 'consumer surplus', headline: () => 'Consumer surplus before the subsidy',
+    text: ({ result }) => `With no subsidy, customers pay ${t('pe', fmtMoney(result.Pstar))} a loaf. Everyone whose demand sits above that price would have been willing to pay more, and the gap is their ${t('cs', 'consumer surplus')}: the triangle between demand and the price, worth ${t('cs', fmtMoney(result.CS))}.`,
+    slider: false, subsidy: false, layers: [...BASE, 'cs', 'readout'], enter: ['cs', 'readout'],
     captions: ({ result }) => ({
-      mps: 'marginal PS',
-      readout: [
-        row('Bakery got (Pe)', fmtMoney(result.Pstar), 'pe'),
-        row('Bakery gets now (Pp)', fmtMoney(result.Pp), 'cost'),
-        row('Extra per loaf', `+ ${fmtMoney(result.Pp - result.Pstar)}`, 'cost'),
-      ],
+      cs: 'consumer surplus',
+      readout: [row('Price paid (Pe)', fmtMoney(result.Pstar), 'pe'), row('Consumer surplus', fmtMoney(result.CS), 'cs')],
     }),
   },
   {
-    id: 'consumer', headline: () => 'Where the money goes: customers',
-    text: ({ result }) => `Customers now pay ${t('customer', fmtMoney(result.Pc))} a loaf instead of ${t('pe', fmtMoney(result.Pstar))}: ${t('customer', `${fmtMoney(result.Pstar - result.Pc)} less`)}. This band is their share of the box, their marginal consumer surplus.`,
-    slider: true, subsidy: true, layers: [...BOXED, 'marginalPs', 'marginalCs', 'readout'], enter: ['marginalCs', 'readout'], grow: ['marginalCs'],
+    id: 'consumer', headline: () => 'The subsidy grows consumer surplus',
+    text: ({ result }) => `Customers now pay ${t('customer', fmtMoney(result.Pc))} a loaf instead of ${t('pe', fmtMoney(result.Pstar))}: ${t('customer', `${fmtMoney(result.Pstar - result.Pc)} less`)}. Their consumer surplus now reaches down to Pc, so it gains this extra band: ${t('mcs', 'marginal consumer surplus')}.`,
+    slider: true, subsidy: true, layers: [...AT_E2, 'pricesCOnly', 'csTriangle', 'marginalCs', 'loafDrops', 'readout'],
+    // The subsidy arrives in order: an arrow drops from S1 at every loaf and S2 fades in at their
+    // tips (S1 doesn't move; the cost is what falls), the arrows clear, e2 appears, the Pc line is
+    // drawn out from e2, then the extra band fills in (the `cs-grows` sequence in pages.css).
+    enter: ['loafDrops', 'supply2', 'eq2', 'marginalCs', 'readout'], fadeIn: ['pricesC'],
+    chartOptions: { sequence: 'cs-grows' },
     captions: ({ result }) => ({
-      mps: 'marginal PS',
+      cs: 'CS before',
       mcs: 'marginal CS',
       readout: [
         row('Customers paid (Pe)', fmtMoney(result.Pstar), 'pe'),
@@ -265,15 +311,89 @@ export const SUBSIDY_STEPS = [
     }),
   },
   {
-    id: 'deadweight loss', headline: () => 'The rest of the box: deadweight loss',
-    text: ({ result }) => `This last corner goes to nobody: the extra loaves past Qe cost more to bake (S1) than buyers value them (D). ${t('cost', 'Bakery’s share')} + ${t('customer', 'customers’ share')} + ${t('dwl', 'this deadweight loss')} = the whole ${t('gov', fmtMoney(result.govCost))}.`,
-    slider: true, subsidy: true, layers: [...BOXED, 'marginalPs', 'marginalCs', 'dwl', 'readout'], enter: ['dwl', 'readout'],
+    // The mirror of "consumer surplus before the subsidy": back to the free market, now the bakery's side.
+    id: 'producer surplus', headline: () => 'Producer surplus before the subsidy',
+    text: ({ result }) => `With no subsidy, the bakery gets ${t('pe', fmtMoney(result.Pstar))} a loaf. Every loaf it could have baked for less than that earns it a little extra, and the gap is its ${t('ps', 'producer surplus')}: the triangle between the price and supply, worth ${t('ps', fmtMoney(result.PS))}.`,
+    slider: false, subsidy: false, layers: [...BASE, 'ps', 'readout'], enter: ['ps', 'readout'],
+    captions: ({ result }) => ({
+      ps: 'producer surplus',
+      readout: [row('Price received (Pe)', fmtMoney(result.Pstar), 'pe'), row('Producer surplus', fmtMoney(result.PS), 'ps')],
+    }),
+  },
+  {
+    id: 'producer', headline: () => 'The subsidy grows producer surplus',
+    text: ({ result }) => `The bakery now gets ${t('cost', fmtMoney(result.Pp))} a loaf instead of ${t('pe', fmtMoney(result.Pstar))}: ${t('cost', `${fmtMoney(result.Pp - result.Pstar)} more`)}. Its producer surplus now reaches up to Pp, so it gains this extra band: ${t('mps', 'marginal producer surplus')}.`,
+    slider: true, subsidy: true, layers: [...AT_E2, 'subsidyArrow', 'pricesPOnly', 'psTriangle', 'marginalPs', 'loafDrops', 'readout'],
+    // Arrives like the customers' step: arrows drop from S1 at every loaf and S2 fades in, the arrows
+    // clear, e2 appears, then an arrow lifts from e2 up to S1, the Pp line is drawn out from its tip,
+    // and the extra band fills up (the `ps-grows` sequence in pages.css).
+    enter: ['loafDrops', 'supply2', 'eq2', 'subsidyArrow', 'marginalPs', 'readout'], fadeIn: ['prices'],
+    // The arrow carries its amount (Explain turns the chip off by default).
+    chartOptions: { sequence: 'ps-grows', arrowChip: true },
+    captions: ({ amount, result }) => ({
+      arrow: `${fmtMoney(amount)} from gov`,
+      ps: 'PS before',
+      mps: 'marginal PS',
+      readout: [
+        row('Bakery got (Pe)', fmtMoney(result.Pstar), 'pe'),
+        row('Bakery gets now (Pp)', fmtMoney(result.Pp), 'cost'),
+        row('Extra per loaf', `+ ${fmtMoney(result.Pp - result.Pstar)}`, 'cost'),
+      ],
+    }),
+  },
+  {
+    // Both sides on one diagram, so the next step's box doesn't arrive with two bands out of nowhere.
+    // Per loaf, the customers' saving and the bakery's gain add up to the subsidy, and the two bands
+    // are those two pieces stacked at Pe. The blue half arrives to meet the orange one (`join` in pages.css).
+    id: 'both sides', headline: () => 'Both sides together',
+    text: ({ amount, result }) => `Put the two sides together. On every loaf, customers save ${t('mcs', fmtMoney(result.Pstar - result.Pc))} and the bakery gains ${t('mps', fmtMoney(result.Pp - result.Pstar))}. Add them up and you get ${t('gov', fmtMoney(amount))}, exactly what the government pays per loaf. That’s why the two bands stack, meeting at the old price, Pe.`,
+    slider: true, subsidy: true, layers: [...AT_E2, 'prices', 'subsidyArrow', 'csTriangle', 'psTriangle', 'marginalPs', 'marginalCs', 'readout'],
+    enter: ['csTriangle', 'marginalCs', 'readout'], fadeIn: ['pricesC'],
+    chartOptions: { sequence: 'join', arrowChip: true },
+    captions: ({ amount, result }) => ({
+      arrow: `${fmtMoney(amount)} from gov`,
+      ps: 'PS before',
+      cs: 'CS before',
+      mps: 'marginal PS',
+      mcs: 'marginal CS',
+      readout: [
+        row('Customers save, per loaf', fmtMoney(result.Pstar - result.Pc), 'mcs'),
+        row('Bakery gains, per loaf', fmtMoney(result.Pp - result.Pstar), 'mps'),
+        row('Government pays, per loaf', fmtMoney(amount), 'gov'),
+      ],
+    }),
+  },
+  {
+    // Back to the government's box: most of it lands with the bakery and customers, but the corner on
+    // the right is still empty. Step 16 says why.
+    id: 'box shares', headline: () => 'Back to the box: who gets the money?',
+    text: ({ result }) => `Here’s the ${t('gov', 'government’s box')} again. Most of it lands with real people: ${t('mps', `${fmtMoney(result.marginalPS)} to the bakery`)} and ${t('mcs', `${fmtMoney(result.marginalCS)} to customers`)}. But the triangle in the right-hand corner of the box, past Q<sub>e</sub>, hasn’t gone to anybody yet.`,
+    think: () => 'Before you click Next: who benefits from the loaves in that empty corner?',
+    slider: true, subsidy: true, layers: [...BOXED, 'marginalPs', 'marginalCs', 'dwlUnknown', 'readout'],
+    // Step 15 already drew both bands, so only the box is new: re-fading the rest would flash the
+    // whole diagram. The triangles ("PS/CS before") drop out here, and the box's outline is a firmer
+    // government purple, and the empty corner is grey with a "?" (`box` in pages.css) so it's clear what we're splitting up.
+    enter: ['wedgeBox', 'dwlUnknown'], chartOptions: { sequence: 'box' },
     captions: ({ result }) => ({
       mps: 'marginal PS',
       mcs: 'marginal CS',
       readout: [
-        row('Bakery’s share', fmtMoney(result.marginalPS), 'cost'),
-        row('Customers’ share', fmtMoney(result.marginalCS), 'customer'),
+        row('Bakery’s share', fmtMoney(result.marginalPS), 'mps'),
+        row('Customers’ share', fmtMoney(result.marginalCS), 'mcs'),
+        row('Government spending', fmtMoney(result.govCost), 'gov'),
+      ],
+    }),
+  },
+  {
+    id: 'deadweight loss', headline: () => `The corner nobody gets: ${dwlInk('deadweight loss')}`,
+    text: ({ result }) => `That corner sits above ${t('customer', 'demand')} and below ${t('cost', 'S1')}: each loaf here costs more to bake than customers think it’s worth, so with no subsidy nobody would trade them. The government’s money pushes them through anyway, and nobody gets a benefit to match: ${t('dwl', `deadweight loss, ${fmtMoney(result.DWL)}`)}. ${t('mps', 'Bakery’s share')} + ${t('mcs', 'customers’ share')} + ${t('dwl', 'deadweight loss')} = the whole ${t('gov', fmtMoney(result.govCost))}.`,
+    slider: true, subsidy: true, layers: [...BOXED, 'marginalPs', 'marginalCs', 'dwlUnknown', 'dwl', 'readout'], enter: ['dwl', 'readout'],
+    captions: ({ result }) => ({
+      mps: 'marginal PS',
+      mcs: 'marginal CS',
+      readout: [
+        row('Bakery’s share', fmtMoney(result.marginalPS), 'mps'),
+        row('Customers’ share', fmtMoney(result.marginalCS), 'mcs'),
         row('Deadweight loss', fmtMoney(result.DWL), 'dwl'),
         row('Total: government spending', fmtMoney(result.govCost), 'gov'),
       ],
@@ -282,6 +402,13 @@ export const SUBSIDY_STEPS = [
   {
     id: 'wrap', headline: () => 'The full diagram',
     text: () => 'That’s the full subsidy diagram, the one you’d draw in an exam. The dashed box is still government spending: the bakery’s share, the customers’ share and the deadweight loss.',
-    slider: true, subsidy: true, layers: [], view: 'ib', finish: true,
+    slider: true, subsidy: true, layers: [], view: 'ib',
+  },
+  {
+    // The last word: the same diagram with an inelastic demand curve (it tweens steeper, pivoting
+    // through e1), so the customers' band swells and the bakery's shrinks, then a push to Play.
+    id: 'inelastic', headline: () => 'What if demand is inelastic?',
+    text: ({ result }) => `Say people need this bread and keep buying whatever it costs: demand is inelastic, so the curve is steeper. Now the subsidy pulls the customers’ price down further: ${t('mcs', 'customers’ share')} grows to ${t('mcs', fmtMoney(result.marginalCS))} while ${t('mps', 'the bakery’s share')} shrinks to ${t('mps', fmtMoney(result.marginalPS))}. Head to Play, flatten and steepen the curves yourself, and see who captures more of the subsidy.`,
+    slider: true, subsidy: true, demand: 'inelastic', layers: [], view: 'ib', finish: true,
   },
 ];

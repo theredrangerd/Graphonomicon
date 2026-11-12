@@ -20,8 +20,8 @@ beforeEach(() => {
 const btn = (t) => [...container.querySelectorAll('button')].find((b) => b.textContent === t);
 
 describe('explain card', () => {
-  it('starts at step 1 of 14 with Back disabled', () => {
-    expect(container.querySelector('.explain-card__count').textContent).toBe('Step 1 of 14');
+  it('starts at step 1 of 15 with Back disabled', () => {
+    expect(container.querySelector('.explain-card__count').textContent).toBe('Step 1 of 19');
     expect(btn('Back').disabled).toBe(true);
     expect(container.querySelector('.explain-slider').closest('div').hidden).toBe(true);
   });
@@ -74,7 +74,7 @@ describe('explain card', () => {
     expect(container.querySelector('.explain-slider').value).toBe('35');
   });
   it('last step offers Try it in Play', () => {
-    card.goTo(13);
+    card.goTo(18);
     btn('Try it in Play →').click();
     expect(onFinish).toHaveBeenCalled();
   });
@@ -186,11 +186,22 @@ describe('text waits for the chart animation', () => {
     expect(c2.classList.contains('explain-card--waiting')).toBe(false);
   });
 
+  it('a thinkDelay step holds its prompt back until the delay has passed', () => {
+    vi.useFakeTimers();
+    const { c, mounted } = mountWith(() => new Promise(() => {}));
+    mounted.goTo(2);
+    const think = c.querySelector('.explain-card__think');
+    expect(think.classList.contains('explain-card__think--delayed')).toBe(true);
+    vi.advanceTimersByTime(6101);
+    expect(think.classList.contains('explain-card__think--delayed')).toBe(false);
+    vi.useRealTimers();
+  });
+
   it('a step the student has already left does not reveal the next one early', async () => {
     const resolvers = [];
     const { c, mounted } = mountWith(() => new Promise((r) => { resolvers.push(r); }));
     mounted.goTo(1);
-    mounted.goTo(2);
+    mounted.goTo(3);
     resolvers[0]();
     await tick();
     expect(c.classList.contains('explain-card--waiting')).toBe(true);

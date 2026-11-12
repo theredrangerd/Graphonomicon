@@ -192,7 +192,7 @@ describe('initSubsidyPage — Explain and Play', () => {
   it('opens #explain on step 1, drawing only demand', () => {
     initSubsidyPage(document, fakeWin('subsidy.html#explain'));
     expect(document.body.dataset.mode).toBe('explain');
-    expect($('#explain-card .explain-card__count').textContent).toBe('Step 1 of 14');
+    expect($('#explain-card .explain-card__count').textContent).toBe('Step 1 of 19');
     expect($('#chart line.demand-curve')).not.toBeNull();
     expect($('#chart line.supply-curve')).toBeNull();
   });
@@ -231,7 +231,7 @@ describe('initSubsidyPage — Explain and Play', () => {
   it('step 4 waits on a Subsidise! button on the dot, then drops the arrow and unlocks Next', async () => {
     initSubsidyPage(document, fakeWin('subsidy.html#explain'));
     document.querySelectorAll('.explain-card .explain-dot')[3].click();
-    expect($('#explain-card .explain-card__count').textContent).toBe('Step 4 of 14');
+    expect($('#explain-card .explain-card__count').textContent).toBe('Step 4 of 19');
     // Armed: the dot and its cost are there, the drop, its labels and the readout are not.
     expect($('#chart .subsidise-btn')).not.toBeNull();
     expect($('#chart .loaf-drop circle')).not.toBeNull();
@@ -302,13 +302,13 @@ describe('initSubsidyPage — Explain and Play', () => {
     $('.mode-switch input[value="explain"]').click();
     expect(document.body.dataset.mode).toBe('explain');
     expect(win.location.hash).toBe('#explain');
-    expect($('#explain-card .explain-card__count').textContent).toBe('Step 1 of 14');
+    expect($('#explain-card .explain-card__count').textContent).toBe('Step 1 of 19');
   });
 
-  it('Try it in Play → on step 14 switches to Play with the subsidy animated on', () => {
+  it('Try it in Play → on step 19 switches to Play with the subsidy animated on', () => {
     const win = fakeWin('subsidy.html#explain');
     initSubsidyPage(document, win);
-    document.querySelectorAll('.explain-card .explain-dot')[13].click();
+    document.querySelectorAll('.explain-card .explain-dot')[18].click();
     button('Try it in Play →').click();
     expect(document.body.dataset.mode).toBe('play');
     expect(win.location.hash).toBe('#play');
@@ -318,7 +318,7 @@ describe('initSubsidyPage — Explain and Play', () => {
 
   it('draws the IB perfect diagram on the wrap-up step', () => {
     initSubsidyPage(document, fakeWin('subsidy.html#explain'));
-    document.querySelectorAll('.explain-card .explain-dot')[13].click();
+    document.querySelectorAll('.explain-card .explain-dot')[18].click();
     expect($('#chart').dataset.detail).toBe('ib');
     expect($('#chart line.supply-curve')).not.toBeNull();
     expect($('#chart [data-region="dwl"]')).not.toBeNull();
@@ -327,7 +327,7 @@ describe('initSubsidyPage — Explain and Play', () => {
   it('locks Next on the drag step until the student has moved the cost dot along S1', () => {
     initSubsidyPage(document, fakeWin('subsidy.html#explain'));
     document.querySelectorAll('.explain-card .explain-dot')[2].click();
-    expect($('#explain-card .explain-card__count').textContent).toBe('Step 3 of 14');
+    expect($('#explain-card .explain-card__count').textContent).toBe('Step 3 of 19');
     expect(button('Put the dot in the halo').disabled).toBe(true);
     expect($('#chart .cost-dot__handle')).not.toBeNull();
     expect($('#chart .drag-hint')).not.toBeNull();
