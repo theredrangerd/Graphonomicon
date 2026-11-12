@@ -205,7 +205,7 @@ describe('initIndirectTaxPage — Explain and Play', () => {
     expect($('.detail-gear')).toBeNull();
     expect($('.view-switch')).not.toBeNull();
     expect($('#chart').dataset.detail).toBe('ib');
-    expect([...document.querySelectorAll('.focus-chip')].map((c) => c.dataset.focus)).toEqual(['consumer-lens', 'producer-lens', 'revenue']);
+    expect([...document.querySelectorAll('.focus-chip')].map((c) => c.dataset.focus)).toEqual(['revenue', 'consumer-lens', 'producer-lens']);
   });
 
   it('draws the IB perfect tax diagram with the quantity axis reading Qe and Qtax', () => {
@@ -253,15 +253,35 @@ describe('initIndirectTaxPage — Explain and Play', () => {
     expect($('.focus-chip[aria-pressed="true"]').dataset.focus).toBe('consumer-lens');
   });
 
-  it('revenue focus shows only the box, split into both burdens, with its revenue chip', () => {
+  it('government perspective builds the box from per-unit strips, with its revenue chip', () => {
     initIndirectTaxPage(document, fakeWin('indirect-tax.html?view=explorer&focus=revenue#play'));
     expect($('#market-note').textContent).toContain('Turn the tax on to see tax revenue');
     toggleTax();
-    expect(regions().sort()).toEqual(['tax-consumer', 'tax-producer']);
-    expect($('#chart [data-region="tax-revenue"]')).not.toBeNull();
+    expect(regions()).toEqual(['tax-revenue']);
+    expect($('#chart .gov-strip')).toBeNull(); // the strips have merged into the solid box
+    expect($('#chart .gov-fill')).not.toBeNull();
+    expect($('#chart .tax-arrow').textContent).toBe(''); // its name moved to the price-axis bracket
+    expect($('#chart .tax-height').textContent).toBe('$20 tax');
+    expect($('#chart .qty-bracket__label').textContent).toMatch(/^[\d.]+ units traded$/);
     expect($('#chart .chart-focus-chip').textContent).toBe('Revenue $1,050');
     const shown = [...document.querySelectorAll('.legend [data-legend]')].filter((i) => !i.hidden).map((i) => i.dataset.legend);
-    expect(shown).toEqual(['demand', 'supply', 'tax-consumer', 'tax-producer', 'revenue']);
+    expect(shown).toEqual(['demand', 'supply', 'revenue']);
+  });
+
+  it('government perspective names an ad valorem tax by its rate', () => {
+    initIndirectTaxPage(document, fakeWin('indirect-tax.html?view=explorer&focus=revenue#play'));
+    $('#tax-mode-advalorem').checked = true;
+    $('#tax-mode-advalorem').dispatchEvent(new Event('change'));
+    toggleTax();
+    expect($('#chart .tax-height').textContent).toContain(`${$('#advalorem-slider').value}% tax`);
+  });
+
+  it('picking the government perspective with the tax on keeps the tax on and shows the revenue box', () => {
+    initIndirectTaxPage(document, fakeWin('indirect-tax.html#play'));
+    toggleTax();
+    $('.focus-chip[data-focus="revenue"]').click();
+    expect($('#tax-toggle').checked).toBe(true);
+    expect($('#chart .tax-height')).not.toBeNull();
   });
 
   // Animations are skipped under Vitest, so every reveal step has run by now: the band is

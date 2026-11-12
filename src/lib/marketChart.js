@@ -280,7 +280,7 @@ export function resolveLayers(result, { detail = 'full', layers, focus = null, s
     const split = (result.mode === 'subsidy' && {
       cs: ['csTriangle', 'marginalCs'], ps: ['psTriangle', 'marginalPs'],
     }[focus]) || (isOpenTax(result) && {
-      revenue: ['taxConsumer', 'taxProducer', 'wedgeBox'],
+      revenue: ['taxArrow', 'qtyBracket', 'taxHeight', 'govStrips', 'govFill', 'wedgeBox'],
     }[focus]);
     if (hasPoly && split) {
       for (const name of split) on.add(name);

@@ -7,11 +7,11 @@ export const SUBSIDY_FOCUSES = Object.freeze([
   ['gov', 'Government spending'],
   ['dwl', 'Deadweight loss'],
 ]);
-// Each lens is one side of the market: its surplus, its tax burden and its half of the DWL.
+// The government perspective ('revenue' in URLs, kept so shared links work) builds the tax box; each lens is one side of the market: its surplus, its tax burden and its half of the DWL.
 export const TAX_FOCUSES = Object.freeze([
+  ['revenue', 'Government perspective'],
   ['consumer-lens', 'Consumer lens'],
   ['producer-lens', 'Producer lens'],
-  ['revenue', 'Tax revenue'],
 ]);
 // Focus ids a shared link may still carry from before the lenses, and what they open now.
 export const TAX_FOCUS_ALIASES = Object.freeze({

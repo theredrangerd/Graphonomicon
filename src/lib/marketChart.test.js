@@ -829,7 +829,7 @@ describe('tax: IB perfect, Explain layers and Explorer foci', () => {
     expect(svg.querySelector('[data-layer="taxBracket"]').textContent).toContain('$20 tax per can');
   });
 
-  it('focus layers: CS/PS show only the surplus, each burden is its own focus, revenue is the split box, a closed market draws none', () => {
+  it('focus layers: CS/PS show only the surplus, each burden is its own focus, revenue is the per-unit strips and their box, a closed market draws none', () => {
     const cs = resolveLayers(tax(), { focus: 'cs' });
     expect([...cs]).toEqual(expect.arrayContaining(['cs', 'focusChip']));
     expect(cs.has('taxConsumer')).toBe(false);
@@ -840,12 +840,32 @@ describe('tax: IB perfect, Explain layers and Explorer foci', () => {
     expect(cb.has('taxProducer')).toBe(false);
     expect([...resolveLayers(tax(), { focus: 'producer-burden' })]).toEqual(expect.arrayContaining(['taxProducer', 'prices', 'focusChip']));
     const revenue = resolveLayers(tax(), { focus: 'revenue' });
-    expect([...revenue]).toEqual(expect.arrayContaining(['taxConsumer', 'taxProducer', 'wedgeBox', 'focusChip']));
+    expect([...revenue]).toEqual(expect.arrayContaining(['taxArrow', 'govStrips', 'wedgeBox', 'focusChip']));
     expect(revenue.has('cs')).toBe(false);
+    expect(revenue.has('taxConsumer')).toBe(false);
     const closed = computeMarket({ ...base, intervention: { type: 'tax', mode: 'specific', amount: 200 } });
     expect(closed.closed).toBe(true);
     renderMarketChart(svg, closed, { detail: 'ib', focus: 'revenue' });
     expect(regions()).toEqual([]);
+  });
+});
+
+describe('tax government perspective marks', () => {
+  it('draws one tax-revenue strip per unit out to Qtax, and the note on the Pe dot only when asked', () => {
+    const svg = makeSvg();
+    const result = computeMarket({ ...base, intervention: { type: 'tax', mode: 'specific', amount: 30 } });
+    renderMarketChart(svg, result, { detail: 'ib', focus: 'revenue', captions: { strip: '1 unit = $30', taxArrow: '$30 tax', qtyBracket: '50.0 units traded', taxHeight: '$30 tax' } });
+    expect(svg.querySelectorAll('.gov-strip').length).toBe(Math.ceil(result.Q));
+    expect(svg.querySelector('[data-layer="govStrips"]').dataset.region).toBe('tax-revenue');
+    expect(svg.textContent).toContain('1 unit = $30');
+    expect(svg.querySelector('.qty-bracket__label').textContent).toBe('50.0 units traded');
+    expect(svg.querySelector('.tax-height').textContent).toBe('$30 tax');
+    expect(svg.querySelector('.tax-arrow').textContent).toBe('$30 tax');
+    expect(svg.querySelector('.qty-bracket')).not.toBeNull();
+    expect(svg.textContent).not.toContain('price being traded');
+    const free = computeMarket({ ...base, intervention: { type: 'none' } });
+    renderMarketChart(svg, free, { detail: 'ib', layers: ['demand', 'supply', 'eq1', 'eq1Note'], captions: { eq1Note: 'Pe $60: the price being traded' } });
+    expect(svg.textContent).toContain('the price being traded');
   });
 });
 

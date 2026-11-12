@@ -24,3 +24,21 @@ Date: 2026-11-09. Status: implemented. Ports the subsidy pilot (`2026-10-27-subs
 
 - Ms. Patel should confirm the Q<sub>tax</sub> label and the IB area names (`TAX_AREA_LABELS`).
 - Step copy is a working draft.
+
+## Government perspective (2026-11-12)
+
+The Explorer's "Tax revenue" chip is now **Government perspective** and comes first (focus id stays `revenue` so shared links keep working). Picking it from a state with the tax on leaves the tax on (2026-11-12) and opens on step 3 below, the strips, then plays the strips-to-box hand-over; the earlier steps are shown as already done. Imposing the tax from the free market plays all of: (1) a note on the e1 dot, "Pe $X: the price being traded", with S1 held still for `DOT_MS`; (2) S1 tweens up to S2 and the per-unit bracket names the tax; (3) the bracket hands over to a strip-per-unit fill from 0 to Qtax labelled "1 unit = $X" (`govStrips`, now drawn for taxes too, in the gov colour, not the burden violets); (4) the box outline and Revenue chip. `wireInterventionToggle` gained `holdOn()` for the opening beat; `eq1Note` is a new layer. Consumer/producer burdens are no longer part of this view (the lenses own them).
+
+Revision (same day): the per-unit chip/bracket is gone. The Pe note moves with the market: "Pe1 $X" on e1, then "Pe2 $Pc" on e2 (`eq2Note`) once S2 is up. A purple arrow (`taxArrow`) runs down the Q line from Pc to Pp, named "$20 tax" (specific) or "8% tax" (ad valorem), and the strips then extend across the quantity.
+
+Revision 2 (same day): one note rides the equilibrium. "Pe1 $80.00" on e1; as S1 slides to S2 it follows e2 and reads "Pe2 $X" with X counting up to Pc. Order is now dot note → slide (note rides e2) → purple `taxArrow` → strips fill across → strips dissolve into one solid `govFill` box (`stripsMerged`) with the outline and Revenue chip.
+
+## Lens reveal: why part of the loss is a burden and part is DWL (2026-11-12)
+
+Both lenses used to wipe the burden band and then the DWL triangle in their final colours, which didn't say why they differ. Now, once the surplus has shrunk, the whole lost gap fills in one neutral grey (`lost`), is split at Qtax, and each half is named (`lostNote`): left "Captured by the government (tax revenue)" (the burden, still in society's surplus), right "No longer traded: deadweight loss". After a read pause the grey fades (`exit`) as the halves take the burden / DWL colours, then the chips arrive. The producer lens mirrors it with the notes above Pe. State: `lostDone` in `indirect-tax.js`.
+
+Government perspective, quantity beat (2026-11-12): after the tax arrow, a purple bracket (`qtyBracket`) wipes in under the x axis from 0 to Qtax, labelled "$20 tax × 52.5 units traded", so the box that follows reads as tax × units. It stays for the rest of the sequence. The page reserves the under-axis band (`reserveGapBand`) while this focus is open, per the gap-bracket standard.
+
+Government perspective, axes (2026-11-12): the x-axis bracket now names only the quantity ("52.5 units traded"). A purple bracket left of the price axis (`taxHeight`, Pp to Pc, rotated label "$20 tax", or "8% tax ($20)" for ad valorem) follows it, and the arrow's own label drops at that moment. The page reserves both bands (`reserveGapBand`, `reserveDimBands`).
+
+Strips → box (2026-11-12): the strips no longer vanish when the solid box arrives. The box (`govFill`) fades in over 0.9 s while the strips and their "1 unit" label fade out (`exit: ['govStrips']`); the strips are dropped from the DOM only after that fade has finished.

@@ -20,8 +20,9 @@ import { TAX_STEPS } from './indirectTaxExplainSteps.js';
 export const TAX_AREA_LABELS = 'full';
 
 // Explorer focuses that only exist once the tax is on, and what the note calls them.
+const GOV_FOCUS = 'revenue'; // the "Government perspective" chip (id kept so shared links work)
 const TAX_ONLY_FOCUS = {
-  'consumer-lens': 'the consumer burden and deadweight loss', 'producer-lens': 'the producer burden and deadweight loss', revenue: 'tax revenue',
+  'consumer-lens': 'the consumer burden and deadweight loss', 'producer-lens': 'the producer burden and deadweight loss', [GOV_FOCUS]: 'tax revenue',
 };
 
 // Explain's curves: the page's default market, or (one step) a steeper, inelastic demand
@@ -67,11 +68,14 @@ export function initIndirectTaxPage(doc, win = window) {
     focus: playView.focus,
     focuses: TAX_FOCUSES,
     onChange(next) {
+      const prevFocus = playView.focus;
       playView = next;
       writePlayView(next, win);
       explainers?.close();
-      // A newly picked area builds itself up the same way it does when the tax goes on.
-      if (taxToggle.checked && next.focus) startReveal();
+      // A newly picked area builds itself up the same way it does when the tax goes on. The
+      // government perspective picked with the tax already on skips the steps the student has
+      // already seen (the tax sliding in, its name, the bracket) and opens on the strips.
+      if (taxToggle.checked && next.focus) startReveal(0, next.focus === GOV_FOCUS && prevFocus !== GOV_FOCUS ? GOV_STRIPS_STEP : 0);
       else { stopReveal(); reveal = {}; render(); }
     },
   });
@@ -108,48 +112,76 @@ export function initIndirectTaxPage(doc, win = window) {
   const STAGGER_MS = 800;
   const WIPE_MS = 900;
   const TOGGLE_MS = 750; // the toggle's 650ms tween plus a frame: a render during the wipe would restart it
+  // Government perspective, tax switched on: a beat on the dot at Pe (the price being traded),
+  // then the tax slides S1 up to S2, then the per-unit tax is named, then one strip per unit
+  // fills in left to right out to Qtax, and last the box is outlined and its revenue chip drawn.
+  const DOT_MS = 1700;
+  const STRIPS_MS = 2000; // the strips' staggered fade (marketChart) plus a beat
+  // Each lens, once the surplus has shrunk: the whole lost gap fills in one neutral colour, is
+  // split at Qtax and named (captured by the government / no longer traded), then each half
+  // takes its own colour (burden, deadweight loss) as the neutral fades, and last the chips.
+  const READ_MS = 3000; // time to read the two names before the halves recolour
+  const lensSteps = (burden, dwl) => [
+    // The grey itself isn't held back: it is drawn from the first frame of the tax tween, growing
+    // exactly as consumer / producer surplus shrinks, so it reads as that surplus turning grey.
+    { keys: ['lostNote'], enter: ['lostNote'] },
+    { keys: [burden, dwl], enter: [burden, dwl], exit: ['lost'], wait: READ_MS },
+    { keys: ['focusChip'], enter: ['focusChip'], wait: 1200, before: () => { lostDone = true; } },
+  ];
   const REVEALS = {
-    'consumer-lens': [
-      { keys: ['taxConsumer'], grow: ['taxConsumer'] },
-      { keys: ['dwlConsumer'], grow: ['dwlConsumer'], wait: WIPE_MS },
-      { keys: ['focusChip'], enter: ['focusChip'], wait: STAGGER_MS },
-    ],
-    'producer-lens': [
-      { keys: ['taxProducer'], grow: ['taxProducer'] },
-      { keys: ['dwlProducer'], grow: ['dwlProducer'], wait: WIPE_MS },
-      { keys: ['focusChip'], enter: ['focusChip'], wait: STAGGER_MS },
-    ],
-    revenue: [
-      { keys: ['taxConsumer'], grow: ['taxConsumer'] },
-      { keys: ['taxProducer'], grow: ['taxProducer'], wait: WIPE_MS },
-      { keys: ['wedgeBox', 'focusChip'], enter: ['wedgeBox', 'focusChip'], wait: WIPE_MS },
+    'consumer-lens': lensSteps('taxConsumer', 'dwlConsumer'),
+    'producer-lens': lensSteps('taxProducer', 'dwlProducer'),
+    [GOV_FOCUS]: [
+      { keys: ['taxArrow'], enter: ['taxArrow'] },
+      { keys: ['qtyBracket'], enter: ['qtyBracket'], grow: ['qtyBracket'], wait: 1400 },
+      { keys: ['taxHeight'], enter: ['taxHeight'], wait: 1400, before: () => { arrowNamed = false; } },
+      { keys: ['govStrips'], enter: ['govStrips'], wait: 1500, before: () => { noteActive = false; } },
+      // The solid box fades in over the strips while they fade out, so the seams dissolve rather than snap away.
+      { keys: ['govFill', 'wedgeBox', 'focusChip'], enter: ['govFill', 'wedgeBox', 'focusChip'], exit: ['govStrips'], wait: STRIPS_MS },
+      { keys: [], wait: 1000, before: () => { stripsMerged = true; } },
     ],
   };
+  const GOV_STRIPS_STEP = REVEALS[GOV_FOCUS].findIndex((step) => step.keys.includes('govStrips'));
   let reveal = {};
+  // The "this is the price being traded" note: on e1 before the tax moves, then it rides e2 as S1 slides up to S2.
+  let noteActive = false;
+  let lostDone = true; // a lens's neutral gap and its two names are gone once the halves have their colours
+  let arrowNamed = true; // the arrow carries the tax's name until the price-axis bracket takes it over
+  let stripsMerged = false; // the strips' seams have faded into the one solid box
   let pendingEnter = [];
   let pendingGrow = [];
+  let pendingExit = [];
   let cancelReveal = [];
   const stopReveal = () => { cancelReveal.forEach((c) => c()); cancelReveal = []; };
   // `lead`: how long before the first step. A focus picked with the tax already on starts at
   // once; the toggle waits for its own tween.
-  function startReveal(lead = 0) {
+  // `from`: the step to open on; earlier steps are shown as already done.
+  function startReveal(lead = 0, from = 0) {
     stopReveal();
     const steps = REVEALS[playView.focus] ?? [];
-    reveal = Object.fromEntries(steps.flatMap((step) => step.keys.map((key) => [key, false])));
+    stripsMerged = false;
+    arrowNamed = true;
+    lostDone = false;
+    noteActive = playView.focus === GOV_FOCUS && lead > 0;
+    if (noteActive) pendingEnter = ['eq1Note'];
+    reveal = Object.fromEntries(steps.flatMap((step, i) => step.keys.map((key) => [key, i < from])));
+    steps.slice(0, from).forEach((step) => step.before?.());
     render();
     const run = (i, wait) => {
       if (i >= steps.length) return;
       const go = () => {
-        const { keys, enter = [], grow = [] } = steps[i];
+        const { keys, enter = [], grow = [], exit = [], before } = steps[i];
+        before?.();
         for (const key of keys) reveal[key] = true;
         pendingEnter = enter;
         pendingGrow = grow;
+        pendingExit = exit;
         render();
         run(i + 1, steps[i + 1]?.wait ?? STAGGER_MS);
       };
       if (wait > 0) cancelReveal.push(delay(wait, go)); else go();
     };
-    run(0, lead);
+    run(from, lead);
   }
 
   // Only a switched-on tax constrains the sliders — a tax that's off shouldn't make the
@@ -161,7 +193,7 @@ export function initIndirectTaxPage(doc, win = window) {
   const sliders = wireShiftAndSlopeInputs(doc, () => render(), isValid);
 
   // The legend keeps demand, supply and the focused area; revenue draws both burdens inside its box.
-  const LEGEND_FOR = { 'consumer-lens': ['cs', 'tax-consumer', 'dwl'], 'producer-lens': ['ps', 'tax-producer', 'dwl'], revenue: ['tax-consumer', 'tax-producer', 'revenue'] };
+  const LEGEND_FOR = { 'consumer-lens': ['cs', 'tax-consumer', 'dwl'], 'producer-lens': ['ps', 'tax-producer', 'dwl'], [GOV_FOCUS]: ['revenue'] };
   function updateLegend(focus) {
     const shown = ['demand', 'supply', ...(LEGEND_FOR[focus] ?? [focus])];
     doc.querySelectorAll('.legend [data-legend]').forEach((item) => {
@@ -190,11 +222,30 @@ export function initIndirectTaxPage(doc, win = window) {
     const taxActive = taxFraction > 0;
     const result = computeMarket({ ...market, intervention: taxActive ? taxAt(taxFraction, kind) : { type: 'none' } });
 
-    const options = { showSurplusLabels: true, detail: chrome.getDetail(), focus, areaLabels: TAX_AREA_LABELS };
+    // The government perspective hangs its brackets outside the axes. That room is reserved in every view and added around the plot (growForBands), so the plot keeps its size across lenses.
+    const options = { reserveGapBand: true, reserveDimBands: true, growForBands: true, showSurplusLabels: true, detail: chrome.getDetail(), focus, areaLabels: TAX_AREA_LABELS };
     if (focus && Object.values(reveal).includes(false)) {
       const held = resolveLayers(result, options);
       for (const [key, drawn] of Object.entries(reveal)) if (!drawn) held.delete(key);
       options.layers = [...held];
+    }
+    if (lostDone) options.layers = (options.layers ?? [...resolveLayers(result, options)]).filter((name) => name !== 'lost' && name !== 'lostNote');
+    if (stripsMerged) options.layers = (options.layers ?? [...resolveLayers(result, options)]).filter((name) => name !== 'govStrips');
+    if (noteActive) options.layers = [...(options.layers ?? resolveLayers(result, options)), taxActive ? 'eq2Note' : 'eq1Note'];
+    if (focus === 'consumer-lens' || focus === 'producer-lens') {
+      options.captions = { lostLeft: 'Captured by the government (tax revenue)', lostRight: 'No longer traded: deadweight loss' };
+    }
+    if (pendingExit.length) { options.exit = pendingExit; pendingExit = []; }
+    if (focus === GOV_FOCUS) {
+      const perUnit = fmtMoney(result.Pc - result.Pp);
+      const taxName = kind === 'advalorem' ? `${advaloremSlider.value}% tax` : `${perUnit} tax`;
+      options.captions = {
+        eq1Note: `Pe1 ${fmtPrice(result.Pstar)}: the price being traded`,
+        eq2Note: `Pe2 ${fmtPrice(result.Pc)}: the price being traded`,
+        taxArrow: arrowNamed ? taxName : undefined,
+        taxHeight: kind === 'advalorem' ? `${taxName} (${perUnit})` : taxName, strip: `1 unit = ${perUnit}`,
+        qtyBracket: `${fmtQty(result.Q)} units traded`,
+      };
     }
     if (pendingEnter.length) { options.enter = pendingEnter; pendingEnter = []; }
     if (pendingGrow.length) { options.grow = pendingGrow; pendingGrow = []; }
@@ -238,9 +289,9 @@ export function initIndirectTaxPage(doc, win = window) {
     settleActiveSlider();
     render();
   }));
-  toggleCtl = wireInterventionToggle(taxToggle, render, { beforeOn: settleActiveSlider, duration: 650 });
+  toggleCtl = wireInterventionToggle(taxToggle, render, { beforeOn: settleActiveSlider, duration: 650, holdOn: () => (playView.focus === GOV_FOCUS ? DOT_MS : 0) });
   taxToggle.addEventListener('change', () => {
-    if (taxToggle.checked) startReveal(TOGGLE_MS); else { stopReveal(); reveal = {}; }
+    if (taxToggle.checked) startReveal(TOGGLE_MS + (playView.focus === GOV_FOCUS ? DOT_MS : 0)); else { stopReveal(); reveal = {}; lostDone = true; }
   });
 
   // ---- Explain ----
