@@ -386,6 +386,16 @@ describe('renderMarketChart', () => {
     expect(svg.querySelector('.pb-total-label').classList.contains('pb-total-label--big')).toBe(true);
   });
 
+  it('marks where Pp meets S1 with a dot, only when asked and only while the Pp line is drawn', () => {
+    const result = computeMarket({ ...base, intervention: { type: 'subsidy', amount: 20 } });
+    renderMarketChart(svg, result, { detail: 'clean', layers: ['demand', 'supply', 'supply2', 'eq2', 'pricesPOnly'], ppDot: true });
+    expect(svg.querySelectorAll('.pp-dot')).toHaveLength(1);
+    renderMarketChart(svg, result, { detail: 'clean', layers: ['demand', 'supply', 'supply2', 'eq2', 'pricesPOnly'] });
+    expect(svg.querySelectorAll('.pp-dot')).toHaveLength(0);
+    renderMarketChart(svg, result, { detail: 'clean', layers: ['demand', 'supply', 'supply2', 'eq2', 'pricesCOnly'], ppDot: true });
+    expect(svg.querySelectorAll('.pp-dot')).toHaveLength(0);
+  });
+
   it('draws only the Pp line and symbol for pricesPOnly', () => {
     const result = computeMarket({ ...base, intervention: { type: 'subsidy', mode: 'specific', amount: 40 } });
     renderMarketChart(svg, result, { detail: 'clean', layers: ['demand', 'supply', 'supply2', 'eq1', 'eq2', 'pricesPOnly'] });
@@ -731,10 +741,13 @@ describe('focus', () => {
     expect(arrow).not.toBeNull();
     expect(arrow.querySelector('.region-badge__text').textContent).toBe(`$${Math.round(result.Pp - result.Pc)}`);
     expect(arrow.querySelector('polygon')).not.toBeNull();
-    for (const focus of ['cs', 'gov', 'dwl', null]) {
+    for (const focus of ['cs', 'dwl', null]) {
       renderMarketChart(svg, result, { detail: 'ib', focus });
       expect(svg.querySelector('.subsidy-arrow')).toBeNull();
     }
+    // The government's lens shows where the producer's share comes from, too.
+    renderMarketChart(svg, result, { detail: 'ib', focus: 'gov' });
+    expect(svg.querySelector('.subsidy-arrow')).not.toBeNull();
     renderMarketChart(svg, r(0), { detail: 'ib', focus: 'ps' });
     expect(svg.querySelector('.subsidy-arrow')).toBeNull();
   });

@@ -51,13 +51,17 @@ export function subsidyChain(focus) {
   }
   const prices = { stage: 'prices', only: priced, enter: ['pricesC', 'prices'], after: 1100 };
   if (focus === 'gov') {
-    // The budget: the government pays the per-unit amount on every loaf sold, one strip per loaf,
-    // and the strips make up the spending box.
-    return [...opening, prices,
-      { stage: 'strips', only: [...priced, 'govStrips'], enter: ['govStrips'], after: 1000 },
-      { stage: 'box', only: [...priced, 'govStrips', 'govFill', 'wedgeBox', 'boxLabel'], enter: ['govFill', 'wedgeBox', 'boxLabel'], exit: ['govStrips'], after: 2000 },
+    // The budget: customers pay Pc, the government's payment lifts that to what the bakery receives
+    // (the arrow from e2 up to S1, then the Pp line), and it pays that on every loaf sold, one strip
+    // per loaf, which make up the spending box.
+    const received = [...priced, 'subsidyArrow'];
+    return [...opening,
+      { stage: 'pc', only: [...atE2, 'pricesCOnly'], enter: ['pricesC'], after: 1000 },
+      { stage: 'received', only: received, enter: ['subsidyArrow', 'prices'], after: 1100 },
+      { stage: 'strips', only: [...received, 'govStrips'], enter: ['govStrips'], after: 1300 },
+      { stage: 'box', only: [...received, 'govStrips', 'govFill', 'wedgeBox', 'boxLabel'], enter: ['govFill', 'wedgeBox', 'boxLabel'], exit: ['govStrips'], after: 2000 },
       // The label gives way before the chip arrives: the chip is placed around whatever labels are up.
-      { stage: 'unlabel', only: [...priced, 'govFill', 'wedgeBox', 'boxLabel'], exit: ['boxLabel'], after: 2000 },
+      { stage: 'unlabel', only: [...received, 'govFill', 'wedgeBox', 'boxLabel'], exit: ['boxLabel'], after: 2000 },
       finish({ enter: ['focusChip'], after: 800 })];
   }
   if (focus === 'societal') {
@@ -212,14 +216,15 @@ export function initSubsidyPage(doc, win = window) {
     const intervention = subsidyActive ? { type: 'subsidy', amount: amount * subsidyFraction } : { type: 'none' };
     const result = computeMarket({ ...market, intervention });
 
-    const options = { showSurplusLabels: true, detail: chrome.getDetail(), focus, areaLabels: SUBSIDY_AREA_LABELS };
+    // Government's arrow (e2 up to S1) is a length, not a figure: a chip would put the number there too.
+    const options = { showSurplusLabels: true, detail: chrome.getDetail(), focus, areaLabels: SUBSIDY_AREA_LABELS, arrowChip: focus !== 'gov' };
     const step = subsidyActive && !result.noTrade ? chainStep : null;
     if (step) {
       const held = step.only ? new Set(step.only) : resolveLayers(result, options);
       (step.drop ?? []).forEach((name) => held.delete(name));
       (step.add ?? []).forEach((name) => held.add(name));
       options.layers = [...held];
-      options.captions = { dropAmount: `${fmtMoney(amount)} per loaf` };
+      options.captions = {};
       if (step.stage === 'arrows') options.dropStagger = DROP_STAGGER_MS;
       if (focus === 'gov' || focus === 'societal') {
         Object.assign(options.captions, {
@@ -319,6 +324,7 @@ export function initSubsidyPage(doc, win = window) {
       ...(waiting ? { loafArmed: true } : {}),
       areaLabels: SUBSIDY_AREA_LABELS,
       reserveDimBands: true, // room outside the axes for the revenue step's dimension lines
+      ppDot: true, // the price the bakery receives, marked where it meets S1, from "One loaf, two prices" on
       arrowChip: false, // Explain's price brackets already carry the amount; no chip beside the arrow
       ...(typeof step.chartOptions === 'function' ? step.chartOptions(ctx) : step.chartOptions),
       ...(animate ? { enter: [...(step.enter ?? []), ...(step.fadeIn ?? [])], grow: step.grow } : {}),

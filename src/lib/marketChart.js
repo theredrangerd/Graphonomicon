@@ -288,6 +288,8 @@ export function resolveLayers(result, { detail = 'full', layers, focus = null, s
     } else if (hasPoly) {
       on.add(FOCUS_LAYER[focus] ?? focus);
       if (focus === 'gov') on.add('wedgeBox');
+      // The government's lens also shows where the producer's share comes from: the arrow from e2 up to S1.
+      if (focus === 'gov' && result.mode === 'subsidy' && hasOpenWedge(result)) on.add('subsidyArrow');
       const spec = focusSpec(result, focus);
       if (spec.value > 0.005) on.add('focusChip');
     }
@@ -1158,7 +1160,7 @@ function drawLoafDrop(layer, result, captions, q, armed = false, guides = true) 
 // Every loaf: the same drop from several points on S1. The arrow tips line up into S2,
 // which is why S2 is parallel to S1 and exactly the subsidy lower. On the step that brings
 // them in, the arrows draw down one after another.
-function drawLoafDrops(layer, result, skipQ = null, stagger = 250, amountLabel = null) {
+function drawLoafDrops(layer, result, skipQ = null, stagger = 250) {
   // Clipped to the plot, so an arrow whose tip would land below zero runs under the x axis and
   // is cut off there instead of vanishing.
   const g = el('g', { 'clip-path': 'url(#plotClip)' }, 'loaf-drops');
@@ -1187,16 +1189,6 @@ function drawLoafDrops(layer, result, skipQ = null, stagger = 250, amountLabel =
       g.appendChild(tip);
     }
   });
-  // One label for the lot: what every arrow is (the per-unit subsidy), beside the middle one.
-  if (amountLabel) {
-    const q = DROP_QS[2], { cost, customer } = loafPoint(result, q);
-    if (cost <= PMAX && sy(customer) - sy(cost) > 12) {
-      const t = mark(teachingLabel(sx(q) + 9, (sy(cost) + sy(customer)) / 2 + 4, amountLabel, 'start', 'var(--gov)'), 'gov');
-      t.classList.add('loaf-drops__amount');
-      if (entering) { t.classList.add('loaf-drops__amount--enter'); t.style.setProperty('--d', String(3 * stagger)); }
-      g.appendChild(t);
-    }
-  }
   g.setAttribute('data-layer', 'loafDrops');
   layer.appendChild(g);
 }
@@ -1386,7 +1378,7 @@ function drawSubsidyTeachingMarks(layer, result, captions, options) {
     if (name) nameArea(layer, result.mode === 'subsidy' ? triPoly : plainPoly, captions[key], name, key);
   }
   if (result.mode !== 'subsidy') return;
-  if (layerOn.has('loafDrops')) drawLoafDrops(layer, result, layerOn.has('loafDrop') ? (options.loafQ ?? DEFAULT_LOAF_Q) : null, options.dropStagger ?? 250, captions.dropAmount);
+  if (layerOn.has('loafDrops')) drawLoafDrops(layer, result, layerOn.has('loafDrop') ? (options.loafQ ?? DEFAULT_LOAF_Q) : null, options.dropStagger ?? 250);
   if (layerOn.has('loafDrop')) drawLoafDrop(layer, result, captions, options.loafQ ?? DEFAULT_LOAF_Q, Boolean(options.loafArmed), options.loafGuides !== false);
   if (layerOn.has('priceBrackets')) drawPriceBrackets(layer, result, captions);
   if (layerOn.has('revenueDims')) drawRevenueDims(layer, result, captions);
@@ -2021,6 +2013,12 @@ export function renderMarketChart(svg, result, options = {}) {
       layer.appendChild(tag(el('circle', { cx: sx(result.Q), cy: sy(result.Pc), r: focusId || e2Note ? 8 : 4, fill: 'var(--surface)', stroke: 'var(--ink)', 'stroke-width': 1.8 }, focusId || e2Note ? 'eq2-dot eq-dot--focus' : 'eq2-dot'), 'eq2'));
       // The note that was on e1 moves here once the tax has moved the market.
       if (e2Note) layer.appendChild(tag(mark(teachingLabel(sx(result.Q) + 16, sy(result.Pc) - 14, captions.eq2Note, 'start'), 'qty'), 'eq2Note'));
+    }
+
+    // Explain's Pp dot: where the price the bakery receives meets S1. It rides on the Pp line's layer,
+    // so it appears with the line and stays on every step that keeps it.
+    if (options.ppDot && result.mode === 'subsidy' && hasOpenWedge(result) && (on.has('prices') || on.has('pricesPOnly'))) {
+      layer.appendChild(tag(el('circle', { cx: sx(result.Q), cy: sy(result.Pp), r: 4.5, fill: 'var(--supply)', stroke: 'var(--surface)', 'stroke-width': 1.5 }, 'pp-dot'), 'prices'));
     }
 
     drawEquilibriumLabels(layer, result, { d: screenSeg(dSeg), s: screenSeg(sSeg), s2: s2Seg && screenSeg(s2Seg) });

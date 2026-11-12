@@ -40,14 +40,16 @@ describe('subsidyChain', () => {
     expect(subsidyChain('ps')[3].only).not.toContain('marginalPs');
   });
 
-  it('builds the government lens as prices, strips, then the box, with no deadweight loss', () => {
-    expect(stages('gov')).toEqual(['arrows', 'shift', 'e2', 'prices', 'strips', 'box', 'unlabel', 'final']);
+  it('builds the government lens as Pc, the arrow up to what the bakery receives with its Pp line, strips, then the box, with no deadweight loss', () => {
+    expect(stages('gov')).toEqual(['arrows', 'shift', 'e2', 'pc', 'received', 'strips', 'box', 'unlabel', 'final']);
     for (const step of subsidyChain('gov')) {
       expect(step.only ?? []).not.toContain('dwl');
       expect(step.add ?? []).not.toContain('dwl');
       expect(step.enter ?? []).not.toContain('dwl');
     }
-    expect(subsidyChain('gov')[4].only).not.toContain('govFill');
+    expect(subsidyChain('gov')[3].only).not.toContain('subsidyArrow');
+    expect(subsidyChain('gov')[4].only).toEqual(expect.arrayContaining(['subsidyArrow', 'prices']));
+    expect(subsidyChain('gov')[5].only).not.toContain('govFill');
   });
 
   it("keeps the societal lens's build-up after the shared opening and the two prices", () => {
