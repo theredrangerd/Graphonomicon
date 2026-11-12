@@ -16,15 +16,18 @@ export function taxSocietyChain() {
   const shifted = [...BASE, 'supply2', 'eq2'];
   const surplus = ['cs', 'ps'];
   const priced = [...shifted, 'prices'];
-  const shift = { stage: 'shift', only: [...shifted, ...surplus, 'loafDrops'], after: 0 };
+  // The grey gap is drawn from the first frame of the tween, growing exactly as the surplus shrinks, so it appears
+  // the moment the line is pushed up.
+  const grey = ['lostConsumer', 'lostProducer'];
+  const shift = { stage: 'shift', only: [...shifted, ...surplus, ...grey, 'loafDrops'], after: 0 };
   const thenLeave = (step) => ({ ...step, only: [...step.only, 'loafDrops'], exit: [...(step.exit ?? []), 'loafDrops'], after: SHIFT_MS + TWEEN_SETTLE_MS });
   // The whole gap the tax opened goes grey at once (no white left between the two halves), split at Qtax into what
   // the government collects and what is no longer traded; then each party's half takes its own colours in turn.
   const base = [...priced, ...surplus];
-  const lost = ['lostConsumer', 'lostProducer', 'lostNote'];
+  const lost = [...grey, 'lostNote'];
   return [
     shift,
-    thenLeave({ stage: 'lost', lens: 'societal', only: [...base, ...lost], enter: ['pricesC', 'prices', ...lost] }),
+    thenLeave({ stage: 'lost', lens: 'societal', only: [...base, ...lost], enter: ['pricesC', 'prices', 'lostNote'] }), // the gap is already grey; now the lines and its names
     { stage: 'cDivide', lens: 'consumer-lens', emphasis: 'consumers', only: [...base, ...lost, 'taxConsumer', 'dwlConsumer', 'focusChip'], enter: ['taxConsumer', 'dwlConsumer', 'focusChip'], exit: ['lostConsumer'], after: 2200 },
     { stage: 'pDivide', lens: 'producer-lens', emphasis: 'producers', only: [...base, 'taxConsumer', 'dwlConsumer', 'lostProducer', 'lostNote', 'taxProducer', 'dwlProducer', 'focusChip'], enter: ['taxProducer', 'dwlProducer', 'focusChip'], exit: ['lostProducer', 'lostNote'], after: 1700 },
     // The leftover surplus and its chips fade together, leaving the two burden bands and the two halves of the loss.

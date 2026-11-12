@@ -13,6 +13,9 @@ describe('taxSocietyChain', () => {
     const [shift] = taxSocietyChain();
     expect(shift.stage).toBe('shift');
     expect(shift.only).toEqual(expect.arrayContaining(['loafDrops', 'supply2', 'eq2', 'cs', 'ps']));
+    // the grey gap appears as soon as the line is pushed up, growing as the surplus shrinks
+    expect(shift.only).toEqual(expect.arrayContaining(['lostConsumer', 'lostProducer']));
+    expect(shift.only).not.toContain('lostNote');
     expect(shift.only).not.toContain('prices');
     expect(shift.enter ?? []).toEqual([]);
     expect(shift.after).toBe(0);
@@ -24,6 +27,8 @@ describe('taxSocietyChain', () => {
     // both halves grey together, named, with no burden colour yet
     expect(lost.only).toEqual(expect.arrayContaining(['lostConsumer', 'lostProducer', 'lostNote']));
     expect(lost.only).not.toContain('taxConsumer');
+    expect(lost.enter).not.toContain('lostConsumer'); // already there from the shift
+    expect(lost.enter).toContain('lostNote');
     expect(lost.only).not.toContain('taxProducer');
     // consumers' half takes its colours while the producers' half is still grey (no white left behind)
     expect(cDivide.lens).toBe('consumer-lens');
