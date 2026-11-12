@@ -621,7 +621,8 @@ function drawWedgeLines(svg, result) {
         if (layerGrow.has('producerPrice')) ppLine.classList.add('layer-grow');
         svg.appendChild(tag(ppLine, 'prices'));
       }
-    } else if (drawPc) {
+    } else if (drawPc && result.mode !== 'subsidy') {
+      // (A subsidy's box edge is its Pc line: a continuation past e2 isn't on an IB diagram.)
       svg.appendChild(tag(el('line', { x1: xQ, y1: yc, x2: M.left + plotW, y2: yc, stroke: 'var(--demand)', 'stroke-width': 1.6, 'stroke-dasharray': '6,3', 'data-mark': 'customer' }, 'wedge-line'), 'pricesC'));
       // A subsidy's Pp line would run off past S1 and read as a stray mark; the box's
       // top edge and the Pp axis symbol already mark that price.

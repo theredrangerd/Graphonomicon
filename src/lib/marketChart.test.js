@@ -95,12 +95,11 @@ describe('renderMarketChart', () => {
     expect(svg.querySelector('polygon.wedge-outline')).not.toBeNull();
   });
 
-  it('draws only the consumer-price reference line for a subsidy', () => {
+  it('draws no price line past e2 for a subsidy: the box edge is the Pc line, as on an IB diagram', () => {
     const result = computeMarket({ ...base, intervention: { type: 'subsidy', amount: 20 } });
     renderMarketChart(svg, result);
-    const lines = svg.querySelectorAll('line.wedge-line');
-    expect(lines).toHaveLength(1);
-    expect(lines[0].getAttribute('stroke')).toBe('var(--demand)');
+    expect(svg.querySelector('[data-layer="wedgeBox"]')).not.toBeNull();
+    expect(svg.querySelectorAll('line.wedge-line')).toHaveLength(0);
   });
 
   it('runs both price lines from the axis to Q when the subsidy box is not drawn', () => {
