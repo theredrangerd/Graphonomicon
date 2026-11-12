@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { subsidyChain } from './subsidy.js';
+import { subsidyChain, replayOf } from './subsidy.js';
 
 const stages = (focus) => subsidyChain(focus).map((step) => step.stage);
 const FOCUSES = ['gov', 'cs', 'ps', 'societal'];
@@ -83,5 +83,16 @@ describe('subsidyChain', () => {
     expect(subsidyChain('cs')[0].only).toContain('csTriangle');
     expect(subsidyChain('ps')[0].only).toContain('psTriangle');
     expect(subsidyChain('gov')[0].only).not.toContain('csTriangle');
+  });
+
+  it.each(FOCUSES)('%s: picking the lens with the subsidy already on replays it without the arrows', (focus) => {
+    const chain = subsidyChain(focus);
+    const replay = replayOf(chain);
+    expect(replay.map((s) => s.stage)).toEqual(chain.map((s) => s.stage));
+    for (const step of replay) {
+      for (const list of [step.only, step.add, step.exit]) expect(list ?? []).not.toContain('loafDrops');
+    }
+    expect(replay[1].after).toBe(300);
+    expect(replay[0].only).toEqual(expect.arrayContaining(['supply2', 'eq2']));
   });
 });

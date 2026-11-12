@@ -89,6 +89,15 @@ export function subsidyChain(focus) {
   return [];
 }
 
+// The chain for a lens picked while the subsidy is already on: S2 and e2 are already there, so no arrows.
+// The shifted picture comes up at once, then the lens's own steps follow shortly after.
+const without = (names, drop) => names?.filter((name) => name !== drop);
+export function replayOf(chain) {
+  const bare = (step) => ({ ...step, only: without(step.only, 'loafDrops'), add: without(step.add, 'loafDrops'), exit: without(step.exit, 'loafDrops') });
+  const [shifted, ...rest] = chain.map(bare);
+  return rest.length ? [shifted, { ...rest[0], after: 300 }, ...rest.slice(1)] : [shifted];
+}
+
 export function initSubsidyPage(doc, win = window) {
   const { backHref, backLabel, siblings } = getFamilyNav('subsidy');
   renderMiniHeader(doc.querySelector('#mini-header'), { title: 'Subsidy', backHref, backLabel, siblings });
@@ -128,7 +137,7 @@ export function initSubsidyPage(doc, win = window) {
       resetReveal();
       explainers?.close();
       // A lens picked with the subsidy already on plays its build-up, like switching the subsidy on.
-      if (subsidyToggle.checked) startReveal(); else { resetReveal(); render(); }
+      if (subsidyToggle.checked) startReveal({ replay: true }); else { resetReveal(); render(); }
     },
   });
 
@@ -150,10 +159,11 @@ export function initSubsidyPage(doc, win = window) {
   const stopReveal = () => { cancelReveal.forEach((c) => c()); cancelReveal = []; };
   function resetReveal() { stopReveal(); chainStep = null; pendingEnter = []; pendingGrow = []; pendingExit = []; }
   // Plays the focus's chain from its first step (each step renders itself), or just draws the
-  // finished picture when the focus has none.
-  function startReveal() {
+  // finished picture when the focus has none. A `replay` (a lens picked with the subsidy already on) has
+  // no shift to show, so it starts from the shifted picture without the arrows and runs the rest.
+  function startReveal({ replay = false } = {}) {
     stopReveal();
-    const steps = CHAINS[playView.focus] ?? [];
+    const steps = replay ? replayOf(CHAINS[playView.focus] ?? []) : CHAINS[playView.focus] ?? [];
     if (!steps.length) { chainStep = null; render(); return; }
     const run = (i) => {
       const step = steps[i];
