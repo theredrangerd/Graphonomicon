@@ -42,16 +42,10 @@ export const snapLoaf = (q) => Math.min(DOT_Q_MAX, Math.max(DOT_Q_MIN, Math.roun
 
 // Explain's slider tops out at $40 (Play's goes to $60). The revenue step asks the student to
 // slide the subsidy down to $0 and back up to that top (a halo marks the end to go to), and the
-// amount stays there for the steps after it, so nothing jumps between steps. Progress is kept
-// once earned, like the dot's. "The top" counts within SWEEP_REACH of the slider's max, so a
-// step short of it still counts.
+// amount stays there for the steps after it, so nothing jumps between steps. The sweep itself
+// (advanceSweep) is shared with the indirect tax's Explain.
 export const EXPLAIN_SUBSIDY_MAX = 40;
-export const SWEEP_REACH = 1;
-export function advanceSweep(sweep, amount, { min, max }) {
-  const low = Boolean(sweep.low) || amount <= min;
-  const high = Boolean(sweep.high) || (low && amount >= max - SWEEP_REACH);
-  return { low, high };
-}
+export { advanceSweep, SWEEP_REACH } from '../lib/explainTasks.js';
 
 // Loaves are counted, so show whole numbers bare and halves with one decimal.
 const loaves = (v) => (Math.abs(v - Math.round(v)) < 0.05 ? String(Math.round(v)) : v.toFixed(1));

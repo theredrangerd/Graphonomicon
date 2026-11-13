@@ -178,6 +178,8 @@ export const LAYERS = Object.freeze([
   'subsidyBracket', 'subsidyArrow', 'taxBracket', 'badges', 'areaNames', 'focusChip',
   // Subsidy Explain teaching marks, never drawn by default (see drawSubsidyTeachingMarks).
   'eq1Note', 'eq2Note', 'taxArrow', 'qtyBracket', 'taxHeight', 'lost', 'lostConsumer', 'lostProducer', 'lostNote', 'costDot', 'loafDrop', 'loafDrops', 'priceBrackets', 'revenueDims', 'revenueBox', 'govStrips', 'boxWidth', 'boxLabel', 'readout',
+  // Indirect tax Explain teaching marks (see drawTaxTeachingMarks).
+  'shiftLeft', 'rideNote', 'passFull', 'passGap', 'wedgeDrag', 'csLost', 'psLost',
 ]);
 
 // Every Explorer focus the renderer knows. Each page offers its own subset (subsidy: cs, ps,
@@ -337,6 +339,7 @@ let layerExit = new Set();
 const LAYER_MARKS = {
   demand: 'customer', supply: 'cost', supply2: 'customer', eq1: 'pe', eq2: 'qty', pricesC: 'customer', prices: 'cost',
   cs: 'cs', csTriangle: 'cs', ps: 'ps', psTriangle: 'ps', wedgeBox: 'gov', revenueBox: 'cost', govFill: 'gov', subsidyBracket: 'gov', subsidyArrow: 'gov', marginalPs: 'mps', marginalCs: 'mcs', dwl: 'dwl', dwlConsumer: 'dwl', dwlProducer: 'dwl',
+  taxConsumer: 'cb', taxProducer: 'pb', csLost: 'cs', psLost: 'ps',
 };
 function tag(node, name) {
   node.setAttribute('data-layer', name);
@@ -368,6 +371,12 @@ const X_GAP = Math.round(SYMBOL_PX * 1.75);
 // Growth starts this far out from Pe/Qe: Pe's hanging subscript needs ~3px more room than
 // the centred-glyph estimate, and at this distance the symbol would be <1px tall anyway.
 const SYMBOL_DEAD_ZONE = 3;
+// A word-subscript symbol (Q_tax, Q_subsidy) is pinned so it grows away from Qe (see drawAxisSymbols), so it only
+// needs about Qe's half-width of clearance before it can be full size. Without this, on a phone-width plot Q_tax sat
+// at half size beside Qe even with the tax fully on.
+const WORD_X_GAP = Math.round(SYMBOL_PX * 1.15);
+const MIN_WORD_SCALE = 13 / SYMBOL_PX;
+const STACK_DROP = 15; // px a stacked word symbol sits below the axis-symbol row
 
 // The IB-style symbols a result puts on each axis: Pe/Qe for the free-market equilibrium
 // (always, so the before/after comparison stays readable), plus whatever prices and
@@ -393,7 +402,14 @@ function axisSymbols(result) {
     // aside, so it never sits off its line or covers Pe/Qe, and it vanishes at exactly
     // zero intervention (e.g. tax = 0, where Pc = Pp = Pe).
     return withPos
-      .map((s) => ({ ...s, scale: s.ref ? 1 : Math.min(1, Math.max(0, Math.abs(s.pos - refPos) - SYMBOL_DEAD_ZONE) / (gap - SYMBOL_DEAD_ZONE)) }))
+      .map((s) => {
+        const word = s.sub.length > 2;
+        const scale = s.ref ? 1 : Math.min(1, Math.max(0, Math.abs(s.pos - refPos) - SYMBOL_DEAD_ZONE) / ((word ? WORD_X_GAP : gap) - SYMBOL_DEAD_ZONE));
+        // A word symbol too close to Qe to be readable at that size keeps a readable size and drops a row,
+        // under Qe, instead of shrinking to a speck (it still vanishes at exactly zero intervention).
+        if (word && scale > 0.05 && scale < MIN_WORD_SCALE) return { ...s, scale: MIN_WORD_SCALE, stacked: true };
+        return { ...s, scale };
+      })
       .filter((s) => s.scale > 0.05);
   };
   // Positions are worked out with every symbol present, then the ones whose layer is off
@@ -458,7 +474,7 @@ function drawAxisSymbols(svg, layer, result) {
     const pin = !word ? { x: s.pos, 'text-anchor': 'middle' }
       : s.pos < refX ? { x: s.pos + 0.15 * SYMBOL_PX * s.scale, 'text-anchor': 'end' }
         : { x: s.pos - 0.35 * SYMBOL_PX * s.scale, 'text-anchor': 'start' };
-    const qLabel = subscriptLabel(s.base, s.sub, { ...pin, y: M.top + plotH + TICK_Y, ...size(s) }, cls(s));
+    const qLabel = subscriptLabel(s.base, s.sub, { ...pin, y: M.top + plotH + TICK_Y + (s.stacked ? STACK_DROP : 0), ...size(s) }, cls(s));
     if (s.ref) mark(qLabel, 'qe'); // Qe, not the layer's Pe mark; the others take their layer's
     layer.appendChild(tag(qLabel, s.layer));
   }
@@ -1043,14 +1059,15 @@ function dimLine(g, x1, y1, x2, y2, tick, style) {
 function nameArea(layer, poly, text, layerName, markKey) {
   if (!text || !(poly?.length >= 3)) return;
   const c = polygonCentroid(poly, placedLabels, { halfW: (text.length * CHAR_PX) / 2 + 2, halfH: 8, min: 0.9 });
-  if (c?.scale != null) layer.appendChild(mark(tag(teachingLabel(c.x, c.y + 5, text, 'middle'), layerName), markKey));
+  if (c?.scale == null) return null;
+  return layer.appendChild(mark(tag(teachingLabel(c.x, c.y + 5, text, 'middle'), layerName), markKey));
 }
 
 // Every teaching mark carries a `data-mark` naming what it stands for (the bakery's cost, the
 // government's money, the customer's price, the old market price, a quantity). The Explain
 // card colours the same words in its text with the same key, and hovering one lights up its
 // marks on the chart, so the sentence and the picture point at each other.
-const MARK_COLOR = { cost: 'var(--supply)', gov: 'var(--gov)', customer: 'var(--demand)', cs: 'var(--demand)', mcs: 'var(--demand)', ps: 'var(--supply)', mps: 'var(--supply)', pe: 'var(--ink)', qe: 'var(--ink)', qty: 'var(--ink)', dwl: 'var(--dwl-line)' };
+const MARK_COLOR = { cost: 'var(--supply)', need: 'var(--supply)', gov: 'var(--gov)', customer: 'var(--demand)', cs: 'var(--demand)', mcs: 'var(--demand)', ps: 'var(--supply)', mps: 'var(--supply)', pe: 'var(--ink)', qe: 'var(--ink)', qty: 'var(--ink)', dwl: 'var(--dwl-line)', cb: 'var(--burden-consumer)', pb: 'var(--burden-producer)', lost: 'var(--ink-secondary)', pass: 'var(--ink)' };
 // `key` may name several terms (space-separated): the equilibrium point answers to both Pe and Qe.
 function mark(node, key) { node.setAttribute('data-mark', key); return node; }
 
@@ -1073,7 +1090,7 @@ function drawCostDot(layer, result, captions, q, target) {
     const fitsRight = x + 6 + captions.dotQtyTag.length * DRAG_CHAR_PX <= M.left + plotW - 2;
     g.appendChild(mark(teachingLabel(fitsRight ? x + 6 : x - 6, M.top + plotH - 8, captions.dotQtyTag, fitsRight ? 'start' : 'end'), 'qty'));
   }
-  const handle = el('g', { tabindex: '0', role: 'slider', 'aria-label': 'Loaf on the supply curve', 'aria-valuemin': '0', 'aria-valuemax': String(QMAX), 'aria-valuenow': String(Math.round(q)) }, 'cost-dot__handle');
+  const handle = el('g', { tabindex: '0', role: 'slider', 'aria-label': captions.dotAria ?? 'Loaf on the supply curve', 'aria-valuemin': '0', 'aria-valuemax': String(QMAX), 'aria-valuenow': String(Math.round(q)) }, 'cost-dot__handle');
   handle.appendChild(el('circle', { cx: x, cy: y, r: 22, fill: 'transparent' }));
   handle.appendChild(el('circle', { cx: x, cy: y, r: 13, fill: 'none', stroke: 'var(--supply)', 'stroke-width': 1.5, 'stroke-opacity': 0.5 }, 'cost-dot__ring'));
   handle.appendChild(mark(el('circle', { cx: x, cy: y, r: 7, fill: 'var(--supply)', stroke: 'var(--surface)', 'stroke-width': 2 }), 'cost'));
@@ -1104,10 +1121,10 @@ function drawDotTarget(g, result, captions, { q, tolerance, reached }) {
 
 // Until the student first grabs the dot: a bobbing "drag me" pill pointing at it, and a
 // chevron either side of it along S1, nudging outward to show which way it moves.
-function drawDragHint(g, result, x, y, text) {
+function drawDragHint(g, result, x, y, text, slope = result.slopeS) {
   const hint = el('g', {}, 'drag-hint');
-  // S1's direction on screen (up and to the right), as a unit vector.
-  const dx = plotW / QMAX, dy = -(result.slopeS * plotH) / PMAX;
+  // The direction of the line the mark moves along on screen (S1: up and to the right), as a unit vector.
+  const dx = plotW / QMAX, dy = -(slope * plotH) / PMAX;
   const len = Math.hypot(dx, dy), ux = dx / len, uy = dy / len;
   for (const dir of [1, -1]) {
     const cx = x + dir * 30 * ux, cy = y + dir * 30 * uy;
@@ -1212,6 +1229,8 @@ function drawLoafDrops(layer, result, skipQ = null, faint = false) {
   DROP_QS.forEach((q, i) => {
     // The student's own loaf (still drawn, as it was, by the loafDrop layer) has its arrow already.
     if (skipQ != null && Math.abs(q - skipQ) < DROP_QS[0] / 2) return;
+    // (Explain's tax arrows skip the one at Qe, which would run up through e1's label.)
+    if (!faint && result.mode === 'tax' && Math.abs(q - result.Qstar) < 3) return;
     // A subsidy's arrows go down from S1 to S2; a tax's go up (S2 is S1 plus the tax, which for an ad valorem tax grows with q).
     const taxed = result.mode === 'tax';
     const s2 = shiftedSupplyParams(result);
@@ -1226,9 +1245,19 @@ function drawLoafDrops(layer, result, skipQ = null, faint = false) {
     } else if (yBot - yTop > 12) one.appendChild(arrowMark(x, yTop + 4, x, yBot - 2, { width: 1.8, head: 8, color: 'var(--gov)' }));
     if (entering) {
       one.classList.add('layer-drop');
+      if (taxed) one.classList.add('layer-drop--up'); // a tax's arrows grow up out of S1
       one.style.setProperty('--d', String(i * 250)); // ms at 1× pace; pages.css scales it
     }
     g.appendChild(one);
+    // A tax's arrow lands on S2: a hollow dot where the cost plus the tax is (Explain only).
+    if (!faint && taxed && yTop - yBot > 12) {
+      const tip = mark(el('circle', { cx: x, cy: yBot, r: 4.5, fill: 'var(--surface)', stroke: 'var(--supply)', 'stroke-width': 2 }, 'loaf-drops__tip'), 'need');
+      if (entering) {
+        tip.classList.add('loaf-drops__tip--enter');
+        tip.style.setProperty('--d', String(i * 250));
+      }
+      g.appendChild(tip);
+    }
     // The same hollow blue dot the single loaf ends on: where the customer's price lands (S2).
     if (!faint && !taxed && yBot - yTop > 12 && customer >= 0) {
       const tip = customerDot(x, yBot, 'loaf-drops__tip');
@@ -1382,11 +1411,17 @@ function drawBoxWidth(layer, result, captions) {
 // The box's name and total, centred in it; the short form (`boxShort`) when the full one is
 // wider than the box (phones).
 function drawBoxLabel(layer, result, captions) {
-  if (!captions.box || !(result.govCost > 0.005)) return;
-  const x = (sx(0) + sx(result.Q)) / 2, y = (sy(result.Pc) + sy(result.Pp)) / 2 + 5;
+  const total = result.mode === 'tax' ? result.govRevenue : result.govCost;
+  if (!captions.box || !(total > 0.005)) return;
+  const yTop = sy(Math.max(result.Pc, result.Pp)), yBot = sy(Math.min(result.Pc, result.Pp));
+  // A tax's box is split at Pe, often right through its middle, so its name sits in the upper half when there's room.
+  const y = result.mode === 'tax' && yBot - yTop >= 40 ? yTop + 18 : (yTop + yBot) / 2 + 5;
   const fits = (text) => text.length * CHAR_PX + 8 <= sx(result.Q) - sx(0);
   const text = fits(captions.box) ? captions.box : captions.boxShort;
-  if (text) layer.appendChild(mark(tag(teachingLabel(x, y, text, 'middle', 'var(--gov)'), 'boxLabel'), 'gov'));
+  // A tax's S2 runs up through the box from its left edge's lower corner, so its name sits at the left end,
+  // which S2 only reaches near the bottom; a subsidy's is centred.
+  const [x, anchor] = result.mode === 'tax' ? [sx(0) + 8, 'start'] : [(sx(0) + sx(result.Q)) / 2, 'middle'];
+  if (text) layer.appendChild(mark(tag(teachingLabel(x, y, text, anchor, 'var(--gov)'), 'boxLabel'), 'gov'));
 }
 
 // The readout: the step's key values in a small table in the plot's top-right corner, each
@@ -1429,8 +1464,8 @@ function drawSubsidyTeachingMarks(layer, result, captions, options) {
     const name = layerOn.has(tri) ? tri : layerOn.has(key) ? key : null;
     if (name) nameArea(layer, result.mode === 'subsidy' ? triPoly : plainPoly, captions[key], name, key);
   }
-  // A tax's arrows (the Society lens's shift) go up from S1; it has no other teaching marks.
-  if (result.mode === 'tax' && layerOn.has('loafDrops')) { drawLoafDrops(layer, result, null, Boolean(options.faintDrops)); return; }
+  // A tax's arrows go up from S1 (the Society lens's shift, and the tax Explain's marks).
+  if (result.mode === 'tax') { drawTaxTeachingMarks(layer, result, captions, options); return; }
   if (result.mode !== 'subsidy') return;
   if (layerOn.has('loafDrops')) drawLoafDrops(layer, result, layerOn.has('loafDrop') ? (options.loafQ ?? DEFAULT_LOAF_Q) : null, Boolean(options.faintDrops));
   if (layerOn.has('loafDrop')) drawLoafDrop(layer, result, captions, options.loafQ ?? DEFAULT_LOAF_Q, Boolean(options.loafArmed), options.loafGuides !== false);
@@ -1442,6 +1477,157 @@ function drawSubsidyTeachingMarks(layer, result, captions, options) {
   for (const [key, layerName, poly] of [['mps', 'marginalPs', result.marginalPsPoly], ['mcs', 'marginalCs', result.marginalCsPoly]]) {
     if (layerOn.has(layerName)) nameArea(layer, poly, captions[key], layerName, key);
   }
+}
+
+// ---- Indirect tax Explain teaching marks ----
+// The sugar levy walkthrough's marks, by layer name. Like the subsidy's, every figure they
+// print comes from the step's `captions`.
+
+const DEFAULT_LITRE_Q = 45;
+// Where a quantity sits on S2 (cost plus the tax) and on demand.
+const s2At = (result, q) => { const s2 = shiftedSupplyParams(result); return s2.Smin + s2.slopeS * q; };
+const demandAt = (result, q) => result.Dmax - result.slopeD * q;
+// Labels sit right of an upright mark at x, or left of it when the plot edge is too close.
+const sideOf = (x, ...texts) => {
+  const longest = Math.max(0, ...texts.map((t) => (t ?? '').length));
+  return x + 12 + longest * CHAR_PX <= M.left + plotW - 2 ? { dx: 12, anchor: 'start' } : { dx: -12, anchor: 'end' };
+};
+
+function drawTaxTeachingMarks(layer, result, captions, options) {
+  const q = options.loafQ ?? DEFAULT_LITRE_Q;
+  // The student's own litre (loafDrop) already has its arrow, so the row of arrows skips it.
+  if (layerOn.has('loafDrops')) drawLoafDrops(layer, result, layerOn.has('loafDrop') ? q : null, Boolean(options.faintDrops));
+  if (!isOpenTax(result)) return;
+  if (layerOn.has('loafDrop')) drawLevyLift(layer, result, captions, q, options.loafGuides !== false);
+  if (layerOn.has('shiftLeft')) drawShiftLeft(layer, result, captions);
+  if (layerOn.has('passFull') || layerOn.has('passGap')) drawPassThrough(layer, result, captions);
+  if (layerOn.has('rideNote')) drawRideNote(layer, result, captions, options.rideT ?? 1);
+  if (layerOn.has('wedgeDrag')) drawWedge(layer, result, captions, options);
+  if (layerOn.has('boxLabel')) drawBoxLabel(layer, result, captions);
+  // Each burden (and the deadweight loss) named inside its area, once the area is drawn.
+  for (const [key, layerName, poly] of [['cb', 'taxConsumer', result.consumerWedgePoly], ['pb', 'taxProducer', result.producerWedgePoly], ['dwlName', 'dwl', result.dwlPoly]]) {
+    // The name fades in after its band has wiped in, rather than being squeezed by the wipe.
+    if (layerOn.has(layerName)) nameArea(layer, poly, captions[key], layerName, key === 'dwlName' ? 'dwl' : key)?.classList.remove('layer-grow');
+  }
+}
+
+// One litre: its dot on S1 (what it costs to make), an arrow straight up by the tax, and a
+// hollow dot where it lands (what the maker now needs for it, on S2), with dashed guides to the
+// axes. On the step that brings it in the arrow rises slowly, and the landing point follows.
+function drawLevyLift(layer, result, captions, q, guides = true) {
+  const cost = s1Cost(result, q), need = s2At(result, q);
+  const x = sx(q), yBot = sy(cost), yTop = sy(Math.min(need, PMAX));
+  const entering = layerEnter.has('loafDrop');
+  const g = el('g', { 'data-layer': 'loafDrop' }, 'levy-lift');
+  const later = (node) => { if (entering) node.classList.add('levy-lift__later'); return node; };
+  const guide = { stroke: 'var(--ink-muted)', 'stroke-width': 1, 'stroke-dasharray': '3,3' };
+  if (guides) {
+    g.appendChild(mark(el('line', { x1: M.left, y1: yBot, x2: x, y2: yBot, ...guide }), 'cost'));
+    g.appendChild(mark(el('line', { x1: x, y1: yBot, x2: x, y2: M.top + plotH, ...guide }), 'qty'));
+  }
+  const lifted = yBot - yTop > 14;
+  const { dx, anchor } = sideOf(x, captions.loafNeed);
+  // The need label sits beside the top dot, nudged up off the Pe guide line when the two prices coincide.
+  const needY = Math.abs(yTop - sy(result.Pstar)) < 8 ? yTop - 7 : yTop + 4;
+  if (lifted) {
+    if (guides) g.appendChild(later(mark(el('line', { x1: M.left, y1: yTop, x2: x, y2: yTop, ...guide }), 'need')));
+    const arrow = mark(arrowMark(x, yBot - 6, x, yTop + 6, { width: 2.4, color: 'var(--gov)' }), 'gov');
+    if (entering) arrow.classList.add('levy-lift__arrow');
+    g.appendChild(arrow);
+    g.appendChild(later(mark(el('circle', { cx: x, cy: yTop, r: 5, fill: 'var(--surface)', stroke: 'var(--supply)', 'stroke-width': 2 }), 'need')));
+    if (captions.loafGov) {
+      // Left of the arrow: S1 climbs away to the right, so the left side is clear.
+      const t = mark(teachingLabel(x - 12, (yTop + yBot) / 2 + 5, captions.loafGov, 'end', 'var(--gov)'), 'gov');
+      if (entering) t.classList.add('levy-lift__arrow-label');
+      g.appendChild(t);
+    }
+    if (captions.loafNeed) g.appendChild(later(mark(teachingLabel(x + dx, needY, captions.loafNeed, anchor, 'var(--supply)'), 'need')));
+  }
+  g.appendChild(mark(el('circle', { cx: x, cy: yBot, r: 5, fill: 'var(--supply)' }), 'cost qty'));
+  // S1 runs up and to the right, so the space above-left of the dot is clear.
+  if (captions.loafCost) g.appendChild(mark(teachingLabel(x - 12, yBot - 10, captions.loafCost, 'end', 'var(--supply)'), 'cost'));
+  layer.appendChild(g);
+}
+
+// Up is the same as left: at the old price, an arrow from S1 back to S2, named by the step
+// ("fewer litres at 80p"), so a curve moving up reads as supply falling.
+function drawShiftLeft(layer, result, captions) {
+  const p = result.Pstar, s2 = shiftedSupplyParams(result);
+  const q1 = (p - result.Smin) / result.slopeS, q2 = (p - s2.Smin) / s2.slopeS;
+  if (!(q2 >= 0) || sx(q1) - sx(q2) < 28) return;
+  const y = sy(p);
+  const g = mark(el('g', {}, 'shift-left'), 'need');
+  g.appendChild(arrowMark(sx(q1) - 7, y, sx(q2) + 7, y, { color: 'var(--supply)', width: 2.8, head: 11 }));
+  // Left of the arrowhead, just above the Pe guide line: clear of both supply curves there.
+  if (captions.shiftLeft) g.appendChild(teachingLabel(sx(q2) - 12, y - 9, captions.shiftLeft, 'end', 'var(--supply)'));
+  layer.appendChild(tag(g, 'shiftLeft'));
+}
+
+// The answer to "will the price rise by the whole tax?": a dashed line where the price would be
+// if it had (Pe + tax), and a bracket from there down to Pc naming the part that wasn't passed
+// on. Both sit at the left of the plot, between the price lines, clear of the curves.
+function drawPassThrough(layer, result, captions) {
+  const full = result.Pstar + (result.Pc - result.Pp);
+  const yFull = sy(full), yPc = sy(result.Pc), xQ = sx(result.Q);
+  if (layerOn.has('passFull')) {
+    const g = mark(el('g', {}, 'pass-full'), 'pass');
+    g.appendChild(el('line', { x1: M.left, y1: yFull, x2: xQ, y2: yFull, stroke: 'var(--ink-secondary)', 'stroke-width': 1.8, 'stroke-dasharray': '2,4', 'stroke-linecap': 'round' }));
+    if (captions.passFull) g.appendChild(teachingLabel(M.left + 8, yFull - 8, captions.passFull, 'start', 'var(--ink-secondary)'));
+    layer.appendChild(tag(g, 'passFull'));
+  }
+  if (layerOn.has('passGap') && yPc - yFull > 8) {
+    const x = M.left + 14;
+    const g = dimLine(mark(el('g', {}, 'pass-gap'), 'pass'), x, yFull + 1, x, yPc - 1, 5, { stroke: 'var(--ink)', 'stroke-width': 2, 'stroke-linecap': 'round' });
+    if (captions.passGap) g.appendChild(teachingLabel(x + 12, (yFull + yPc) / 2 + 5, captions.passGap, 'start'));
+    layer.appendChild(tag(g, 'passGap'));
+  }
+}
+
+// The price shoppers pay, as a ring riding along demand from e1 (t = 0) to e2 (t = 1), with its
+// note ("Pe 80p" counting up to "Pc 92p") where Play's Government perspective puts the same note.
+function drawRideNote(layer, result, captions, t) {
+  const q = result.Qstar + t * (result.Q - result.Qstar);
+  const x = sx(q), y = sy(demandAt(result, q));
+  const landed = t >= 1;
+  const g = mark(el('g', {}, 'ride-note'), landed ? 'customer' : 'pe');
+  g.appendChild(el('circle', { cx: x, cy: y, r: 8, fill: 'none', stroke: landed ? 'var(--demand)' : 'var(--ink)', 'stroke-width': 2.4 }, 'ride-note__ring'));
+  // Well above the point: clear of the e1/e2 label beside it, and of S2, which climbs away to the right.
+  if (captions.rideNote) g.appendChild(teachingLabel(x + 10, y - 30, captions.rideNote, 'start', landed ? 'var(--demand)' : 'var(--ink)'));
+  layer.appendChild(tag(g, 'rideNote'));
+}
+
+// The tax as a wedge (MRU's picture): a purple bar exactly the tax tall, hanging from demand at
+// the quantity the student drags it to. Until it fits, a dashed line shows how far its foot is
+// from S1; it fits only at Q_tax, where its top is what shoppers pay and its foot, on S1, what
+// the maker keeps.
+function drawWedge(layer, result, captions, { wedgeQ, wedgeFit = false }) {
+  const amount = result.Pc - result.Pp;
+  const q = wedgeFit || wedgeQ == null ? result.Q : wedgeQ;
+  const top = demandAt(result, q), foot = top - amount, s1 = s1Cost(result, q);
+  const x = sx(q), yTop = sy(top), yFoot = sy(foot), yS1 = sy(s1);
+  const g = el('g', {}, wedgeFit ? 'wedge-drag wedge-drag--fit' : 'wedge-drag');
+  const side = sideOf(x, captions.wedgeName);
+  // Once it fits, its name goes on the left: e1 sits just to the right of Q_tax. Past Q_tax (foot short of S1),
+  // the gap label goes right, below demand, and the name left.
+  const short = !wedgeFit && foot < s1;
+  const { dx, anchor } = wedgeFit || short ? { dx: -12, anchor: 'end' } : side;
+  if (!wedgeFit && Math.abs(yFoot - yS1) > 3) {
+    g.appendChild(mark(el('line', { x1: x, y1: yFoot, x2: x, y2: yS1, stroke: 'var(--ink-secondary)', 'stroke-width': 1.8, 'stroke-dasharray': '3,3' }, 'wedge-drag__gap'), 'cost'));
+    g.appendChild(mark(el('circle', { cx: x, cy: yS1, r: 4, fill: 'var(--supply)' }, 'wedge-drag__s1'), 'cost'));
+    if (captions.wedgeGap) g.appendChild(teachingLabel(x - dx, (yFoot + yS1) / 2 + 5, captions.wedgeGap, anchor === 'start' ? 'end' : 'start', 'var(--ink-secondary)'));
+  }
+  const handle = el('g', { tabindex: '0', role: 'slider', 'aria-label': captions.wedgeAria ?? 'The tax wedge', 'aria-valuemin': '0', 'aria-valuemax': String(QMAX), 'aria-valuenow': String(Math.round(q)) }, 'wedge-drag__handle');
+  handle.appendChild(el('rect', { x: x - 18, y: yTop - 12, width: 36, height: Math.max(0, yFoot - yTop) + 24, fill: 'transparent' }));
+  handle.appendChild(mark(el('rect', { x: x - 5, y: yTop, width: 10, height: Math.max(0, yFoot - yTop), rx: 3, fill: 'var(--gov)', 'fill-opacity': 0.85 }, 'wedge-drag__bar'), 'gov'));
+  handle.appendChild(mark(el('circle', { cx: x, cy: yTop, r: 5.5, fill: 'var(--demand)', stroke: 'var(--surface)', 'stroke-width': 1.5 }, 'wedge-drag__top'), 'customer'));
+  handle.appendChild(mark(el('circle', { cx: x, cy: yFoot, r: 6.5, fill: wedgeFit ? 'var(--supply)' : 'var(--surface)', stroke: 'var(--supply)', 'stroke-width': 2.4 }, 'wedge-drag__foot'), 'cost'));
+  g.appendChild(handle);
+  if (captions.wedgeName) g.appendChild(mark(teachingLabel(x + dx, (yTop + yFoot) / 2 + 5, captions.wedgeName, anchor, 'var(--gov)'), 'gov'));
+  // Once it fits, the two prices it marks, named on their own lines by the price axis.
+  if (wedgeFit && captions.wedgeTop) g.appendChild(mark(teachingLabel(M.left + 8, yTop - 7, captions.wedgeTop, 'start', 'var(--demand)'), 'customer'));
+  if (wedgeFit && captions.wedgeFoot) g.appendChild(mark(teachingLabel(M.left + 8, yFoot + 18, captions.wedgeFoot, 'start', 'var(--supply)'), 'cost'));
+  if (!wedgeFit && captions.dragHint) drawDragHint(g, result, x, (yTop + yFoot) / 2, captions.dragHint, -result.slopeD);
+  layer.appendChild(tag(g, 'wedgeDrag'));
 }
 
 // Turns a pointer's screen x into a quantity on the chart's axis (for the draggable cost
@@ -1808,6 +1994,10 @@ export function renderMarketChart(svg, result, options = {}) {
   // quantity dimension lines, on every step, so the plot doesn't resize when they arrive.
   const layer = ensureDynamicLayer(svg, Boolean(options.reserveGapBand) || isPriceControl(result), Boolean(options.reserveDimBands), Boolean(options.growForBands));
   while (layer.firstChild) layer.removeChild(layer.firstChild);
+  // A page can name its own units (the tax Explain's pence a litre and millions of litres).
+  const [xAxisLabel, yAxisLabel] = svg.querySelectorAll('.axis-label');
+  if (xAxisLabel) xAxisLabel.textContent = options.axisLabels?.x ?? 'Quantity (units)';
+  if (yAxisLabel) yAxisLabel.textContent = options.axisLabels?.y ?? 'Price ($ / unit)';
   placedLabels = [];
   curvePoints = [];
   controlPlan = null;
@@ -1828,6 +2018,8 @@ export function renderMarketChart(svg, result, options = {}) {
   const narrow = plotW < NARROW_PLOT_W;
   if (narrow && on.has('supply2')) { delete captions.s1; delete captions.s2; }
   if (narrow) { delete captions.readout; delete captions.dotLabel; }
+  // A caller can give a shorter form of any caption for a phone-width plot (`<key>Narrow`).
+  if (narrow) for (const [key, text] of Object.entries(captions)) if (key.endsWith('Narrow')) captions[key.slice(0, -'Narrow'.length)] = text;
   const focusId = FOCUS_IDS.includes(options.focus) ? options.focus : null;
   if (focusId) svg.dataset.focus = focusId; else delete svg.dataset.focus;
   // A named entry sequence for the Explain steps whose marks arrive one after another (pages.css, [data-seq]).
@@ -1924,11 +2116,25 @@ export function renderMarketChart(svg, result, options = {}) {
           ['taxProducer', 'tax-producer', result.producerWedgePoly, 'var(--burden-producer-fill)', 'burden-fill burden-fill--producer'],
         ]) {
           if (!on.has(half) && !on.has('taxWedges')) continue;
-          const g = el('g', { 'data-region': region }, 'region region--fill');
+          const g = el('g', { 'data-region': region, 'data-mark': half === 'taxConsumer' ? 'cb' : 'pb' }, 'region region--fill');
           g.appendChild(el('polygon', { points: pts(poly), fill: 'var(--surface)' }, 'wedge-backing'));
           g.appendChild(el('polygon', { points: pts(poly), fill }, cls));
           fills.appendChild(tag(g, on.has(half) ? half : 'taxWedges'));
         }
+      }
+    }
+    // Explain: the part of a surplus the tax is about to take, still in the surplus's own colour, so
+    // the triangle reads as whole until the grey (lostConsumer / lostProducer) covers that part.
+    if (isOpenTax(result)) {
+      for (const [name, polys, fill] of [
+        ['csLost', [result.consumerWedgePoly, result.dwlConsumerPoly], 'var(--demand-fill)'],
+        ['psLost', [result.producerWedgePoly, result.dwlProducerPoly], 'var(--supply-fill)'],
+      ]) {
+        if (!on.has(name)) continue;
+        const g = el('g', {}, 'lost-as-surplus');
+        g.style.pointerEvents = 'none';
+        for (const poly of polys) if (poly?.length >= 3) g.appendChild(el('polygon', { points: pts(poly), fill }));
+        fills.appendChild(tag(g, name));
       }
     }
     if (on.has('lost') && LENSES[focusId]) drawLostSurplus(fills, layer, result, focusId);
@@ -2016,6 +2222,9 @@ export function renderMarketChart(svg, result, options = {}) {
     const dys = preferBelow ? [20, -8, 36, -24, 52] : [-8, 20, -24, 36, 52];
     const cands = [];
     for (const dx of [0, -60, -120]) for (const dy of dys) cands.push({ x: x + dx, y: labelY(yEnd + dy) });
+    // Further along the line, back from its end: for a readout that fills the top-right corner.
+    const slope = (sy(seg[1][1]) - sy(seg[0][1])) / (sx(seg[1][0]) - sx(seg[0][0]));
+    for (const dx of [-180, -240, -300]) for (const dy of preferBelow ? [20, -8] : [-8, 20]) cands.push({ x: x + dx, y: labelY(yEnd + slope * dx + dy) });
     return placeLabel(cands, text);
   };
 
@@ -2032,7 +2241,10 @@ export function renderMarketChart(svg, result, options = {}) {
       layer.appendChild(tag(curveName(captions.s1, 'S', '1', { x: p1.x, y: p1.y, fill: 'var(--supply)', 'text-anchor': 'end', ...(s1Muted ? { 'fill-opacity': '0.6' } : {}) }), 'supply'));
     }
     if (on.has('supply2')) {
-      layer.appendChild(tag(el('line', { x1: sx(s2Seg[0][0]), y1: sy(s2Seg[0][1]), x2: sx(s2Seg[1][0]), y2: sy(s2Seg[1][1]), stroke: 'var(--supply)', 'stroke-width': 2.5, 'stroke-linecap': 'round' }, 'supply-curve-shifted'), 'supply2'));
+      const s2Line = el('line', { x1: sx(s2Seg[0][0]), y1: sy(s2Seg[0][1]), x2: sx(s2Seg[1][0]), y2: sy(s2Seg[1][1]), stroke: 'var(--supply)', 'stroke-width': 2.5, 'stroke-linecap': 'round' }, 'supply-curve-shifted');
+      // A tax's S2 is cost plus the tax (what the maker needs), not the subsidy's "what customers pay".
+      if (result.mode === 'tax') s2Line.setAttribute('data-mark', 'need');
+      layer.appendChild(tag(s2Line, 'supply2'));
       const p2 = supplyPos(s2Seg, captions.s2 ?? 'S2', s2Lower === true);
       layer.appendChild(tag(curveName(captions.s2, 'S', '2', { x: p2.x, y: p2.y, fill: 'var(--supply)', 'text-anchor': 'end' }), 'supply2'));
     }
@@ -2122,6 +2334,8 @@ export function renderMarketChart(svg, result, options = {}) {
 // (`ghost-in`) or ends (`ghost-out`), never again on a rebuild that keeps it as it was; a ghost that is leaving
 // (exit) just fades on from where it is.
 const GHOSTED = {
+  // The tax Explain's wedge step: S2 and everything found with it step back until the wedge fits.
+  wedge: ['supply2', 'eq2', 'pricesC', 'rideNote'],
   consumers: ['supply', 'supply2', 'govFill', 'wedgeBox', 'ps', 'taxProducer', 'dwlProducer'],
   producers: ['demand', 'supply2', 'govFill', 'wedgeBox', 'csTriangle', 'marginalCs', 'cs', 'taxConsumer', 'dwlConsumer'],
 };

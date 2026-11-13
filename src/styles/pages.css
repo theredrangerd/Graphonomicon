@@ -1536,7 +1536,7 @@ body[data-mode="play"] .market-chart [data-layer="marginalPs"].layer-enter { ani
 /* While a step's chart animation plays, the headline stays and the description waits (space kept),
    then fades in. */
 .explain-card > :is(.explain-card__text, .explain-card__think, .explain-card__readout, .explain-card__slider) { transition: opacity 500ms ease-out; }
-.explain-card--waiting > :is(.explain-card__text, .explain-card__think:not(.explain-card__think--do), .explain-card__readout, .explain-card__slider) { opacity: 0; pointer-events: none; transition: none; }
+.explain-card--waiting > :is(.explain-card__text, .explain-card__think:not(.explain-card__think--do), .explain-card__readout, .explain-card__slider, .explain-card__slider-name) { opacity: 0; pointer-events: none; transition: none; }
 .explain-card > .explain-card__think--delayed { opacity: 0; pointer-events: none; }
 .explain-card--waiting > .explain-card__think--with-slider { opacity: 0; pointer-events: none; transition: none; }
 .explain-card__slider[hidden] { display: none; }
@@ -1800,3 +1800,126 @@ h1 .level-pill { font-size: 14px; vertical-align: middle; margin-left: 10px; let
 
 /* Digits the same width, so a changing number doesn't nudge the words around it. */
 .explain-card__text, .explain-card__readout { font-variant-numeric: tabular-nums; }
+
+/* ---- Indirect tax Explain (the UK sugar levy, indirectTaxExplainSteps.js) ----
+   Timings are multiples of --pace (2.2 in Explain), like the subsidy's. */
+/* The new coloured words and what they light up: what the maker needs (S2), each burden. */
+.term--need { color: var(--supply); }
+.term--cb { color: var(--burden-consumer); }
+.term--pb { color: var(--burden-producer); }
+.term--pass { color: var(--ink); }
+.market-chart[data-hot="need"] [data-mark]:not([data-mark~="need"]),
+.market-chart[data-hot="cb"] [data-mark]:not([data-mark~="cb"]),
+.market-chart[data-hot="pb"] [data-mark]:not([data-mark~="pb"]),
+.market-chart[data-hot="pass"] [data-mark]:not([data-mark~="pass"]) { opacity: 0.18; animation: none; }
+.market-chart[data-hot="need"] line[data-mark~="need"][stroke-dasharray] { stroke-dasharray: none; stroke-width: 2.4; stroke: var(--supply); stroke-opacity: 1; }
+/* A tax's arrows grow up out of S1 (the subsidy's grow down). */
+.market-chart .layer-drop--up { transform-origin: center bottom; }
+/* One litre: the levy's arrow rises slowly out of S1, then its name, then where it lands (S2). */
+.market-chart .levy-lift__arrow { transform-box: fill-box; transform-origin: center bottom; animation: rise calc(var(--pace) * 1300ms) cubic-bezier(0.4, 0, 0.2, 1) calc(var(--pace) * 300ms) both; }
+.market-chart .levy-lift__arrow-label { animation: layer-enter calc(var(--pace) * 500ms) ease-out calc(var(--pace) * 900ms) both; }
+.market-chart .levy-lift__later { animation: layer-enter calc(var(--pace) * 500ms) ease-out calc(var(--pace) * 1600ms) both; }
+/* Up is left: the arrow is drawn out from S1 back to S2, then named. */
+.market-chart .shift-left.layer-enter { animation: none; }
+.market-chart .shift-left.layer-enter > g { transform-box: fill-box; transform-origin: right center; animation: layer-grow calc(var(--pace) * 800ms) ease-in-out calc(var(--pace) * 200ms) both; }
+.market-chart .shift-left.layer-enter > text { animation: layer-enter calc(var(--pace) * 400ms) ease-out calc(var(--pace) * 1000ms) both; }
+/* The guess answered (data-seq="pass"), after the price note has ridden from e1 to e2: the Pc line is drawn out
+   from e2 to the axis, then the dashed "if all of it were passed on" line, then the bracket between them. */
+body[data-mode] .market-chart[data-seq="pass"] line.wedge-line.layer-enter[data-layer="pricesC"] { transform-box: fill-box; transform-origin: right center; animation: layer-grow calc(var(--pace) * 700ms) ease-in-out both; }
+body[data-mode] .market-chart[data-seq="pass"] .axis-symbol.layer-enter[data-layer="pricesC"] { animation: layer-enter calc(var(--pace) * 400ms) ease-out calc(var(--pace) * 600ms) both; }
+body[data-mode] .market-chart[data-seq="pass"] .pass-full.layer-enter { animation: layer-enter calc(var(--pace) * 500ms) ease-out calc(var(--pace) * 1100ms) both; }
+body[data-mode] .market-chart[data-seq="pass"] .pass-gap.layer-enter { animation: none; }
+body[data-mode] .market-chart[data-seq="pass"] .pass-gap.layer-enter > line { transform-box: fill-box; transform-origin: center bottom; animation: rise calc(var(--pace) * 600ms) ease-in-out calc(var(--pace) * 1700ms) both; }
+body[data-mode] .market-chart[data-seq="pass"] .pass-gap.layer-enter > text { animation: layer-enter calc(var(--pace) * 400ms) ease-out calc(var(--pace) * 2300ms) both; }
+/* The wedge. While it's looking for its spot, demand and S1 (what it has to fit between) are drawn bold and
+   S2 steps back (data-emphasis="wedge"); when it fits, the foot pops and the Pp line is drawn out from it. */
+.market-chart .wedge-drag__handle { cursor: grab; outline: none; }
+.market-chart.is-dragging .wedge-drag__handle { cursor: grabbing; }
+.market-chart .wedge-drag__handle:focus-visible .wedge-drag__bar { stroke: var(--ink); stroke-width: 2; }
+.market-chart[data-emphasis="wedge"] line.demand-curve { stroke-width: 4; }
+.market-chart[data-emphasis="wedge"] line.supply-curve { stroke-width: 3.5; stroke-opacity: 1; stroke-dasharray: none; }
+.market-chart .wedge-drag--fit .wedge-drag__foot { transform-box: fill-box; transform-origin: center; animation: dot-pop calc(var(--pace) * 450ms) cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+body[data-mode] .market-chart[data-seq="fit"] line.wedge-line.layer-enter[data-layer="prices"] { transform-box: fill-box; transform-origin: right center; animation: layer-grow calc(var(--pace) * 700ms) ease-in-out calc(var(--pace) * 300ms) both; }
+body[data-mode] .market-chart[data-seq="fit"] .axis-symbol.layer-enter[data-layer="prices"] { animation: layer-enter calc(var(--pace) * 400ms) ease-out calc(var(--pace) * 900ms) both; }
+/* 24p on every litre sold (data-seq="strips"): the 24p height by the price axis, then one strip per million
+   litres fills in, then the bracket under the axis names how many litres that is. */
+body[data-mode] .market-chart[data-seq="strips"] [data-layer="taxHeight"].layer-enter { transform-box: fill-box; transform-origin: center bottom; animation: rise calc(var(--pace) * 500ms) ease-in-out both; }
+body[data-mode] .market-chart[data-seq="strips"] .gov-strip.layer-enter { animation-delay: calc(var(--pace) * (var(--d, 0) * 1ms + 500ms)); }
+body[data-mode] .market-chart[data-seq="strips"] .gov-strips__name.layer-enter { animation-delay: calc(var(--pace) * 900ms); }
+body[data-mode] .market-chart[data-seq="strips"] .qty-bracket.layer-grow { animation: layer-grow calc(var(--pace) * 600ms) ease-in-out calc(var(--pace) * 2000ms) both; }
+body[data-mode] .market-chart[data-seq="strips"] .qty-bracket__label.layer-enter { animation-delay: calc(var(--pace) * 2500ms); }
+/* The box (data-seq="tax-box"): the strips melt into one solid box (govFill in, strips out), then its outline and name. */
+body[data-mode] .market-chart[data-seq="tax-box"] [data-layer="wedgeBox"].layer-enter { animation: layer-enter calc(var(--pace) * 400ms) ease-out calc(var(--pace) * 800ms) both; }
+body[data-mode] .market-chart[data-seq="tax-box"] .teach-label.layer-enter[data-layer="boxLabel"] { animation: layer-enter calc(var(--pace) * 400ms) ease-out calc(var(--pace) * 1100ms) both; }
+/* Who really pays (data-seq="burdens"): shoppers' part wipes up from Pe to Pc and is named, then the maker's
+   wipes down from Pe to Pp and is named. */
+body[data-mode] .market-chart[data-seq="burdens"] [data-layer="taxConsumer"] .layer-grow { animation: wipe-up calc(var(--pace) * 700ms) cubic-bezier(0.4, 0, 0.25, 1) calc(var(--pace) * 100ms) both; }
+body[data-mode] .market-chart[data-seq="burdens"] .teach-label.layer-enter[data-layer="taxConsumer"] { animation-delay: calc(var(--pace) * 800ms); }
+body[data-mode] .market-chart[data-seq="burdens"] [data-layer="taxProducer"] .layer-grow { animation: wipe-down calc(var(--pace) * 700ms) cubic-bezier(0.4, 0, 0.25, 1) calc(var(--pace) * 1300ms) both; }
+body[data-mode] .market-chart[data-seq="burdens"] .teach-label.layer-enter[data-layer="taxProducer"] { animation-delay: calc(var(--pace) * 2000ms); }
+/* The levy shrinks a surplus (data-seq="cs-shrinks" / "ps-shrinks"). The levy arrives again, quicker this time
+   (the student has seen it): arrows up from S1 with S2, the arrows go, e2 pops in, then the price that side now
+   gets is drawn out (Pc from e2; for the maker, the tax arrow down to S1 and then Pp). Only then does the part of
+   the old triangle the levy takes go grey and get its two names, and after a pause to read them each half takes
+   its own colour: the burden band and that side's half of the deadweight loss. */
+body[data-mode] .market-chart:is([data-seq="cs-shrinks"], [data-seq="ps-shrinks"]) .layer-drop { animation-duration: calc(var(--pace) * 350ms); animation-delay: calc(var(--pace) * var(--d, 0) * 0.4ms); }
+body[data-mode] .market-chart:is([data-seq="cs-shrinks"], [data-seq="ps-shrinks"]) .loaf-drops__tip--enter { animation-delay: calc(var(--pace) * (var(--d, 0) * 0.4ms + 350ms)); }
+body[data-mode] .market-chart:is([data-seq="cs-shrinks"], [data-seq="ps-shrinks"]) [data-layer="supply2"].layer-enter { animation-delay: calc(var(--pace) * 600ms); }
+body[data-mode] .market-chart:is([data-seq="cs-shrinks"], [data-seq="ps-shrinks"]) [data-layer="loafDrops"] { pointer-events: none; animation: layer-exit calc(var(--pace) * 300ms) ease-out calc(var(--pace) * 1000ms) both; }
+body[data-mode] .market-chart:is([data-seq="cs-shrinks"], [data-seq="ps-shrinks"]) .eq2-dot.layer-enter { animation-delay: calc(var(--pace) * 1150ms); }
+body[data-mode] .market-chart:is([data-seq="cs-shrinks"], [data-seq="ps-shrinks"]) .eq-label.layer-enter[data-layer="eq2"] { animation-delay: calc(var(--pace) * 1300ms); }
+body[data-mode] .market-chart:is([data-seq="cs-shrinks"], [data-seq="ps-shrinks"]) .eq2-line.layer-enter { animation-duration: calc(var(--pace) * 500ms); animation-delay: calc(var(--pace) * 1300ms); }
+body[data-mode] .market-chart:is([data-seq="cs-shrinks"], [data-seq="ps-shrinks"]) .axis-symbol.layer-enter[data-layer="eq2"] { animation-delay: calc(var(--pace) * 1600ms); }
+body[data-mode] .market-chart[data-seq="cs-shrinks"] line.wedge-line.layer-enter[data-layer="pricesC"] { transform-box: fill-box; transform-origin: right center; animation: layer-grow calc(var(--pace) * 500ms) ease-in-out calc(var(--pace) * 1700ms) both; }
+body[data-mode] .market-chart[data-seq="cs-shrinks"] .axis-symbol.layer-enter[data-layer="pricesC"] { animation: layer-enter calc(var(--pace) * 300ms) ease-out calc(var(--pace) * 2100ms) both; }
+body[data-mode] .market-chart[data-seq="ps-shrinks"] [data-layer="taxArrow"].layer-enter { transform-box: fill-box; transform-origin: center top; animation: layer-drop calc(var(--pace) * 500ms) ease-in-out calc(var(--pace) * 1700ms) both; }
+body[data-mode] .market-chart[data-seq="ps-shrinks"] line.wedge-line.layer-enter[data-layer="prices"] { transform-box: fill-box; transform-origin: right center; animation: layer-grow calc(var(--pace) * 500ms) ease-in-out calc(var(--pace) * 2200ms) both; }
+body[data-mode] .market-chart[data-seq="ps-shrinks"] .axis-symbol.layer-enter[data-layer="prices"] { animation: layer-enter calc(var(--pace) * 300ms) ease-out calc(var(--pace) * 2600ms) both; }
+body[data-mode] .market-chart:is([data-seq="cs-shrinks"], [data-seq="ps-shrinks"]) :is([data-layer="lostConsumer"], [data-layer="lostProducer"]).layer-enter { animation: layer-enter calc(var(--pace) * 500ms) ease-out calc(var(--pace) * 2700ms) both; }
+body[data-mode] .market-chart:is([data-seq="cs-shrinks"], [data-seq="ps-shrinks"]) :is([data-layer="csLost"], [data-layer="psLost"]).layer-exit { animation: layer-exit calc(var(--pace) * 300ms) ease-in calc(var(--pace) * 3200ms) both; }
+body[data-mode] .market-chart:is([data-seq="cs-shrinks"], [data-seq="ps-shrinks"]) [data-layer="lostNote"].layer-enter { animation: layer-enter calc(var(--pace) * 400ms) ease-out calc(var(--pace) * 3300ms) both; }
+body[data-mode] .market-chart:is([data-seq="cs-shrinks"], [data-seq="ps-shrinks"]) :is([data-layer="lostConsumer"], [data-layer="lostProducer"]).layer-exit { animation: layer-exit calc(var(--pace) * 500ms) ease-in calc(var(--pace) * 4600ms) both; }
+body[data-mode] .market-chart:is([data-seq="cs-shrinks"], [data-seq="ps-shrinks"]) :is([data-layer="taxConsumer"], [data-layer="taxProducer"], [data-layer="dwlConsumer"], [data-layer="dwlProducer"]).layer-enter { animation: layer-enter calc(var(--pace) * 500ms) ease-out calc(var(--pace) * 4600ms) both; }
+/* The grey arrives and leaves within the step, so it carries both classes: one animation does both. */
+body[data-mode] .market-chart:is([data-seq="cs-shrinks"], [data-seq="ps-shrinks"]) :is([data-layer="lostConsumer"], [data-layer="lostProducer"]).layer-enter.layer-exit { animation: lost-flash calc(var(--pace) * 2400ms) ease-in-out calc(var(--pace) * 2700ms) both; }
+@keyframes lost-flash { 0% { opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+/* The two "no longer traded" halves join into one deadweight loss triangle (data-seq="join-dwl"). */
+body[data-mode] .market-chart[data-seq="join-dwl"] [data-layer="dwl"].layer-enter { animation: layer-enter calc(var(--pace) * 600ms) ease-in-out calc(var(--pace) * 300ms) both; }
+body[data-mode] .market-chart[data-seq="join-dwl"] :is([data-layer="dwlConsumer"], [data-layer="dwlProducer"]).layer-exit { animation: layer-exit calc(var(--pace) * 600ms) ease-in-out calc(var(--pace) * 300ms) both; }
+/* VAT (data-seq="vat"): from the free market, arrows rise from S1, each 20% of the cost there, S2 fans out
+   through their tips, the arrows go, then e2, then the prices, then the rest of the exam diagram. */
+body[data-mode] .market-chart[data-seq="vat"] [data-layer="loafDrops"].layer-exit { animation: layer-exit calc(var(--pace) * 400ms) ease-out calc(var(--pace) * 2400ms) both; }
+body[data-mode] .market-chart[data-seq="vat"] .layer-enter:not([data-layer="supply2"]) { animation: layer-enter calc(var(--pace) * 500ms) ease-out calc(var(--pace) * 3600ms) both; }
+body[data-mode] .market-chart[data-seq="vat"] .eq2-dot.layer-enter { animation: dot-pop calc(var(--pace) * 450ms) cubic-bezier(0.3, 1.6, 0.5, 1) calc(var(--pace) * 2700ms) both; }
+body[data-mode] .market-chart[data-seq="vat"] :is(.eq-label, .axis-symbol, .eq2-line).layer-enter[data-layer="eq2"] { animation: layer-enter calc(var(--pace) * 400ms) ease-out calc(var(--pace) * 2900ms) both; }
+body[data-mode] .market-chart[data-seq="vat"] .layer-enter:is([data-layer="prices"], [data-layer="pricesC"]) { animation: layer-enter calc(var(--pace) * 400ms) ease-out calc(var(--pace) * 3200ms) both; }
+/* Each sequence's readout comes last: its numbers are the result, so they wait for the marks that cause them. */
+body[data-mode] .market-chart:has(.levy-lift__arrow) .readout.layer-enter { animation-delay: calc(var(--pace) * 1700ms); }
+body[data-mode] .market-chart:has(.shift-left.layer-enter) .readout.layer-enter { animation-delay: calc(var(--pace) * 1000ms); }
+body[data-mode] .market-chart:has(.ride-note.layer-enter) .readout.layer-enter { animation-delay: calc(var(--pace) * 1800ms); }
+body[data-mode] .market-chart[data-seq="pass"] .readout.layer-enter { animation-delay: calc(var(--pace) * 1100ms); }
+body[data-mode] .market-chart[data-seq="fit"] .readout.layer-enter { animation-delay: calc(var(--pace) * 900ms); }
+body[data-mode] .market-chart[data-seq="strips"] .readout.layer-enter { animation-delay: calc(var(--pace) * 2500ms); }
+body[data-mode] .market-chart[data-seq="tax-box"] .readout.layer-enter { animation-delay: calc(var(--pace) * 1100ms); }
+body[data-mode] .market-chart[data-seq="burdens"] .readout.layer-enter { animation-delay: calc(var(--pace) * 2000ms); }
+body[data-mode] .market-chart:is([data-seq="cs-shrinks"], [data-seq="ps-shrinks"]) .readout.layer-enter { animation-delay: calc(var(--pace) * 3300ms); }
+body[data-mode] .market-chart[data-seq="join-dwl"] .readout.layer-enter { animation-delay: calc(var(--pace) * 800ms); }
+@media (prefers-reduced-motion: reduce) { .market-chart .levy-lift__arrow, .market-chart .levy-lift__arrow-label, .market-chart .levy-lift__later, .market-chart .shift-left > *, .market-chart .pass-gap > *, .market-chart .wedge-drag__foot { animation: none; } }
+
+/* The guess buttons on the predict step, and a step's own way into Play beside Next. */
+.explain-predict { display: flex; flex-wrap: wrap; gap: 8px; }
+.explain-predict[hidden] { display: none; }
+.explain-predict__btn { font-weight: 700; border-color: var(--accent, var(--demand)); color: var(--accent, var(--demand)); }
+.explain-predict__btn:not(:disabled):hover { background: color-mix(in srgb, var(--accent, var(--demand)) 10%, transparent); }
+.explain-predict__btn[aria-pressed="true"] { background: var(--accent, var(--demand)); color: #fff; opacity: 1; }
+.explain-card--waiting > .explain-predict { opacity: 0; pointer-events: none; }
+.explain-card > .explain-predict { transition: opacity 500ms ease-out; }
+.explain-card__slider-name { margin: 0 0 2px; font-size: 14px; font-weight: 700; color: var(--ink-secondary); }
+.explain-card__slider-name[hidden] { display: none; }
+.explain-btn--play { align-self: flex-start; font-weight: 700; border-color: var(--accent, var(--demand)); color: var(--accent, var(--demand)); }
+.explain-btn--play:hover { background: color-mix(in srgb, var(--accent, var(--demand)) 10%, transparent); }
+.explain-btn--play[hidden] { display: none; }
+/* A long last-step label ("Try ad valorem in Play →") stays on one line and moves under the dots if it must. */
+.explain-btn--primary { white-space: nowrap; }
+.explain-card__nav { flex-wrap: wrap; row-gap: 10px; }
+.explain-card__nav > .explain-btn--primary { margin-left: auto; }

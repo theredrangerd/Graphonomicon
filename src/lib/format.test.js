@@ -1,5 +1,35 @@
 import { describe, it, expect } from 'vitest';
-import { fmtMoney, fmtPrice, fmtQty, elasticityLabel, fmtShift } from './format.js';
+import { fmtMoney, fmtPrice, fmtQty, elasticityLabel, fmtShift, fmtPence, fmtPounds, fmtLitres } from './format.js';
+
+describe('fmtPence', () => {
+  it('shows whole pence bare and a fraction to one decimal', () => {
+    expect(fmtPence(80)).toBe('80p');
+    expect(fmtPence(0)).toBe('0p');
+    expect(fmtPence(87.2727)).toBe('87.3p');
+    expect(fmtPence(12.0001)).toBe('12p');
+  });
+  it('switches to pounds from £1', () => {
+    expect(fmtPence(104)).toBe('£1.04');
+    expect(fmtPence(99.98)).toBe('£1.00');
+    expect(fmtPence(120)).toBe('£1.20');
+  });
+});
+
+describe('fmtPounds', () => {
+  it('turns pence × millions of litres into £ millions, to the penny', () => {
+    expect(fmtPounds(1224)).toBe('£12.24m');
+    expect(fmtPounds(108)).toBe('£1.08m');
+    expect(fmtPounds(2400)).toBe('£24.00m');
+  });
+});
+
+describe('fmtLitres', () => {
+  it('names millions of litres, whole when it is whole', () => {
+    expect(fmtLitres(51)).toBe('51m');
+    expect(fmtLitres(52.5)).toBe('52.5m');
+    expect(fmtLitres(46.3246)).toBe('46.3m');
+  });
+});
 
 describe('fmtMoney', () => {
   it('rounds to whole dollars with a thousands separator', () => {

@@ -886,6 +886,26 @@ describe('tax: IB perfect, Explain layers and Explorer foci', () => {
     expect(names()).toEqual([]);
   });
 
+  // Review 2026-11-12, finding 5: on a phone-width plot Q_tax was drawn at half size beside Qe.
+  it('draws Qtax full size on a phone-width chart once the tax has moved it a symbol’s width from Qe', () => {
+    Object.defineProperty(svg, 'clientWidth', { value: 390, configurable: true });
+    renderMarketChart(svg, computeMarket({ ...base, intervention: { type: 'tax', mode: 'specific', amount: 24 } }));
+    const q = [...svg.querySelectorAll('.axis-symbol')].find((t) => t.textContent === 'Qtax');
+    expect(+q.getAttribute('font-size')).toBe(16);
+    delete svg.clientWidth;
+  });
+
+  // Re-review 2026-11-13, finding 3: a narrower gap (VAT, a phone) still kept Qtax at 7px.
+  it('never draws Qtax below a readable size: too close to Qe, it drops a row under it', () => {
+    Object.defineProperty(svg, 'clientWidth', { value: 260, configurable: true });
+    renderMarketChart(svg, computeMarket({ ...base, intervention: { type: 'tax', mode: 'advalorem', rate: 0.2 } }));
+    const q = [...svg.querySelectorAll('.axis-symbol')].find((t) => t.textContent === 'Qtax');
+    const qe = [...svg.querySelectorAll('.axis-symbol')].find((t) => t.textContent === 'Qe');
+    expect(+q.getAttribute('font-size')).toBeGreaterThanOrEqual(13);
+    expect(+q.getAttribute('y')).toBeGreaterThan(+qe.getAttribute('y'));
+    delete svg.clientWidth;
+  });
+
   it('labels the traded quantity Qtax, ending at its own line left of Qe', () => {
     renderMarketChart(svg, tax(), { detail: 'ib' });
     const q = [...svg.querySelectorAll('.axis-symbol')].find((t) => t.textContent === 'Qtax');

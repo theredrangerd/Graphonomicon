@@ -31,6 +31,8 @@ The Explorer's "Tax revenue" chip is now **Government perspective** and comes fi
 
 Revision (same day): the per-unit chip/bracket is gone. The Pe note moves with the market: "Pe1 $X" on e1, then "Pe2 $Pc" on e2 (`eq2Note`) once S2 is up. A purple arrow (`taxArrow`) runs down the Q line from Pc to Pp, named "$20 tax" (specific) or "8% tax" (ad valorem), and the strips then extend across the quantity.
 
+Revision 3 (2026-11-12, from the Explain review): the note uses Explain's names, "Pe $80.00: the price being traded" on e1 and "Pc $X: the price buyers pay" on e2, since Pe stays the old price (it was "Pe1" / "Pe2").
+
 Revision 2 (same day): one note rides the equilibrium. "Pe1 $80.00" on e1; as S1 slides to S2 it follows e2 and reads "Pe2 $X" with X counting up to Pc. Order is now dot note → slide (note rides e2) → purple `taxArrow` → strips fill across → strips dissolve into one solid `govFill` box (`stripsMerged`) with the outline and Revenue chip.
 
 ## Lens reveal: why part of the loss is a burden and part is DWL (2026-11-12)

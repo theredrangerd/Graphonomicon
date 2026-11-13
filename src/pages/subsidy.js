@@ -1,6 +1,6 @@
 import { renderMiniHeader } from '../components/chrome.js';
 import { computeMarket } from '../lib/marketEngine.js';
-import { renderMarketChart, resolveLayers, quantityAtClientX } from '../lib/marketChart.js';
+import { renderMarketChart, resolveLayers } from '../lib/marketChart.js';
 import { delay, tweenValue } from '../lib/animate.js';
 import { replayOf } from '../lib/chain.js';
 import { fmtMoney, fmtPrice, setStatusPill } from '../lib/format.js';
@@ -15,7 +15,8 @@ import { mountViewSwitch, SUBSIDY_FOCUSES, SUBSIDY_FOCUS_ALIASES, SUBSIDY_QUESTI
 import { mountExplainCard } from '../components/explainCard.js';
 import { whenAnimationsDone } from '../lib/animationSettle.js';
 import { demandTween, explainMarket, stepDemand, fitsEveryExplainMarket, keepStepCardInView } from '../lib/explainRuntime.js';
-import { SUBSIDY_STEPS, LOAF_Q, LOAF_STEP, DOT_Q_MIN, DOT_Q_MAX, TARGET_Q, TARGET_TOLERANCE, snapLoaf, advanceSweep, EXPLAIN_SUBSIDY_MAX } from './subsidyExplainSteps.js';
+import { SUBSIDY_STEPS, LOAF_Q, LOAF_STEP, DOT_Q_MIN, DOT_Q_MAX, TARGET_Q, TARGET_TOLERANCE, snapLoaf, EXPLAIN_SUBSIDY_MAX } from './subsidyExplainSteps.js';
+import { advanceSweep, reachedTarget, wireChartDrag, wireTermHighlight } from '../lib/explainTasks.js';
 
 export const SUBSIDY_AREA_LABELS = 'full'; // 'full' | 'half' | 'none' — Ms. Patel request 3; flip after she confirms.
 
@@ -369,9 +370,7 @@ export function initSubsidyPage(doc, win = window) {
       // Reached when the dot lands in, or sweeps through, the halo: TARGET_TOLERANCE loaves
       // either side of its centre (how big the chart draws it) plus one loaf, so the dot's body
       // touching the ring counts, not just its centre.
-      const reach = TARGET_TOLERANCE + 1;
-      const [from, to] = dot.q < next ? [dot.q, next] : [next, dot.q];
-      dot.explored = dot.explored || (from <= TARGET_Q + reach && TARGET_Q - reach <= to);
+      dot.explored = dot.explored || reachedTarget(dot.q, next, TARGET_Q, TARGET_TOLERANCE + 1);
     }
     const crossed = next !== dot.q;
     dot.q = next;
@@ -388,47 +387,17 @@ export function initSubsidyPage(doc, win = window) {
 
   // Dragging: pressing anywhere on the chart puts the dot at that loaf, and it follows the
   // pointer along S1 until release. Only on a step that asks for it.
-  let dragging = false;
-  chart.addEventListener('pointerdown', (e) => {
-    if (mode !== 'explain' || !currentStep().drag) return;
-    cancelSettle();
-    dragging = true;
-    chart.classList.add('is-dragging');
-    chart.setPointerCapture?.(e.pointerId);
-    moveDot(quantityAtClientX(chart, e.clientX), true);
-    e.preventDefault();
-  });
-  chart.addEventListener('pointermove', (e) => {
-    if (dragging) moveDot(quantityAtClientX(chart, e.clientX), true);
-  });
-  const endDrag = () => {
-    if (!dragging) return;
-    dragging = false;
-    chart.classList.remove('is-dragging');
-    settleDot();
-  };
-  chart.addEventListener('pointerup', endDrag);
-  chart.addEventListener('pointercancel', endDrag);
-  chart.addEventListener('keydown', (e) => {
-    if (!e.target.closest?.('.cost-dot__handle')) return;
-    const step = LOAF_STEP * (e.shiftKey ? 5 : 1);
-    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { moveDot(dot.q + step, true); e.preventDefault(); }
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { moveDot(dot.q - step, true); e.preventDefault(); }
+  wireChartDrag(chart, {
+    isActive: () => mode === 'explain' && Boolean(currentStep().drag),
+    handleSelector: '.cost-dot__handle',
+    onMove: (q) => { cancelSettle(); moveDot(q, true); },
+    onRelease: settleDot,
+    onKey: (dir, big) => moveDot(dot.q + dir * LOAF_STEP * (big ? 5 : 1), true),
   });
 
   // A coloured word in the step card (or a row of the chart's readout) lights up the marks it
   // names: the chart's data-hot fades every other marked thing (pages.css).
-  const setHot = (e) => {
-    const key = e.target.closest?.('[data-mark]')?.dataset.mark;
-    if (key && e.target.closest('.term, .readout__row, .explain-card__readout-row')) chart.dataset.hot = key;
-  };
-  const clearHot = () => { delete chart.dataset.hot; };
-  for (const host of [doc.querySelector('#explain-card'), chart]) {
-    host.addEventListener('pointerover', setHot);
-    host.addEventListener('pointerout', clearHot);
-    host.addEventListener('focusin', setHot);
-    host.addEventListener('focusout', clearHot);
-  }
+  const clearHot = wireTermHighlight(chart, [doc.querySelector('#explain-card'), chart]);
 
   function deferred() {
     let resolve;
@@ -499,7 +468,7 @@ export function initSubsidyPage(doc, win = window) {
       if (currentStep().sliderHalo) sweep = advanceSweep(sweep, amount, sweepRange());
     },
     // Both of Explain's markets (default and inelastic demand) must stay on the chart.
-    isValidAmount: (amount) => fitsEveryExplainMarket((market) => marketFits(market, { type: 'subsidy', amount })),
+    isValidAmount: (amount) => fitsEveryExplainMarket((market) => marketFits(market, { type: 'subsidy', amount }), ['default', 'inelastic']),
     onFinish() {
       writeMode('play', win);
       applyMode('play');

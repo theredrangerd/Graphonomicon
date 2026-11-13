@@ -1,8 +1,8 @@
 import { renderMiniHeader } from '../components/chrome.js';
 import { computeMarket } from '../lib/marketEngine.js';
 import { renderMarketChart, resolveLayers } from '../lib/marketChart.js';
-import { delay } from '../lib/animate.js';
-import { fmtMoney, fmtPrice, fmtQty, setStatusPill } from '../lib/format.js';
+import { delay, tweenValue } from '../lib/animate.js';
+import { fmtMoney, fmtPrice, fmtQty, fmtPence, setStatusPill } from '../lib/format.js';
 import { getFamilyNav } from '../components/familyNav.js';
 import { wireShiftAndSlopeInputs, updateShiftAndSlopeLabels, wireInterventionToggle, readCurveParams, marketFits, guardSliders, settleDown, fillSharedStats, NO_TRADE_NOTE } from '../lib/pageControls.js';
 import { attachRegionExplainers } from '../lib/regionExplainers.js';
@@ -13,8 +13,9 @@ import { mountModeLink } from '../components/modeSwitch.js';
 import { mountViewSwitch, TAX_FOCUSES, TAX_FOCUS_ALIASES } from '../components/viewSwitch.js';
 import { mountExplainCard } from '../components/explainCard.js';
 import { whenAnimationsDone } from '../lib/animationSettle.js';
-import { demandTween, explainMarket, stepDemand, fitsEveryExplainMarket, keepStepCardInView } from '../lib/explainRuntime.js';
-import { TAX_STEPS } from './indirectTaxExplainSteps.js';
+import { demandTween, explainMarket, stepDemand, fitsEveryExplainMarket, keepStepCardInView, EXPLAIN_DEMAND } from '../lib/explainRuntime.js';
+import { advanceSweep, reachedTarget, wireChartDrag, wireTermHighlight } from '../lib/explainTasks.js';
+import { TAX_STEPS, LEVY, EXPLAIN_LEVY_MAX, VAT_RATE, AXES, LITRE_Q, DOT_Q_MIN, DOT_Q_MAX, TARGET_Q, TARGET_TOLERANCE, snapLitre, WEDGE_START_Q, wedgeFits } from './indirectTaxExplainSteps.js';
 import { replayOf } from '../lib/chain.js';
 import { taxSocietyChain, taxSocietyNote, SHIFT_MS } from './taxSociety.js';
 
@@ -278,8 +279,10 @@ export function initIndirectTaxPage(doc, win = window) {
       const perUnit = fmtMoney(result.Pc - result.Pp);
       const taxName = kind === 'advalorem' ? `${advaloremSlider.value}% tax` : `${perUnit} tax`;
       options.captions = {
-        eq1Note: `Pe1 ${fmtPrice(result.Pstar)}: the price being traded`,
-        eq2Note: `Pe2 ${fmtPrice(result.Pc)}: the price being traded`,
+        // Explain's names: Pe stays the old price; the new one buyers pay is Pc.
+        eq1Note: `Pe ${fmtPrice(result.Pstar)}: the price being traded`,
+        // While the tax is still sliding on, the price is on its way (Explain shows it bare too); Pc once it's there.
+        eq2Note: taxFraction < 1 ? fmtPrice(result.Pc) : `Pc ${fmtPrice(result.Pc)}: the price buyers pay`,
         taxArrow: arrowNamed ? taxName : undefined,
         taxHeight: kind === 'advalorem' ? `${taxName} (${perUnit})` : taxName, strip: `1 unit = ${perUnit}`,
         qtyBracket: `${fmtQty(result.Q)} units traded`,
@@ -320,10 +323,7 @@ export function initIndirectTaxPage(doc, win = window) {
 
   const settleActiveSlider = () => settleDown(taxMode() === 'advalorem' ? advaloremSlider : specificSlider, isValid);
   guardSliders([specificSlider, advaloremSlider], isValid);
-  specificSlider.addEventListener('input', () => {
-    card.refresh(); // keep the Explain slider on the same amount
-    render();
-  });
+  specificSlider.addEventListener('input', render);
   advaloremSlider.addEventListener('input', render);
   [modeSpecific, modeAdvalorem].forEach((input) => input.addEventListener('change', () => {
     settleActiveSlider();
@@ -335,74 +335,275 @@ export function initIndirectTaxPage(doc, win = window) {
   });
 
   // ---- Explain ----
-  // Always a specific tax on the default curves (one step swaps in inelastic demand); the
-  // Play toggle and tax-mode radios don't matter here, only the step does.
+  // The UK sugar levy, step by step (indirectTaxExplainSteps.js): its own market in pence a litre
+  // and millions of litres, with its own levy amount. Play's toggle, radios and $ slider don't
+  // matter here, only the step and what the student has done on it.
 
-  const explainTax = (step) => (step.tax ? { type: 'tax', mode: 'specific', amount: +specificSlider.value } : { type: 'none' });
-
-  // The step text always describes the step's own curves, even while the chart is still
-  // tweening toward them.
-  function explainContext(step) {
-    return { amount: +specificSlider.value, result: computeMarket({ ...explainMarket(stepDemand(step)), intervention: explainTax(step) }) };
-  }
-
+  let levy = LEVY;
+  const explainTax = (step) => (step.tax === 'advalorem' ? { type: 'tax', mode: 'advalorem', rate: VAT_RATE }
+    : step.tax ? { type: 'tax', mode: 'specific', amount: levy } : { type: 'none' });
+  const NO_TAX = { type: 'none' };
+  const easeInOut = (x) => (x < 0.5 ? 2 * x * x : 1 - ((-2 * x + 2) ** 2) / 2);
   const demand = demandTween();
 
-  function drawExplain(step, animate) {
+  // What the student has done, kept for the visit (progress toward a gate is kept once earned):
+  // the cost dot (step 3: `pos` is where it's drawn, `q` the whole litre it names), the guess
+  // (step 8: `prediction`, and `revealed` once the chart has answered it, with `rideT` the price
+  // note's ride from e1 to e2), the wedge (step 9) and the slide-down-and-up (step 11).
+  const dot = { q: LITRE_Q, pos: LITRE_Q, explored: false, touched: false };
+  let prediction = null;
+  let revealed = false;
+  let rideT = 1;
+  const wedge = { q: WEDGE_START_Q, fit: false, touched: false };
+  let sweep = { low: false, high: false };
+  const sweepRange = { min: 0, max: EXPLAIN_LEVY_MAX };
+  let cancelMotion = () => {}; // the dot's settle or the guess's ride, whichever is running
+  let entering = null; // the promise a step's held entry resolves (step 20 waits for its curve)
+  let settleToken = 0;
+
+  const currentStep = () => TAX_STEPS[card ? card.index() : 0];
+  const valueOf = (field, ctx) => (typeof field === 'function' ? field(ctx) : field);
+
+  // The text always describes the step's own curves, even while the chart is still tweening to them.
+  function explainContext(step) {
+    const market = explainMarket(stepDemand(step));
+    return {
+      amount: levy,
+      result: computeMarket({ ...market, intervention: explainTax(step) }),
+      free: computeMarket({ ...market, intervention: NO_TAX }),
+      dotQ: dot.q, dotPos: dot.pos, explored: dot.explored, touched: dot.touched,
+      prediction, revealed, rideT: revealed ? 1 : rideT,
+      wedgeQ: wedge.q, wedgeFit: wedge.fit, wedgeTouched: wedge.touched,
+      sweepLow: sweep.low, sweepHigh: sweep.high,
+    };
+  }
+
+  // Draws one frame of a step. `animate` plays its entry (its `transient` layers come and go as
+  // part of it); `reveal` plays what a student's action brings in instead (step.reveal). A step
+  // that tweens its demand curve with `enterAfterDemand` shows the bare market until the curve
+  // has arrived, then plays its entry.
+  function drawExplain(step, { animate = false, reveal = false } = {}) {
     if (mode !== 'explain') return;
     const ctx = explainContext(step);
-    // Mid-tween the chart is on curves of its own; otherwise it's the step's, already computed.
-    const result = demand.settled(step) ? ctx.result : computeMarket({ ...explainMarket(demand.now()), intervention: explainTax(step) });
+    const settled = demand.settled(step);
+    const bare = !settled && step.enterAfterDemand;
+    const result = settled ? ctx.result : computeMarket({ ...explainMarket(demand.now()), intervention: bare ? NO_TAX : explainTax(step) });
     const ib = step.view === 'ib';
+    const playing = animate && !bare;
+    const captions = bare ? {} : step.captions?.(ctx) ?? {};
+    let layers;
+    if (bare) layers = ['demand', 'supply', 'eq1'];
+    // An exam-diagram step draws the exam diagram, plus its readout (the numbers its words use) and whatever passes through.
+    else if (ib) layers = [...resolveLayers(result, { detail: 'ib' }), ...(captions.readout ? ['readout'] : []), ...(playing ? step.transient ?? [] : [])];
+    else layers = [...valueOf(step.layers, ctx), ...(playing ? step.transient ?? [] : [])];
+    // An exam-diagram step's entry brings in everything after the curves it starts from.
+    // (The Pc line and its symbol are named 'pricesC' inside the prices layer, so they come in with it.)
+    const enter = reveal ? step.reveal.enter
+      : !playing ? undefined
+        : ib ? (step.sequence ? [...layers.filter((name) => !['demand', 'supply', 'eq1'].includes(name)), 'pricesC'] : undefined)
+          : step.enter;
     renderMarketChart(chart, result, {
       detail: ib ? 'ib' : 'clean',
-      // The IB wrap-up draws the full IB perfect diagram, i.e. the default layer set.
-      layers: ib ? undefined : step.layers,
-      captions: step.captions?.(ctx),
+      layers,
+      captions,
       areaLabels: TAX_AREA_LABELS,
-      ...(animate ? { enter: step.enter, grow: step.grow } : {}),
+      axisLabels: AXES,
+      // Room outside the axes, on every step, for the brackets steps 10-11 hang there, so the plot never resizes.
+      reserveGapBand: true, reserveDimBands: true,
+      emphasis: valueOf(step.emphasis, ctx),
+      ...valueOf(step.chartOptions, ctx),
+      ...(reveal ? { enter, sequence: step.reveal.sequence } : {}),
+      ...(playing ? { enter, grow: step.grow, exit: step.transient, sequence: step.sequence } : {}),
     });
+  }
+
+  // Once a step's entry has played, it's drawn again as it rests, without the marks that only
+  // passed through it (a rebuilt chart would otherwise bring them back, e.g. on a resize).
+  function settleWhenDone(step) {
+    const mine = ++settleToken;
+    const settle = () => { if (mine === settleToken && currentStep() === step) drawExplain(step); };
+    const done = whenAnimationsDone(chart);
+    if (done) done.then(settle); else settle();
   }
 
   function renderExplain(step, { animate }) {
     if (mode !== 'explain') return;
-    demand.follow(step, animate, (first) => drawExplain(step, first));
+    ++settleToken;
+    entering = demand.follow(step, animate, (first) => drawExplain(step, { animate: first }), { enterAfter: Boolean(step.enterAfterDemand) });
+    if (animate && (step.transient || step.sequence)) {
+      if (entering) entering.then(() => settleWhenDone(step)); else settleWhenDone(step);
+    }
   }
 
-  // Explain's slider must keep both of its markets (default and inelastic demand) on the
-  // chart and still trading.
+  // Re-renders the current step in place (no entry), keeping keyboard focus on a dragged mark.
+  function redrawStep() {
+    const focused = doc.activeElement?.closest?.('.cost-dot__handle, .wedge-drag__handle')?.classList[0];
+    drawExplain(currentStep());
+    if (focused) chart.querySelector(`.${focused}`)?.focus();
+  }
+
+  // The cost dot (step 3): it follows the pointer smoothly, names the whole litre it's nearest,
+  // and on release eases onto that litre.
+  function moveDot(pos, byStudent) {
+    dot.pos = Math.min(DOT_Q_MAX, Math.max(DOT_Q_MIN, pos));
+    const next = snapLitre(dot.pos);
+    if (byStudent) {
+      dot.touched = true;
+      dot.explored = dot.explored || reachedTarget(dot.q, next, TARGET_Q, TARGET_TOLERANCE + 1);
+    }
+    const crossed = next !== dot.q;
+    dot.q = next;
+    redrawStep();
+    if (crossed || byStudent) card.refresh();
+  }
+  function settleDot() {
+    cancelMotion();
+    cancelMotion = tweenValue({ from: dot.pos, to: dot.q, duration: 350, onUpdate: (v) => { dot.pos = v; redrawStep(); } });
+  }
+
+  // The wedge (step 9): it follows the pointer along demand until it fits at Q_tax, then locks
+  // there, the chart answers (S2 comes back above it, Pp is drawn out from its foot) and the words follow.
+  function moveWedge(q) {
+    if (wedge.fit) return;
+    wedge.touched = true;
+    wedge.q = Math.min(DOT_Q_MAX, Math.max(DOT_Q_MIN, q));
+    const step = currentStep();
+    if (wedgeFits(wedge.q, explainContext(step).result)) {
+      wedge.fit = true;
+      drawExplain(step, { reveal: true });
+      card.refresh();
+      const answered = whenAnimationsDone(chart) ?? Promise.resolve();
+      card.waitFor(answered);
+      // A keyboard user carries straight on from the handle (rebuilt by the redraw) to Next.
+      answered.then(() => { if (currentStep() === step) doc.querySelector('#explain-card .explain-btn--primary')?.focus(); });
+      return;
+    }
+    redrawStep();
+    card.refresh();
+  }
+
+  const dragging = () => mode === 'explain' && currentStep().drag;
+  wireChartDrag(chart, {
+    isActive: () => Boolean(dragging()),
+    handleSelector: '.cost-dot__handle, .wedge-drag__handle',
+    onMove: (q) => { cancelMotion(); if (dragging() === 'wedge') moveWedge(q); else moveDot(q, true); },
+    onRelease: () => { if (dragging() === 'dot') settleDot(); },
+    onKey: (dir, big) => {
+      if (dragging() === 'wedge') moveWedge(wedge.q + dir * (big ? 5 : 1));
+      else moveDot(dot.q + dir * (big ? 5 : 1), true);
+    },
+  });
+
+  // The guess (step 8): once made, the price note rides along demand from e1 to e2, counting up to
+  // Pc, then the chart answers (the Pc line, the "all of it" line and the gap), and the words follow.
+  function guess(choice) {
+    if (prediction != null) return;
+    prediction = choice;
+    const step = currentStep();
+    card.refresh();
+    let landed;
+    card.waitFor(new Promise((resolve) => { landed = resolve; }));
+    cancelMotion();
+    cancelMotion = tweenValue({
+      from: 0, to: 1, duration: 1600, easing: easeInOut,
+      onUpdate: (v) => { rideT = v; drawExplain(step); },
+      onComplete: () => {
+        revealed = true;
+        drawExplain(step, { reveal: true });
+        card.refresh();
+        const done = whenAnimationsDone(chart);
+        if (done) done.then(landed); else landed();
+      },
+    });
+  }
+
+  const clearHot = wireTermHighlight(chart, [doc.querySelector('#explain-card'), chart]);
+
+  // Arriving on a step (or replaying it): set up its task. Progress toward a gate is kept once earned.
+  function arriveAt(step) {
+    cancelMotion();
+    if (step.sliderHalo) sweep = advanceSweep(sweep, levy, sweepRange);
+    if (step.drag === 'dot') Object.assign(dot, { q: LITRE_Q, pos: LITRE_Q, touched: false });
+    if (step.drag === 'wedge' && !wedge.fit) Object.assign(wedge, { q: WEDGE_START_Q, touched: false });
+    // A guess the chart hadn't finished answering (the student left mid-ride) can be made again.
+    if (step.predict && !revealed) { prediction = null; rideT = 0; }
+    card?.refresh();
+  }
+
+  // Explain's levy slider must keep both of its markets (default and elastic demand) on the chart and trading.
   const explainFits = (amount) => fitsEveryExplainMarket((market) => {
     const tax = { type: 'tax', mode: 'specific', amount };
     return marketFits(market, tax) && !computeMarket({ ...market, intervention: tax }).closed;
-  });
+  }, ['default', 'elastic']);
+
+  // Out of Explain into Play, onto the diagram the student just finished, with the tax animated on.
+  // A student who leaves for Play from the middle of the walkthrough comes back to the step they left.
+  let resumeAt = 0;
+  function goToPlay(setUp) {
+    resumeAt = card.index();
+    tourChecked = true; // they came to try something: the first-visit tour would cover it
+    writeMode('play', win);
+    applyMode('play');
+    setUp();
+    if (!taxToggle.checked) {
+      taxToggle.checked = true;
+      taxToggle.dispatchEvent(new Event('change'));
+    } else render();
+  }
 
   card = mountExplainCard(doc.querySelector('#explain-card'), {
     steps: TAX_STEPS,
     replayHost: doc.querySelector('.chart-head'),
-    animationsDone: () => whenAnimationsDone(chart),
-    amount: +specificSlider.value,
-    min: +specificSlider.min,
-    max: +specificSlider.max,
-    sliderLabel: 'Tax per can',
-    getContext: () => explainContext(TAX_STEPS[card ? card.index() : 0]),
+    // The words wait for the step's animation (and a step that tweens its curve first, for that).
+    animationsDone: () => {
+      const wait = () => whenAnimationsDone(chart, { only: currentStep().textAfter });
+      return entering ? entering.then(wait) : wait();
+    },
+    amount: levy,
+    min: 0,
+    max: EXPLAIN_LEVY_MAX,
+    sliderLabel: 'Levy per litre',
+    formatAmount: fmtPence,
+    getContext: () => explainContext(currentStep()),
     onRender: (step, opts) => {
       explainers?.close();
+      clearHot();
+      chart.classList.toggle('is-draggable', Boolean(step.drag));
+      if (opts.animate) arriveAt(step);
+      // Arriving on the guess after it has been answered shows the answer straight away.
       renderExplain(step, opts);
       if (opts.animate) keepStepCardInView(doc);
     },
-    onAmount: (amount) => { specificSlider.value = String(amount); },
-    isValidAmount: explainFits,
-    onFinish() {
-      writeMode('play', win);
-      // Explain taught the specific tax, so Play picks up the same one.
-      modeSpecific.checked = true;
-      applyMode('play');
-      // Land on the diagram the student just finished: animate the tax on.
-      if (!taxToggle.checked) {
-        taxToggle.checked = true;
-        taxToggle.dispatchEvent(new Event('change'));
-      }
+    onLeave: (step) => {
+      if (step.resetAmountOnLeave) levy = LEVY;
+      return null;
     },
+    onAmount: (amount) => {
+      levy = amount;
+      if (currentStep().sliderHalo) sweep = advanceSweep(sweep, amount, sweepRange);
+    },
+    onPredict: guess,
+    isValidAmount: explainFits,
+    // Mid-walkthrough, "Try elasticity in Play →": the specific tax on, demand as elastic as Explain's.
+    onPlayLink: () => goToPlay(() => {
+      modeSpecific.checked = true;
+      const slopeD = doc.querySelector('#slope-d-slider');
+      slopeD.value = String(EXPLAIN_DEMAND.elastic);
+      slopeD.dispatchEvent(new Event('input'));
+      slopeD.scrollIntoView?.({ block: 'center' });
+      slopeD.focus?.({ preventScroll: true });
+    }),
+    // The last step, "Try ad valorem in Play →": a 20% ad valorem tax on the default curves (as on that step),
+    // even if an earlier exit left Play's demand elastic.
+    onFinish: () => goToPlay(() => {
+      for (const id of ['#demand-slider', '#supply-slider', '#slope-d-slider', '#slope-s-slider']) {
+        const input = doc.querySelector(id);
+        if (input.value !== '0') { input.value = '0'; input.dispatchEvent(new Event('input')); }
+      }
+      modeAdvalorem.checked = true;
+      advaloremSlider.value = String(VAT_RATE * 100);
+      modeAdvalorem.dispatchEvent(new Event('change'));
+    }),
   });
 
   // ---- Modes ----
@@ -418,6 +619,9 @@ export function initIndirectTaxPage(doc, win = window) {
     doc.body.dataset.mode = mode;
     modeSwitch.setMode(mode);
     doc.querySelector('#explain-card').hidden = mode !== 'explain';
+    // The chart's title says what's being explained while the walkthrough runs.
+    const chartTitle = doc.querySelector('.chart-title');
+    if (chartTitle) chartTitle.innerHTML = mode === 'explain' ? 'The <span class="chart-title__word">sugar levy</span>, step by step' : 'Price &amp; quantity';
   }
 
   function applyMode(next) {
@@ -433,7 +637,8 @@ export function initIndirectTaxPage(doc, win = window) {
         taxToggle.dispatchEvent(new Event('change'));
       }
       demand.reset(); // a fresh walkthrough starts on the default curves
-      card.goTo(0);
+      card.goTo(resumeAt);
+      resumeAt = 0;
     } else {
       demand.stop();
       render();

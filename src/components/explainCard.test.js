@@ -210,3 +210,66 @@ describe('text waits for the chart animation', () => {
     expect(c.classList.contains('explain-card--waiting')).toBe(false);
   });
 });
+
+describe('predict, Play exits and holding the words', () => {
+  const STEPS = [
+    { id: 'one', headline: () => 'One', text: () => 'first', layers: [] },
+    {
+      id: 'guess', headline: () => 'Guess', text: (ctx) => (ctx.prediction ? `you said ${ctx.prediction}` : 'guess first'), layers: [],
+      predict: { options: [['all', 'All 24p'], ['some', 'Some of it'], ['none', 'None of it']] },
+      gate: (ctx) => ctx.prediction != null, lockedLabel: 'Make a guess',
+    },
+    { id: 'exit', headline: () => 'Exit', text: () => 'go on', layers: [], playLink: { label: 'Try elasticity in Play →', state: { focus: 'slope' } } },
+    { id: 'last', headline: () => 'Last', text: () => 'done', layers: [], finishLabel: 'Try ad valorem in Play →' },
+  ];
+  let c, ctx, onPredict, onPlayLink, onFinishFn, mounted;
+  beforeEach(() => {
+    document.body.innerHTML = '<section id="explain-card"></section>';
+    c = document.getElementById('explain-card');
+    ctx = { amount: 24, prediction: null };
+    onPredict = vi.fn((id) => { ctx.prediction = id; mounted.refresh(); });
+    onPlayLink = vi.fn();
+    onFinishFn = vi.fn();
+    mounted = mountExplainCard(c, {
+      steps: STEPS, amount: 24, getContext: () => ctx,
+      onRender: vi.fn(), onAmount() {}, onFinish: onFinishFn, onPredict, onPlayLink,
+    });
+  });
+  const button = (t) => [...c.querySelectorAll('button')].find((b) => b.textContent === t);
+
+  it('shows the guesses only on a predict step, and keeps Next locked until one is picked', () => {
+    expect(c.querySelector('.explain-predict').hidden).toBe(true);
+    mounted.goTo(1);
+    expect(c.querySelector('.explain-predict').hidden).toBe(false);
+    expect([...c.querySelectorAll('.explain-predict button')].map((b) => b.textContent)).toEqual(['All 24p', 'Some of it', 'None of it']);
+    expect(button('Make a guess').disabled).toBe(true);
+    button('Some of it').click();
+    expect(onPredict).toHaveBeenCalledWith('some');
+    expect(c.textContent).toContain('you said some');
+    expect(button('Next').disabled).toBe(false);
+    // The guess is made: it stays marked and the others can't be picked now.
+    expect(button('Some of it').getAttribute('aria-pressed')).toBe('true');
+    expect(button('All 24p').disabled).toBe(true);
+  });
+
+  it('offers a step’s own way into Play beside Next, and the last step’s own label', () => {
+    mounted.goTo(2);
+    button('Try elasticity in Play →').click();
+    expect(onPlayLink).toHaveBeenCalledWith({ focus: 'slope' });
+    expect(button('Next')).toBeDefined();
+    mounted.goTo(3);
+    expect(button('Try elasticity in Play →')).toBeUndefined();
+    button('Try ad valorem in Play →').click();
+    expect(onFinishFn).toHaveBeenCalled();
+  });
+
+  it('waitFor hides the words until the promise settles, unless the student has moved on', async () => {
+    mounted.goTo(1);
+    let done;
+    mounted.waitFor(new Promise((r) => { done = r; }));
+    expect(c.classList.contains('explain-card--waiting')).toBe(true);
+    done();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(c.classList.contains('explain-card--waiting')).toBe(false);
+  });
+});
