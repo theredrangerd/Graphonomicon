@@ -12,9 +12,9 @@ import { initGraphChrome, interventionTourSteps } from '../components/graphChrom
 const PAGES = [
   { file: 'price-ceiling.html', init: initPriceCeilingPage, toggle: '#ceiling-toggle', policy: 'impose the price ceiling', gear: false },
   { file: 'price-floor.html', init: initPriceFloorPage, toggle: '#floor-toggle', policy: 'impose the price floor', gear: false },
-  // Every page: each swaps the gear for its own IB perfect / Explorer view switch.
-  { file: 'indirect-tax.html', init: initIndirectTaxPage, toggle: '#tax-toggle', policy: 'impose the tax', gear: false },
-  { file: 'subsidy.html', init: initSubsidyPage, toggle: '#subsidy-toggle', policy: 'impose the subsidy', gear: false },
+  // Every page swaps the gear for a view switch; tax and subsidy are Explorer only, so just the focus bar.
+  { file: 'indirect-tax.html', init: initIndirectTaxPage, toggle: '#tax-toggle', policy: 'impose the tax', gear: false, explorerOnly: true },
+  { file: 'subsidy.html', init: initSubsidyPage, toggle: '#subsidy-toggle', policy: 'impose the subsidy', gear: false, explorerOnly: true },
 ];
 
 function loadPage(file) {
@@ -29,7 +29,7 @@ const pick = (v) => {
   r.dispatchEvent(new Event('change', { bubbles: true }));
 };
 
-describe.each(PAGES)('$file: detail settings and walkthrough', ({ file, init, toggle, policy, gear }) => {
+describe.each(PAGES)('$file: detail settings and walkthrough', ({ file, init, toggle, policy, gear, explorerOnly }) => {
   beforeEach(() => {
     localStorage.clear();
     history.replaceState(null, '', '/');
@@ -38,7 +38,7 @@ describe.each(PAGES)('$file: detail settings and walkthrough', ({ file, init, to
 
   it('adds the gear (or view switch) to the chart head, the replay button, and a 4-step first-visit tour', () => {
     init(document);
-    expect(document.querySelector(gear ? '.chart-head .detail-gear' : '.chart-head .view-switch')).not.toBeNull();
+    expect(document.querySelector(gear ? '.chart-head .detail-gear' : explorerOnly ? '.focus-bar' : '.chart-head .view-switch')).not.toBeNull();
     expect(document.querySelector('.tour-replay')).not.toBeNull();
     const bubble = document.querySelector('.tour-bubble');
     expect(bubble.textContent).toContain('Step 1 of 4');

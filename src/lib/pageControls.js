@@ -1,5 +1,5 @@
 import { elasticityLabel, fmtMoney, fmtQty, fmtShift } from './format.js';
-import { tweenValue } from './animate.js';
+import { delay, tweenValue } from './animate.js';
 import { computeMarket, fitsChart, pointElasticities } from './marketEngine.js';
 import { getUnits, familyHref } from './units.js';
 
@@ -149,19 +149,25 @@ export function fillSharedStats(doc, result) {
 // so every future intervention page picks it up automatically instead of re-copying the
 // tween/cancel bookkeeping. `beforeOn` runs just before switching on, so a page can pull
 // its intervention slider back into range first.
-export function wireInterventionToggle(toggle, render, { beforeOn, duration } = {}) {
+export function wireInterventionToggle(toggle, render, { beforeOn, duration, holdOn } = {}) {
   let fraction = toggle.checked ? 1 : 0;
   let cancelAnim = null;
   toggle.addEventListener('change', () => {
     if (toggle.checked && beforeOn) beforeOn();
     if (cancelAnim) cancelAnim();
-    cancelAnim = tweenValue({
-      from: fraction,
-      to: toggle.checked ? 1 : 0,
-      ...(duration ? { duration } : {}),
-      onUpdate(v) { fraction = v; render(); },
-      onComplete() { cancelAnim = null; },
-    });
+    // `holdOn()` ms (a page that opens with a beat before the intervention moves anything):
+    // the intervention stays at its current fraction until then.
+    const hold = toggle.checked && holdOn ? holdOn() : 0;
+    const run = () => {
+      cancelAnim = tweenValue({
+        from: fraction,
+        to: toggle.checked ? 1 : 0,
+        ...(duration ? { duration: typeof duration === 'function' ? duration() : duration } : {}), // a page may vary it by lens
+        onUpdate(v) { fraction = v; render(); },
+        onComplete() { cancelAnim = null; },
+      });
+    };
+    if (hold > 0) cancelAnim = delay(hold, run); else run();
   });
   return { getFraction: () => fraction };
 }

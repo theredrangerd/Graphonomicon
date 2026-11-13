@@ -19,18 +19,40 @@ describe('mountViewSwitch', () => {
     expect(bar.hidden).toBe(false);
   });
 
-  it('has the seven labelled chips', () => {
+  it('has the four subsidy chips, government perspective first like the tax page', () => {
     const { bar } = setup('explorer');
     expect([...bar.querySelectorAll('.focus-chip')].map((c) => c.textContent)).toEqual(
-      ['Consumer surplus', 'Producer surplus', 'Overlap', 'Government spending', 'Deadweight loss']);
+      ['Government', 'Consumers', 'Producers', 'Society']);
     expect(bar.textContent).toContain('Pick something to highlight:');
   });
 
-  it('clicking Overlap focuses it, clicking again clears it', () => {
+  it('with questions, drops the prompt and says what the graph shows: the exam diagram, or a lens\'s question', () => {
+    document.body.innerHTML = '<div class="chart-head"></div>';
+    const head = document.querySelector('.chart-head');
+    const onChange = vi.fn();
+    const api = mountViewSwitch(head, { view: 'explorer', focus: null, questions: { cs: 'What is the impact on consumers?', ps: 'What is the impact on producers?' }, onChange });
+    const bar = document.querySelector('.focus-bar');
+    expect(bar.textContent).not.toContain('Pick something to highlight');
+    expect(bar.classList.contains('focus-bar--lenses')).toBe(true);
+    const status = bar.querySelector('.focus-question');
+    expect(status.textContent).toContain('IB exam diagram');
+    expect(status.textContent).toContain('draw in an exam');
+    expect(status.querySelector('.focus-question__back')).toBeNull();
+    bar.querySelector('[data-focus="cs"]').click();
+    expect(status.querySelector('.focus-question__q').textContent).toBe('What is the impact on consumers?');
+    expect(status.textContent).toContain('part of the diagram');
+    api.set({ view: 'explorer', focus: 'ps' });
+    expect(status.querySelector('.focus-question__q').textContent).toBe('What is the impact on producers?');
+    status.querySelector('.focus-question__back').click();
+    expect(onChange).toHaveBeenLastCalledWith({ view: 'explorer', focus: null });
+    expect(status.textContent).toContain('IB exam diagram');
+  });
+
+  it('clicking a lens focuses it, clicking again clears it', () => {
     const { bar, onChange } = setup('explorer');
-    const chip = bar.querySelector('[data-focus="overlap"]');
+    const chip = bar.querySelector('[data-focus="cs"]');
     chip.click();
-    expect(onChange).toHaveBeenLastCalledWith({ view: 'explorer', focus: 'overlap' });
+    expect(onChange).toHaveBeenLastCalledWith({ view: 'explorer', focus: 'cs' });
     expect(chip.getAttribute('aria-pressed')).toBe('true');
     chip.click();
     expect(onChange).toHaveBeenLastCalledWith({ view: 'explorer', focus: null });
@@ -47,7 +69,7 @@ describe('mountViewSwitch', () => {
 
   it('set() does not fire onChange', () => {
     const { api, onChange } = setup();
-    api.set({ view: 'explorer', focus: 'dwl' });
+    api.set({ view: 'explorer', focus: 'gov' });
     expect(onChange).not.toHaveBeenCalled();
   });
 });

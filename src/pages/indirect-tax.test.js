@@ -199,13 +199,14 @@ describe('initIndirectTaxPage — Explain and Play', () => {
     expect(TAX_AREA_LABELS).toBe('full');
   });
 
-  it('lands a bare URL in Play on IB perfect, with the view switch and no detail gear', () => {
+  it('lands a bare URL in Play on Explorer, with the focus bar, no IB perfect option and no detail gear', () => {
     initIndirectTaxPage(document, fakeWin('indirect-tax.html'));
     expect(document.body.dataset.mode).toBe('play');
     expect($('.detail-gear')).toBeNull();
-    expect($('.view-switch')).not.toBeNull();
+    expect($('.view-switch')).toBeNull();
+    expect($('.focus-bar').hidden).toBe(false);
     expect($('#chart').dataset.detail).toBe('ib');
-    expect([...document.querySelectorAll('.focus-chip')].map((c) => c.dataset.focus)).toEqual(['consumer-lens', 'producer-lens', 'revenue']);
+    expect([...document.querySelectorAll('.focus-chip')].map((c) => c.dataset.focus)).toEqual(['revenue', 'consumer-lens', 'producer-lens', 'societal']);
   });
 
   it('draws the IB perfect tax diagram with the quantity axis reading Qe and Qtax', () => {
@@ -248,20 +249,62 @@ describe('initIndirectTaxPage — Explain and Play', () => {
     expect(shownLegend()).toEqual(['demand', 'supply', 'ps', 'tax-producer', 'dwl']);
   });
 
+  it('societal lens, tax on: the two burdens and the whole deadweight loss, with a chip each, and no surplus left over', () => {
+    initIndirectTaxPage(document, fakeWin('indirect-tax.html?view=explorer&focus=societal#play'));
+    expect($('#market-note').textContent).toContain('Turn the tax on to see the burdens and the deadweight loss');
+    toggleTax();
+    expect(regions().sort()).toEqual(['dwl', 'tax-consumer', 'tax-producer']);
+    expect($('#chart [data-layer="dwl"]')).not.toBeNull();
+    expect($('#chart [data-layer="dwlConsumer"]')).toBeNull();
+    expect($('#chart [data-layer="cs"]')).toBeNull();
+    expect($('#chart [data-layer="loafDrops"]')).toBeNull(); // the arrows were only for the shift
+    expect(chipTexts().map((t) => t.split(' ')[0]).slice(0, 2)).toEqual(['CB', 'PB']);
+    expect(shownLegend()).toEqual(['demand', 'supply', 'tax-consumer', 'tax-producer', 'dwl']);
+    expect($('#market-note').textContent).toContain('no longer traded');
+  });
+
+  it('switching to another lens with the tax on does not bring the arrows back', () => {
+    initIndirectTaxPage(document, fakeWin('indirect-tax.html?view=explorer&focus=consumer-lens#play'));
+    toggleTax();
+    $('.focus-chip[data-focus="societal"]').click();
+    expect($('#chart [data-layer="loafDrops"]')).toBeNull();
+    expect($('.focus-chip[aria-pressed="true"]').dataset.focus).toBe('societal');
+  });
+
   it('opens an old ?focus=cs link on the consumer lens', () => {
     initIndirectTaxPage(document, fakeWin('indirect-tax.html?view=explorer&focus=cs#play'));
     expect($('.focus-chip[aria-pressed="true"]').dataset.focus).toBe('consumer-lens');
   });
 
-  it('revenue focus shows only the box, split into both burdens, with its revenue chip', () => {
+  it('government perspective builds the box from per-unit strips, with its revenue chip', () => {
     initIndirectTaxPage(document, fakeWin('indirect-tax.html?view=explorer&focus=revenue#play'));
     expect($('#market-note').textContent).toContain('Turn the tax on to see tax revenue');
     toggleTax();
-    expect(regions().sort()).toEqual(['tax-consumer', 'tax-producer']);
-    expect($('#chart [data-region="tax-revenue"]')).not.toBeNull();
+    expect(regions()).toEqual(['tax-revenue']);
+    expect($('#chart .gov-strip')).toBeNull(); // the strips have merged into the solid box
+    expect($('#chart .gov-fill')).not.toBeNull();
+    expect($('#chart .tax-arrow').textContent).toBe(''); // its name moved to the price-axis bracket
+    expect($('#chart .tax-height').textContent).toBe('$20 tax');
+    expect($('#chart .qty-bracket__label').textContent).toMatch(/^[\d.]+ units traded$/);
     expect($('#chart .chart-focus-chip').textContent).toBe('Revenue $1,050');
     const shown = [...document.querySelectorAll('.legend [data-legend]')].filter((i) => !i.hidden).map((i) => i.dataset.legend);
-    expect(shown).toEqual(['demand', 'supply', 'tax-consumer', 'tax-producer', 'revenue']);
+    expect(shown).toEqual(['demand', 'supply', 'revenue']);
+  });
+
+  it('government perspective names an ad valorem tax by its rate', () => {
+    initIndirectTaxPage(document, fakeWin('indirect-tax.html?view=explorer&focus=revenue#play'));
+    $('#tax-mode-advalorem').checked = true;
+    $('#tax-mode-advalorem').dispatchEvent(new Event('change'));
+    toggleTax();
+    expect($('#chart .tax-height').textContent).toContain(`${$('#advalorem-slider').value}% tax`);
+  });
+
+  it('picking the government perspective with the tax on keeps the tax on and shows the revenue box', () => {
+    initIndirectTaxPage(document, fakeWin('indirect-tax.html#play'));
+    toggleTax();
+    $('.focus-chip[data-focus="revenue"]').click();
+    expect($('#tax-toggle').checked).toBe(true);
+    expect($('#chart .tax-height')).not.toBeNull();
   });
 
   // Animations are skipped under Vitest, so every reveal step has run by now: the band is
@@ -269,76 +312,190 @@ describe('initIndirectTaxPage — Explain and Play', () => {
   it('draws the lens, then its chips, when a focus is picked with the tax already on', () => {
     initIndirectTaxPage(document, fakeWin('indirect-tax.html#play'));
     toggleTax();
-    $('.view-switch input[value="explorer"]').click();
     $('.focus-chip[data-focus="producer-lens"]').click();
     expect(regions().sort()).toEqual(['dwl', 'ps', 'tax-producer']);
     expect(chipTexts()[0]).toMatch(/^PS/);
   });
 
-  it('opens #explain on step 1 of 12, drawing only demand', () => {
-    initIndirectTaxPage(document, fakeWin('indirect-tax.html#explain'));
+  // ---- Explain: the UK sugar levy ----
+  const explain = () => { initIndirectTaxPage(document, fakeWin('indirect-tax.html#explain')); };
+  const next = () => $('.explain-btn--primary');
+  const goToStep = (id) => {
+    const i = ['demand', 'supply', 'cost of a litre', 'the levy', 'every litre', 'up is left', 'equilibrium', 'guess', 'wedge',
+      'strips', 'revenue', 'burdens', 'consumer surplus', 'consumer', 'producer surplus', 'producer', 'deadweight loss',
+      'wrap', 'elasticity', 'vat'].indexOf(id);
+    dot(i).click();
+  };
+  const press = (selector, key, times = 1, shiftKey = false) => {
+    for (let i = 0; i < times; i++) $(selector).dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey, bubbles: true }));
+  };
+  const card = () => $('#explain-card').textContent;
+
+  it('opens #explain on step 1 of 20, drawing only demand, in pence and litres', () => {
+    explain();
     expect(document.body.dataset.mode).toBe('explain');
-    expect(stepCount()).toBe('Step 1 of 12');
+    expect(stepCount()).toBe('Step 1 of 20');
     expect($('#chart line.demand-curve')).not.toBeNull();
     expect($('#chart line.supply-curve')).toBeNull();
-    expect($('.explain-slider').getAttribute('aria-label')).toBe('Tax per can');
+    expect($('.explain-slider').getAttribute('aria-label')).toBe('Levy per litre');
+    expect([...document.querySelectorAll('#chart .axis-label')].map((l) => l.textContent)).toEqual(['Quantity (millions of litres)', 'Price (pence per litre)']);
   });
 
-  it('brings the burdens in one at a time, each wiping in', () => {
-    initIndirectTaxPage(document, fakeWin('indirect-tax.html#explain'));
-    dot(5).click();
-    expect(regions()).toEqual(['tax-consumer']);
-    expect($('#chart [data-region="tax-consumer"] .layer-grow')).not.toBeNull();
-    button('Next').click();
+  it('keeps Next locked on the dot step until the dot reaches the halo, then says what it found', () => {
+    explain();
+    goToStep('cost of a litre');
+    expect(next().disabled).toBe(true);
+    expect(card()).not.toContain('every point on S1 is a number of litres');
+    press('.cost-dot__handle', 'ArrowLeft', 7, true); // 75 → 40 million litres, through the halo at 42
+    expect(next().disabled).toBe(false);
+    expect(card()).toContain('every point on S1 is a number of litres');
+  });
+
+  it('raises the levy from the student’s own litre, then from every litre, and S2 appears with them', () => {
+    explain();
+    goToStep('the levy');
+    expect($('#chart .levy-lift')).not.toBeNull();
+    expect($('#chart line.supply-curve-shifted')).toBeNull();
+    expect(card()).toContain('In April 2018 the UK put a tax on sugary drinks: 24p on every litre');
+    next().click();
+    expect(document.querySelectorAll('#chart .loaf-drops__one').length).toBeGreaterThan(3);
+    expect($('#chart line.supply-curve-shifted')).not.toBeNull();
+  });
+
+  it('asks for a guess before showing the new price, then answers it on the chart and in words', () => {
+    explain();
+    goToStep('guess');
+    expect(next().disabled).toBe(true);
+    expect($('#chart .pass-gap')).toBeNull();
+    expect($('#chart line.wedge-line')).toBeNull(); // no Pc line yet
+    button('Some of it').click();
+    expect($('#chart .pass-gap')).not.toBeNull();
+    expect($('#chart .pass-full')).not.toBeNull();
+    expect($('#chart .ride-note').textContent).toBe('Pc 92p');
+    expect(card()).toContain('Yes: some of it, not all.');
+    expect(card()).toContain('Pc = 92p');
+    expect(next().disabled).toBe(false);
+    expect(button('All of it').disabled).toBe(true);
+  });
+
+  it('keeps Next locked on the wedge step until the wedge fits, with S2 stepped back until then', () => {
+    explain();
+    goToStep('wedge');
+    expect(next().disabled).toBe(true);
+    expect($('#chart [data-layer="supply2"]').classList.contains('ghost')).toBe(true);
+    expect($('#chart .wedge-drag__gap')).not.toBeNull();
+    press('.wedge-drag__handle', 'ArrowRight', 5, true); // 25 → 50 million litres: within reach of Q tax (51)
+    expect($('#chart .wedge-drag--fit')).not.toBeNull();
+    expect($('#chart [data-layer="supply2"]').classList.contains('ghost')).toBe(false);
+    expect([...document.querySelectorAll('#chart .axis-symbol')].map((t) => t.textContent)).toContain('Pp');
+    expect(next().disabled).toBe(false);
+    expect(card()).toContain('Pp = 68p');
+  });
+
+  it('builds the box from strips, locks Next until the levy is slid down and up, and puts it back to 24p after', () => {
+    explain();
+    goToStep('strips');
+    expect(document.querySelectorAll('#chart .gov-strip').length).toBe(51);
+    next().click();
+    expect(card()).toContain('£12.24m');
+    expect(next().disabled).toBe(true);
+    const slider = $('.explain-slider');
+    for (const v of ['0', '40']) { slider.value = v; slider.dispatchEvent(new Event('input')); }
+    expect(next().disabled).toBe(false);
+    next().click();
+    expect(stepCount()).toBe('Step 12 of 20');
+    expect(card()).toContain('12p + 12p = the whole 24p');
     expect(regions().sort()).toEqual(['tax-consumer', 'tax-producer']);
-    expect($('#chart [data-region="tax-consumer"] .layer-grow')).toBeNull();
-    expect($('#explain-card').textContent).toContain('$10 + $10 = the whole $20 tax');
   });
 
-  it('the elasticity step steepens demand so consumers carry most of the tax, and the wrap-up restores it', () => {
-    initIndirectTaxPage(document, fakeWin('indirect-tax.html#explain'));
-    const demandY1 = () => +$('#chart line.demand-curve').getAttribute('y1');
-    dot(9).click();
-    const before = demandY1();
-    button('Next').click();
-    expect(stepCount()).toBe('Step 11 of 12');
-    expect(demandY1()).not.toBe(before);
-    expect($('#explain-card').textContent).toContain('Customers pay $15 of the $20 tax, and the company only $5');
-    button('Next').click();
-    expect($('#chart').dataset.detail).toBe('ib');
-    expect(demandY1()).toBe(before);
+  it('shrinks consumer surplus with the grey named before it takes its colours', () => {
+    explain();
+    goToStep('consumer');
+    expect([...document.querySelectorAll('#chart .lost-notes text')].map((t) => t.textContent)).toEqual(['Captured by the government (tax revenue)', 'No longer traded']);
+    expect(regions().sort()).toEqual(['cs', 'dwl', 'tax-consumer']);
   });
 
-  it('shares one tax amount between the Explain slider and the Play specific-tax slider', () => {
-    initIndirectTaxPage(document, fakeWin('indirect-tax.html#explain'));
-    dot(2).click();
+  it('hands keyboard focus to Next once the wedge fits, and shows the slider’s name and value', async () => {
+    explain();
+    goToStep('wedge');
+    expect($('.explain-card__slider-name').textContent).toBe('Levy per litre: 24p');
+    $('.wedge-drag__handle').focus();
+    press('.wedge-drag__handle', 'ArrowRight', 5, true);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(document.activeElement).toBe(next());
+  });
+
+  it('draws a readout on the exam-diagram steps that quote numbers', () => {
+    explain();
+    goToStep('elasticity');
+    expect([...document.querySelectorAll('#chart .readout__value')].map((v) => v.textContent)).toEqual(['8p', '16p', '24p']);
+    goToStep('wrap');
+    expect($('#chart .readout')).toBeNull();
+  });
+
+  it('keeps Explain’s levy apart from Play’s $ slider', () => {
+    explain();
+    goToStep('the levy');
     const slider = $('.explain-slider');
     slider.value = '30';
     slider.dispatchEvent(new Event('input'));
-    expect($('#specific-slider').value).toBe('30');
-    expect($('#explain-card').textContent).toContain('$30');
+    expect($('#specific-slider').value).toBe('20');
+    expect(card()).toContain('30p (the real levy was 24p)');
   });
 
-  it('Try it in Play → switches to Play with the specific tax animated on', () => {
+  it('flattens demand on the elasticity step, and its exit opens Play with the tax on and demand that elastic', () => {
     const win = fakeWin('indirect-tax.html#explain');
     initIndirectTaxPage(document, win);
-    $('#tax-mode-advalorem').checked = true;
-    dot(11).click();
-    button('Try it in Play →').click();
+    goToStep('elasticity');
+    expect(card()).toContain('shoppers pay only 8p of the 24p levy and the drinks company 16p');
+    button('Try elasticity in Play →').click();
     expect(document.body.dataset.mode).toBe('play');
     expect(win.location.hash).toBe('#play');
     expect($('#tax-toggle').checked).toBe(true);
     expect($('#tax-mode-specific').checked).toBe(true);
-    expect($('#stat-revenue').textContent).toBe('$1,050');
+    expect($('#slope-d-slider').value).toBe('0.3');
+  });
+
+  it('comes back to the step a student left for Play from, and the ad valorem exit resets Play’s curves', () => {
+    const win = fakeWin('indirect-tax.html#explain');
+    initIndirectTaxPage(document, win);
+    goToStep('elasticity');
+    button('Try elasticity in Play →').click();
+    expect($('#slope-d-slider').value).toBe('0.3');
+    $('.mode-link').click();
+    expect(stepCount()).toBe('Step 19 of 20');
+    next().click();
+    button('Try ad valorem in Play →').click();
+    expect($('#slope-d-slider').value).toBe('0');
+    expect($('#stat-price-consumer').textContent).toBe('$87.27');
+  });
+
+  it('ends on VAT, and Try ad valorem in Play → opens Play with a 20% ad valorem tax on', () => {
+    const win = fakeWin('indirect-tax.html#explain');
+    initIndirectTaxPage(document, win);
+    goToStep('vat');
+    expect($('#chart').dataset.detail).toBe('ib');
+    expect(card()).toContain('ad valorem');
+    button('Try ad valorem in Play →').click();
+    expect(document.body.dataset.mode).toBe('play');
+    expect($('#tax-mode-advalorem').checked).toBe(true);
+    expect($('#advalorem-slider').value).toBe('20');
+    expect($('#tax-toggle').checked).toBe(true);
   });
 
   it('entering Explain switches the tax off and restarts at step 1', () => {
     const win = fakeWin('indirect-tax.html#play');
     initIndirectTaxPage(document, win);
     toggleTax();
-    $('.mode-switch input[value="explain"]').click();
+    $('.mode-link').click();
     expect(win.location.hash).toBe('#explain');
     expect($('#tax-toggle').checked).toBe(false);
-    expect(stepCount()).toBe('Step 1 of 12');
+    expect(stepCount()).toBe('Step 1 of 20');
+    expect($('.mode-link').textContent).toBe('← Back to Play');
+    $('.mode-link').click();
+    expect(win.location.hash).toBe('#play');
+    expect($('.mode-switch')).toBeNull();
+    // Play's axes are back to its own generic units.
+    expect($('#chart .axis-label').textContent).toBe('Quantity (units)');
   });
 });

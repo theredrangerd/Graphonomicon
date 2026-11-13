@@ -167,7 +167,7 @@ describe('initSubsidyPage — Explain and Play', () => {
     try {
       initSubsidyPage(document, fakeWin('subsidy.html#explain'));
       expect(document.querySelector('.tour-bubble')).toBeNull();
-      $('.mode-switch input[value="play"]').click();
+      $('.mode-link').click();
       expect(document.querySelector('.tour-bubble')).not.toBeNull();
     } finally {
       document.querySelectorAll('.tour-bubble, .tour-backdrop, .tour-spotlight').forEach((n) => n.remove());
@@ -179,12 +179,14 @@ describe('initSubsidyPage — Explain and Play', () => {
     expect(SUBSIDY_AREA_LABELS).toBe('full');
   });
 
-  it('lands a bare URL in Play on IB perfect, with the view switch and no detail gear', () => {
+  it('lands a bare URL in Play on Explorer, with the focus bar, no IB perfect option and no detail gear', () => {
     initSubsidyPage(document, fakeWin('subsidy.html'));
     expect(document.body.dataset.mode).toBe('play');
     expect($('.detail-gear')).toBeNull();
-    expect($('.view-switch')).not.toBeNull();
-    expect($('.mode-switch')).not.toBeNull();
+    expect($('.view-switch')).toBeNull();
+    expect($('.mode-switch')).toBeNull();
+    expect($('.mode-link').textContent).toBe('Wait, how does this work?');
+    expect($('.focus-bar').hidden).toBe(false);
     expect($('#chart').dataset.detail).toBe('ib');
     expect($('#chart [data-region="subsidy-overlap"]')).toBeNull();
   });
@@ -192,7 +194,7 @@ describe('initSubsidyPage — Explain and Play', () => {
   it('opens #explain on step 1, drawing only demand', () => {
     initSubsidyPage(document, fakeWin('subsidy.html#explain'));
     expect(document.body.dataset.mode).toBe('explain');
-    expect($('#explain-card .explain-card__count').textContent).toBe('Step 1 of 14');
+    expect($('#explain-card .explain-card__count').textContent).toBe('Step 1 of 19');
     expect($('#chart line.demand-curve')).not.toBeNull();
     expect($('#chart line.supply-curve')).toBeNull();
   });
@@ -204,20 +206,82 @@ describe('initSubsidyPage — Explain and Play', () => {
     fills.forEach((f) => expect(f.dataset.region).toBe('cs'));
   });
 
-  it('shows only demand, supply and the focused item in the legend; IB perfect hides only the overlap', () => {
+  it('shows only demand, supply and the focused item in the legend', () => {
     initSubsidyPage(document, fakeWin('subsidy.html?focus=ps#play'));
     const shown = () => [...document.querySelectorAll('.legend [data-legend]')].filter((i) => !i.hidden).map((i) => i.dataset.legend);
     expect(shown()).toEqual(['demand', 'supply', 'ps']);
-    $('.view-switch input[value="ib"]').click();
-    expect(shown()).toEqual(['demand', 'supply', 'cs', 'ps', 'marginal-cs', 'marginal-ps', 'gov', 'dwl']);
   });
 
   it('keeps the view in the URL when the student switches it', () => {
     const win = fakeWin('subsidy.html#play');
     initSubsidyPage(document, win);
-    $('.view-switch input[value="explorer"]').click();
-    $('.focus-chip[data-focus="dwl"]').click();
-    expect(win.location.search).toBe('?view=explorer&focus=dwl');
+    $('.focus-chip[data-focus="ps"]').click();
+    expect(win.location.search).toBe('?view=explorer&focus=ps');
+  });
+
+  it('offers the government perspective, the two lenses and the societal lens, and opens retired links on their replacements', () => {
+    initSubsidyPage(document, fakeWin('subsidy.html?view=explorer&focus=dwl#play'));
+    expect([...document.querySelectorAll('.focus-chip')].map((c) => c.dataset.focus)).toEqual(['gov', 'cs', 'ps', 'societal']);
+    expect($('.focus-chip[aria-pressed="true"]').dataset.focus).toBe('societal');
+    initSubsidyPage(document, fakeWin('subsidy.html?view=explorer&focus=overlap#play'));
+    expect($('.focus-chip[aria-pressed="true"]').dataset.focus).toBe('cs');
+  });
+
+  it('offers a Societal lens last', () => {
+    initSubsidyPage(document, fakeWin('subsidy.html?view=explorer&focus=societal#play'));
+    expect([...document.querySelectorAll('.focus-chip')].map((c) => c.dataset.focus)).toEqual(['gov', 'cs', 'ps', 'societal']);
+    expect($('.focus-chip[aria-pressed="true"]').dataset.focus).toBe('societal');
+    expect($('#market-note').textContent).toContain('Turn the subsidy on');
+  });
+
+  it('Societal lens ends on just the marginal CS, marginal PS and deadweight loss inside the spending box outline', () => {
+    initSubsidyPage(document, fakeWin('subsidy.html?view=explorer&focus=societal#play'));
+    toggleOn(); // the page's timers run at once under Vitest, so this is the finished sequence
+    const regions = new Set([...document.querySelectorAll('#chart [data-region]')].map((e) => e.dataset.region));
+    // 'subsidy-cost' is the dashed box outline (tappable), not a fill.
+    expect(regions).toEqual(new Set(['marginal-cs', 'marginal-ps', 'dwl', 'subsidy-cost']));
+    expect($('#chart .gov-fill')).toBeNull();
+    expect($('#chart .wedge-outline')).not.toBeNull();
+    expect($('#chart .gov-strips')).toBeNull();
+    expect($('#chart [data-layer="govFill"]')).toBeNull();
+    expect($('#market-note').textContent).toContain('captured by nobody');
+  });
+
+  it('Societal lens lists only what it shows in the legend', () => {
+    initSubsidyPage(document, fakeWin('subsidy.html?view=explorer&focus=societal#play'));
+    toggleOn();
+    const shown = [...document.querySelectorAll('.legend [data-legend]')].filter((i) => !i.hidden).map((i) => i.dataset.legend);
+    expect(shown).toEqual(['demand', 'supply', 'marginal-cs', 'marginal-ps', 'gov', 'dwl']);
+  });
+
+  it('draws the spending box, and no deadweight loss, in the government perspective once the subsidy is on', () => {
+    initSubsidyPage(document, fakeWin('subsidy.html?view=explorer&focus=gov#play'));
+    toggleOn();
+    expect($('#chart [data-region="dwl"]')).toBeNull();
+    expect($('#chart [data-region="subsidy-cost"]')).not.toBeNull();
+    const shown = [...document.querySelectorAll('.legend [data-legend]')].filter((i) => !i.hidden).map((i) => i.dataset.legend);
+    expect(shown).toEqual(['demand', 'supply', 'gov']);
+    expect($('#market-note').textContent).not.toContain('Deadweight');
+    expect($('#market-note').textContent).not.toContain('Turn the subsidy on');
+  });
+
+  it("animates each lens's last step in (the chain hands its enter list to the chart)", () => {
+    for (const [focus, layer] of [['cs', 'marginalCs'], ['ps', 'marginalPs'], ['gov', 'focusChip']]) {
+      initSubsidyPage(document, fakeWin(`subsidy.html?view=explorer&focus=${focus}#play`));
+      toggleOn();
+      expect($(`#chart [data-layer="${layer}"].layer-enter`), `${focus} -> ${layer}`).not.toBeNull();
+    }
+  });
+
+  it('"Show the exam diagram" clears the lens even with the subsidy on', () => {
+    initSubsidyPage(document, fakeWin('subsidy.html?view=explorer&focus=ps#play'));
+    toggleOn();
+    $('.focus-question__back').click();
+    expect($('.focus-chip[aria-pressed="true"]')).toBeNull();
+    expect($('.focus-question').textContent).toContain('IB exam diagram');
+    // ...and the chart is redrawn as the whole diagram, not left on the lens
+    expect($('#chart').dataset.focus).toBeUndefined();
+    expect($('#chart [data-layer="supply2"]')).not.toBeNull();
   });
 
   it('says to turn the subsidy on when the Explorer focus has nothing to show', () => {
@@ -231,7 +295,7 @@ describe('initSubsidyPage — Explain and Play', () => {
   it('step 4 waits on a Subsidise! button on the dot, then drops the arrow and unlocks Next', async () => {
     initSubsidyPage(document, fakeWin('subsidy.html#explain'));
     document.querySelectorAll('.explain-card .explain-dot')[3].click();
-    expect($('#explain-card .explain-card__count').textContent).toBe('Step 4 of 14');
+    expect($('#explain-card .explain-card__count').textContent).toBe('Step 4 of 19');
     // Armed: the dot and its cost are there, the drop, its labels and the readout are not.
     expect($('#chart .subsidise-btn')).not.toBeNull();
     expect($('#chart .loaf-drop circle')).not.toBeNull();
@@ -298,17 +362,17 @@ describe('initSubsidyPage — Explain and Play', () => {
     win.location.hash = '#play';
     win.fire('hashchange');
     expect(document.body.dataset.mode).toBe('play');
-    expect($('.mode-switch input[value="play"]').checked).toBe(true);
-    $('.mode-switch input[value="explain"]').click();
+    expect($('.mode-link').textContent).toBe('Wait, how does this work?');
+    $('.mode-link').click();
     expect(document.body.dataset.mode).toBe('explain');
     expect(win.location.hash).toBe('#explain');
-    expect($('#explain-card .explain-card__count').textContent).toBe('Step 1 of 14');
+    expect($('#explain-card .explain-card__count').textContent).toBe('Step 1 of 19');
   });
 
-  it('Try it in Play → on step 14 switches to Play with the subsidy animated on', () => {
+  it('Try it in Play → on step 19 switches to Play with the subsidy animated on', () => {
     const win = fakeWin('subsidy.html#explain');
     initSubsidyPage(document, win);
-    document.querySelectorAll('.explain-card .explain-dot')[13].click();
+    document.querySelectorAll('.explain-card .explain-dot')[18].click();
     button('Try it in Play →').click();
     expect(document.body.dataset.mode).toBe('play');
     expect(win.location.hash).toBe('#play');
@@ -318,7 +382,7 @@ describe('initSubsidyPage — Explain and Play', () => {
 
   it('draws the IB perfect diagram on the wrap-up step', () => {
     initSubsidyPage(document, fakeWin('subsidy.html#explain'));
-    document.querySelectorAll('.explain-card .explain-dot')[13].click();
+    document.querySelectorAll('.explain-card .explain-dot')[18].click();
     expect($('#chart').dataset.detail).toBe('ib');
     expect($('#chart line.supply-curve')).not.toBeNull();
     expect($('#chart [data-region="dwl"]')).not.toBeNull();
@@ -327,7 +391,7 @@ describe('initSubsidyPage — Explain and Play', () => {
   it('locks Next on the drag step until the student has moved the cost dot along S1', () => {
     initSubsidyPage(document, fakeWin('subsidy.html#explain'));
     document.querySelectorAll('.explain-card .explain-dot')[2].click();
-    expect($('#explain-card .explain-card__count').textContent).toBe('Step 3 of 14');
+    expect($('#explain-card .explain-card__count').textContent).toBe('Step 3 of 19');
     expect(button('Put the dot in the halo').disabled).toBe(true);
     expect($('#chart .cost-dot__handle')).not.toBeNull();
     expect($('#chart .drag-hint')).not.toBeNull();
@@ -377,7 +441,7 @@ describe('initSubsidyPage — Explain and Play', () => {
 
     it('scrolls the chart card to the top when a step change leaves the step card below the viewport', () => {
       const chartCard = setup(window.innerHeight + 50);
-      $('.mode-switch input[value="explain"]').click();
+      $('.mode-link').click();
       expect(chartCard.scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({ block: 'start' }));
       chartCard.scrollIntoView.mockClear();
       button('Next').click();
@@ -386,7 +450,7 @@ describe('initSubsidyPage — Explain and Play', () => {
 
     it('does not scroll when the step card already fits, nor on a slider tick', () => {
       const chartCard = setup(window.innerHeight - 10);
-      $('.mode-switch input[value="explain"]').click();
+      $('.mode-link').click();
       button('Next').click();
       expect(chartCard.scrollIntoView).not.toHaveBeenCalled();
       $('#explain-card').getBoundingClientRect = () => ({ bottom: window.innerHeight + 50 });

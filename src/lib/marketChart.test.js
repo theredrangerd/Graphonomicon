@@ -95,12 +95,11 @@ describe('renderMarketChart', () => {
     expect(svg.querySelector('polygon.wedge-outline')).not.toBeNull();
   });
 
-  it('draws only the consumer-price reference line for a subsidy', () => {
+  it('draws no price line past e2 for a subsidy: the box edge is the Pc line, as on an IB diagram', () => {
     const result = computeMarket({ ...base, intervention: { type: 'subsidy', amount: 20 } });
     renderMarketChart(svg, result);
-    const lines = svg.querySelectorAll('line.wedge-line');
-    expect(lines).toHaveLength(1);
-    expect(lines[0].getAttribute('stroke')).toBe('var(--demand)');
+    expect(svg.querySelector('[data-layer="wedgeBox"]')).not.toBeNull();
+    expect(svg.querySelectorAll('line.wedge-line')).toHaveLength(0);
   });
 
   it('runs both price lines from the axis to Q when the subsidy box is not drawn', () => {
@@ -370,6 +369,7 @@ describe('renderMarketChart', () => {
     const layers = ['demand', 'supply', 'supply2', 'eq1', 'eq2', 'prices', 'priceBrackets', 'subsidyArrow'];
     const captions = { customer: 'customer pays', gov: '+ gov', total: 'bakery gets' };
     renderMarketChart(svg, result, { detail: 'clean', layers, captions, exit: ['priceBrackets', 'pricesC'] });
+    expect(svg.querySelector('.pb-total-label').classList.contains('pb-total-label--grow')).toBe(true);
     expect(svg.querySelector('.pb-customer').classList.contains('layer-exit')).toBe(false);
     expect(svg.querySelector('.pb-gov').classList.contains('layer-exit')).toBe(false);
     expect(svg.querySelector('.pb-customer-label').classList.contains('layer-exit')).toBe(true);
@@ -377,6 +377,22 @@ describe('renderMarketChart', () => {
     expect(svg.querySelector('.pb-total-label').classList.contains('layer-exit')).toBe(false);
     expect(svg.querySelector('.wedge-line[data-layer="pricesC"]').classList.contains('layer-exit')).toBe(true);
     expect(svg.querySelector('.price-line--producer').classList.contains('layer-exit')).toBe(false);
+  });
+
+  it('draws the bakery total at its swollen size when captions.totalBig is set', () => {
+    const result = computeMarket({ ...base, intervention: { type: 'subsidy', mode: 'specific', amount: 40 } });
+    renderMarketChart(svg, result, { detail: 'clean', layers: ['demand', 'supply', 'supply2', 'eq1', 'eq2', 'pricesPOnly', 'priceBrackets'], captions: { total: 'bakery gets $90', totalBig: true } });
+    expect(svg.querySelector('.pb-total-label').classList.contains('pb-total-label--big')).toBe(true);
+  });
+
+  it('marks where Pp meets S1 with a dot, only when asked and only while the Pp line is drawn', () => {
+    const result = computeMarket({ ...base, intervention: { type: 'subsidy', amount: 20 } });
+    renderMarketChart(svg, result, { detail: 'clean', layers: ['demand', 'supply', 'supply2', 'eq2', 'pricesPOnly'], ppDot: true });
+    expect(svg.querySelectorAll('.pp-dot')).toHaveLength(1);
+    renderMarketChart(svg, result, { detail: 'clean', layers: ['demand', 'supply', 'supply2', 'eq2', 'pricesPOnly'] });
+    expect(svg.querySelectorAll('.pp-dot')).toHaveLength(0);
+    renderMarketChart(svg, result, { detail: 'clean', layers: ['demand', 'supply', 'supply2', 'eq2', 'pricesCOnly'], ppDot: true });
+    expect(svg.querySelectorAll('.pp-dot')).toHaveLength(0);
   });
 
   it('draws only the Pp line and symbol for pricesPOnly', () => {
@@ -683,15 +699,39 @@ describe('focus', () => {
       expect(new Set(regions)).toEqual(new Set(parts));
     }
   });
+  it('fades in only the marginal band chip, never the surplus chip already on screen', () => {
+    const result = r();
+    for (const [focus, band] of [['cs', 'marginalCs'], ['ps', 'marginalPs']]) {
+      renderMarketChart(svg, result, { detail: 'full', focus, enter: [band, 'focusChip'] });
+      const chips = [...svg.querySelectorAll('.chart-focus-chip .region-badge')];
+      expect(chips).toHaveLength(2);
+      expect(svg.querySelector('.chart-focus-chip').classList.contains('layer-enter')).toBe(false);
+      expect(chips[0].classList.contains('layer-enter')).toBe(false);
+      expect(chips[1].classList.contains('layer-enter')).toBe(true);
+    }
+  });
   it('chips a subsidised CS/PS focus and its marginal band separately', () => {
     const result = r();
-    for (const [focus, total, band, bandValue] of [['cs', 'CS', 'mCS', result.marginalCS], ['ps', 'PS', 'mPS', result.marginalPS]]) {
+    for (const [focus, total, band, bandValue] of [['cs', 'old CS', 'mCS', result.marginalCS], ['ps', 'old PS', 'mPS', result.marginalPS]]) {
       renderMarketChart(svg, result, { detail: 'ib', focus });
       const chips = [...svg.querySelectorAll('.chart-focus-chip .region-badge')].map((b) => b.textContent);
       expect(chips).toHaveLength(2);
-      expect(chips[0]).toMatch(new RegExp(`^${total} `));
+      expect(chips[0]).toBe(`${total} $${Math.round(focus === 'cs' ? result.csTriangleArea : result.psTriangleArea).toLocaleString('en-US')}`);
       expect(chips[1]).toBe(`${band} $${Math.round(bandValue).toLocaleString('en-US')}`);
     }
+  });
+  it('calls the overlap focus triangles old CS / old PS under a subsidy, plain CS / PS without one', () => {
+    renderMarketChart(svg, r(), { detail: 'ib', focus: 'overlap' });
+    expect([...svg.querySelectorAll('.chart-focus-chip .region-badge')].map((b) => b.textContent.split(' $')[0])).toEqual(['old CS', 'old PS']);
+  });
+  it('chips the societal lens by its three parts and draws only those inside the box outline', () => {
+    const result = r();
+    renderMarketChart(svg, result, { detail: 'ib', focus: 'societal' });
+    expect(new Set([...svg.querySelectorAll('.fills [data-region]')].map((g) => g.dataset.region))).toEqual(new Set(['marginal-cs', 'marginal-ps', 'dwl']));
+    expect(svg.querySelector('.wedge-outline')).not.toBeNull();
+    const labels = [...svg.querySelectorAll('.chart-focus-chip .region-badge')].map((b) => b.textContent.split(' $')[0]);
+    expect(labels.slice(0, 2)).toEqual(['mCS', 'mPS']);
+    expect(svg.querySelector('[data-layer="govFill"]')).toBeNull();
   });
   it('draws the per-unit subsidy arrow from e2 up to S1 in the producer surplus and overlap focuses only', () => {
     const result = r();
@@ -700,12 +740,74 @@ describe('focus', () => {
     expect(arrow).not.toBeNull();
     expect(arrow.querySelector('.region-badge__text').textContent).toBe(`$${Math.round(result.Pp - result.Pc)}`);
     expect(arrow.querySelector('polygon')).not.toBeNull();
-    for (const focus of ['cs', 'gov', 'dwl', null]) {
+    for (const focus of ['cs', 'dwl', null]) {
       renderMarketChart(svg, result, { detail: 'ib', focus });
       expect(svg.querySelector('.subsidy-arrow')).toBeNull();
     }
+    // The government's lens shows where the producer's share comes from, too.
+    renderMarketChart(svg, result, { detail: 'ib', focus: 'gov' });
+    expect(svg.querySelector('.subsidy-arrow')).not.toBeNull();
     renderMarketChart(svg, r(0), { detail: 'ib', focus: 'ps' });
     expect(svg.querySelector('.subsidy-arrow')).toBeNull();
+  });
+  it('fades ghosted marks only when an emphasis begins or ends, not on a rebuild that keeps it', () => {
+    const layers = ['demand', 'supply', 'supply2', 'eq1', 'eq2', 'wedgeBox', 'govFill'];
+    const opts = (emphasis) => ({ detail: 'ib', focus: 'cs', layers, ...(emphasis ? { emphasis } : {}) });
+    renderMarketChart(svg, r(), opts());
+    expect(svg.querySelector('.ghost')).toBeNull();
+    renderMarketChart(svg, r(), opts('consumers'));
+    expect(svg.querySelector('[data-layer="supply"].ghost.ghost-in')).not.toBeNull();
+    expect(svg.querySelector('[data-layer="demand"].ghost')).toBeNull();
+    renderMarketChart(svg, r(), opts('consumers'));
+    expect(svg.querySelector('[data-layer="supply"].ghost')).not.toBeNull();
+    expect(svg.querySelector('.ghost-in')).toBeNull();
+    renderMarketChart(svg, r(), opts());
+    expect(svg.querySelector('.ghost')).toBeNull();
+    expect(svg.querySelector('[data-layer="supply"].ghost-out')).not.toBeNull();
+    // ...except a mark that is leaving: it fades on from its ghost rather than back up to full first.
+    renderMarketChart(svg, r(), opts('consumers'));
+    renderMarketChart(svg, r(), { ...opts(), exit: ['supply'] });
+    expect(svg.querySelector('[data-layer="supply"].ghost')).not.toBeNull();
+    expect(svg.querySelector('[data-layer="supply"].ghost-out')).toBeNull();
+    expect(svg.querySelector('[data-layer="supply"].layer-exit')).not.toBeNull();
+    renderMarketChart(svg, r(), opts());
+    expect(svg.querySelector('.ghost-out')).toBeNull();
+  });
+  it("adding the tax's price-axis bracket (taxHeight) does not move the plot", () => {
+    const taxed = computeMarket({ ...base, intervention: { type: 'tax', mode: 'specific', amount: 20 } });
+    const layers = ['demand', 'supply', 'supply2', 'eq1', 'eq2', 'prices'];
+    const plot = () => ({ clip: svg.querySelector('#plotClip rect')?.outerHTML, view: svg.getAttribute('viewBox'), size: `${svg.getAttribute('width')}x${svg.getAttribute('height')}` });
+    const opts = { detail: 'ib', focus: 'societal', reserveGapBand: true, reserveDimBands: true, growForBands: true };
+    renderMarketChart(svg, taxed, { ...opts, layers });
+    const without = plot();
+    renderMarketChart(svg, taxed, { ...opts, layers: [...layers, 'taxHeight'], captions: { taxHeight: '$20 tax' } });
+    expect(svg.querySelector('.tax-height')).not.toBeNull();
+    expect(plot()).toEqual(without);
+  });
+
+  it('can fill the government strips from the right', () => {
+    const layers = ['demand', 'supply', 'supply2', 'eq1', 'eq2', 'govStrips'];
+    const delays = (opts) => {
+      renderMarketChart(svg, r(), { detail: 'ib', focus: 'gov', layers, enter: ['govStrips'], ...opts });
+      return [...svg.querySelectorAll('.gov-strip')].map((strip) => Number(strip.style.getPropertyValue('--d')));
+    };
+    const ltr = delays({}), rtl = delays({ stripsFromRight: true });
+    expect(ltr[0]).toBe(0);
+    expect(ltr.at(-1)).toBeGreaterThan(ltr[0]);
+    expect(rtl.at(-1)).toBeLessThan(rtl[0]);
+    expect(rtl.at(-1)).toBe(0);
+  });
+  it('can draw the loaf arrows faint and dotless, for Play\'s shift', () => {
+    const layers = ['demand', 'supply', 'supply2', 'eq1', 'eq2', 'loafDrops'];
+    renderMarketChart(svg, r(), { detail: 'ib', focus: 'cs', layers });
+    expect(svg.querySelectorAll('.loaf-drops__one circle').length).toBeGreaterThan(0);
+    renderMarketChart(svg, r(), { detail: 'ib', focus: 'cs', layers, faintDrops: true });
+    const arrows = [...svg.querySelectorAll('.loaf-drops__one')];
+    expect(arrows.length).toBeGreaterThan(0);
+    expect(svg.querySelectorAll('.loaf-drops__one circle')).toHaveLength(0);
+    expect(arrows.every((a) => Number(a.getAttribute('opacity')) < 0.5)).toBe(true);
+    renderMarketChart(svg, r(), { detail: 'ib', focus: 'cs', layers, faintDrops: true, exit: ['loafDrops'] });
+    expect(svg.querySelector('[data-layer="loafDrops"]').classList.contains('layer-exit')).toBe(true);
   });
   it('can hold back the Pp line and symbol while keeping the Pc line that tracks e2', () => {
     const result = r();
@@ -733,7 +835,7 @@ describe('focus', () => {
     expect(svg.querySelectorAll('polygon.overlap-fill').length).toBeGreaterThan(0);
     expect(svg.querySelector('.subsidy-arrow')).not.toBeNull();
   });
-  it('puts a subsidised CS chip inside the free-market triangle, still showing total CS', () => {
+  it('puts a subsidised CS chip inside the free-market triangle, showing only the triangle (old CS)', () => {
     const result = r();
     renderMarketChart(svg, result, { detail: 'ib', focus: 'cs' });
     const [, tx, ty] = svg.querySelector('.chart-focus-chip .region-badge').getAttribute('transform').match(/translate\(([-\d.]+), ([-\d.]+)\)/).map(Number);
@@ -742,7 +844,8 @@ describe('focus', () => {
     expect(ty).toBeLessThan(Math.max(...ys));
     expect(ty).toBeGreaterThan(Math.min(...ys));
     expect(tx).toBeGreaterThan(Math.min(...tri.map(([x]) => x)));
-    expect(svg.textContent).toContain(`CS $${Math.round(result.CS).toLocaleString('en-US')}`);
+    expect(svg.textContent).toContain(`old CS $${Math.round(result.csTriangleArea).toLocaleString('en-US')}`);
+    expect(svg.textContent).not.toContain(`CS $${Math.round(result.CS).toLocaleString('en-US')}`);
   });
   it('fades S1 and enlarges e2', () => {
     renderMarketChart(svg, r(), { detail: 'ib', focus: 'cs' });
@@ -783,6 +886,26 @@ describe('tax: IB perfect, Explain layers and Explorer foci', () => {
     expect(names()).toEqual([]);
   });
 
+  // Review 2026-11-12, finding 5: on a phone-width plot Q_tax was drawn at half size beside Qe.
+  it('draws Qtax full size on a phone-width chart once the tax has moved it a symbol’s width from Qe', () => {
+    Object.defineProperty(svg, 'clientWidth', { value: 390, configurable: true });
+    renderMarketChart(svg, computeMarket({ ...base, intervention: { type: 'tax', mode: 'specific', amount: 24 } }));
+    const q = [...svg.querySelectorAll('.axis-symbol')].find((t) => t.textContent === 'Qtax');
+    expect(+q.getAttribute('font-size')).toBe(16);
+    delete svg.clientWidth;
+  });
+
+  // Re-review 2026-11-13, finding 3: a narrower gap (VAT, a phone) still kept Qtax at 7px.
+  it('never draws Qtax below a readable size: too close to Qe, it drops a row under it', () => {
+    Object.defineProperty(svg, 'clientWidth', { value: 260, configurable: true });
+    renderMarketChart(svg, computeMarket({ ...base, intervention: { type: 'tax', mode: 'advalorem', rate: 0.2 } }));
+    const q = [...svg.querySelectorAll('.axis-symbol')].find((t) => t.textContent === 'Qtax');
+    const qe = [...svg.querySelectorAll('.axis-symbol')].find((t) => t.textContent === 'Qe');
+    expect(+q.getAttribute('font-size')).toBeGreaterThanOrEqual(13);
+    expect(+q.getAttribute('y')).toBeGreaterThan(+qe.getAttribute('y'));
+    delete svg.clientWidth;
+  });
+
   it('labels the traded quantity Qtax, ending at its own line left of Qe', () => {
     renderMarketChart(svg, tax(), { detail: 'ib' });
     const q = [...svg.querySelectorAll('.axis-symbol')].find((t) => t.textContent === 'Qtax');
@@ -797,7 +920,7 @@ describe('tax: IB perfect, Explain layers and Explorer foci', () => {
     expect(svg.querySelector('[data-layer="taxBracket"]').textContent).toContain('$20 tax per can');
   });
 
-  it('focus layers: CS/PS show only the surplus, each burden is its own focus, revenue is the split box, a closed market draws none', () => {
+  it('focus layers: CS/PS show only the surplus, each burden is its own focus, revenue is the per-unit strips and their box, a closed market draws none', () => {
     const cs = resolveLayers(tax(), { focus: 'cs' });
     expect([...cs]).toEqual(expect.arrayContaining(['cs', 'focusChip']));
     expect(cs.has('taxConsumer')).toBe(false);
@@ -808,12 +931,32 @@ describe('tax: IB perfect, Explain layers and Explorer foci', () => {
     expect(cb.has('taxProducer')).toBe(false);
     expect([...resolveLayers(tax(), { focus: 'producer-burden' })]).toEqual(expect.arrayContaining(['taxProducer', 'prices', 'focusChip']));
     const revenue = resolveLayers(tax(), { focus: 'revenue' });
-    expect([...revenue]).toEqual(expect.arrayContaining(['taxConsumer', 'taxProducer', 'wedgeBox', 'focusChip']));
+    expect([...revenue]).toEqual(expect.arrayContaining(['taxArrow', 'govStrips', 'wedgeBox', 'focusChip']));
     expect(revenue.has('cs')).toBe(false);
+    expect(revenue.has('taxConsumer')).toBe(false);
     const closed = computeMarket({ ...base, intervention: { type: 'tax', mode: 'specific', amount: 200 } });
     expect(closed.closed).toBe(true);
     renderMarketChart(svg, closed, { detail: 'ib', focus: 'revenue' });
     expect(regions()).toEqual([]);
+  });
+});
+
+describe('tax government perspective marks', () => {
+  it('draws one tax-revenue strip per unit out to Qtax, and the note on the Pe dot only when asked', () => {
+    const svg = makeSvg();
+    const result = computeMarket({ ...base, intervention: { type: 'tax', mode: 'specific', amount: 30 } });
+    renderMarketChart(svg, result, { detail: 'ib', focus: 'revenue', captions: { strip: '1 unit = $30', taxArrow: '$30 tax', qtyBracket: '50.0 units traded', taxHeight: '$30 tax' } });
+    expect(svg.querySelectorAll('.gov-strip').length).toBe(Math.ceil(result.Q));
+    expect(svg.querySelector('[data-layer="govStrips"]').dataset.region).toBe('tax-revenue');
+    expect(svg.textContent).toContain('1 unit = $30');
+    expect(svg.querySelector('.qty-bracket__label').textContent).toBe('50.0 units traded');
+    expect(svg.querySelector('.tax-height').textContent).toBe('$30 tax');
+    expect(svg.querySelector('.tax-arrow').textContent).toBe('$30 tax');
+    expect(svg.querySelector('.qty-bracket')).not.toBeNull();
+    expect(svg.textContent).not.toContain('price being traded');
+    const free = computeMarket({ ...base, intervention: { type: 'none' } });
+    renderMarketChart(svg, free, { detail: 'ib', layers: ['demand', 'supply', 'eq1', 'eq1Note'], captions: { eq1Note: 'Pe $60: the price being traded' } });
+    expect(svg.textContent).toContain('the price being traded');
   });
 });
 
@@ -962,5 +1105,23 @@ describe('subsidy Explain teaching marks', () => {
     });
     expect(svg.querySelector('text[data-layer="marginalPs"]').textContent).toBe('marginal PS');
     expect(svg.querySelector('text[data-layer="marginalCs"]').textContent).toBe('marginal CS');
+  });
+
+  it('fades the cost dot in when its layer enters', () => {
+    const r = computeMarket({ ...base, intervention: { type: 'none' } });
+    renderMarketChart(svg, r, { detail: 'clean', layers: ['demand', 'supply', 'costDot'], enter: ['costDot'] });
+    expect(svg.querySelector('.cost-dot').classList.contains('layer-enter')).toBe(true);
+    renderMarketChart(svg, r, { detail: 'clean', layers: ['demand', 'supply', 'costDot'] });
+    expect(svg.querySelector('.cost-dot').classList.contains('layer-enter')).toBe(false);
+  });
+
+  it('keeps the student\'s loaf arrow and draws the other loaves\' arrows around it', () => {
+    const r = computeMarket({ ...base, intervention: { type: 'subsidy', amount: 20 } });
+    const opts = { detail: 'clean', layers: ['demand', 'supply', 'supply2', 'loafDrop', 'loafDrops'], loafQ: 44 };
+    renderMarketChart(svg, r, { ...opts, enter: ['loafDrops', 'supply2'] });
+    expect(svg.querySelectorAll('[data-layer="loafDrop"]')).toHaveLength(1);
+    expect(svg.querySelector('[data-layer="loafDrop"]').querySelector('.loaf-drop__arrow')).toBeNull(); // drawn as it was, not re-animated
+    expect(svg.querySelectorAll('.loaf-drops__one')).toHaveLength(5); // loaf 45's arrow is the student's own
+    expect(svg.querySelectorAll('.loaf-drops__tip')).toHaveLength(5); // a blue dot at the end of each arrow
   });
 });

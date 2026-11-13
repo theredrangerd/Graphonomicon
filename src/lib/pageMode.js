@@ -34,12 +34,13 @@ export function onModeChange(cb, win = window) {
 
 // `focusIds` is the page's own focus list, so a link can't pick a focus the page doesn't offer.
 // `aliases` maps a retired focus id to its replacement, so links already shared keep working.
-export function readPlayView(win = window, focusIds = FOCUS_IDS, aliases = {}) {
+// `defaultView` is what a link with no view/focus opens on.
+export function readPlayView(win = window, focusIds = FOCUS_IDS, aliases = {}, defaultView = 'ib') {
   const params = new URLSearchParams(win.location.search);
   const raw = params.get(FOCUS_PARAM);
   const rawFocus = aliases[raw] ?? raw;
   const focus = focusIds.includes(rawFocus) ? rawFocus : null;
-  const view = focus || params.get(VIEW_PARAM) === 'explorer' ? 'explorer' : 'ib';
+  const view = focus || params.get(VIEW_PARAM) === 'explorer' || defaultView === 'explorer' ? 'explorer' : 'ib';
   return { view, focus };
 }
 
