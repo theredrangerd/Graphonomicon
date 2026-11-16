@@ -1,11 +1,35 @@
 import { migrateSnapshot } from '../lib/snapshot.js';
-import { labelSnapshots } from '../lib/snapshotLabels.js';
+import { describeSnapshots } from '../lib/snapshotLabels.js';
 
 // Full-screen gallery of the frozen graphs: two cards on screen at a time (one below the
 // mobile breakpoint), slid sideways with native scroll-snap. Cards redraw their snapshot
 // through `drawSnapshot` at their own width, so chart text stays real-pixel sized.
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
+
+// A change as a chip: a square in the colour of what changed (or, for a change with a size,
+// up to three Isotype squares, filled to show how big), then the words.
+function chipEl(doc, { kind, text, n }) {
+  const chip = doc.createElement('span');
+  chip.className = `tag tag--${kind}`;
+  chip.setAttribute('aria-hidden', 'true');
+  if (n) {
+    const units = doc.createElement('span');
+    units.className = 'units';
+    for (let i = 1; i <= 3; i++) {
+      const unit = doc.createElement('span');
+      unit.className = i > n ? 'unit unit--off' : 'unit';
+      units.append(unit);
+    }
+    chip.append(units);
+  } else {
+    const dot = doc.createElement('span');
+    dot.className = 'dot';
+    chip.append(dot);
+  }
+  chip.append(text);
+  return chip;
+}
 
 export function openCompareGallery(doc, { store, drawSnapshot, labelOptions, onClose, onEdit }) {
   const opener = doc.activeElement;
@@ -55,7 +79,7 @@ export function openCompareGallery(doc, { store, drawSnapshot, labelOptions, onC
       if (focused) root.querySelector('.compare-gallery__close').focus();
       return;
     }
-    const titles = labelSnapshots(entries.map((e) => e.snapshot), labelOptions);
+    const described = describeSnapshots(entries.map((e) => e.snapshot), labelOptions);
     entries.forEach(({ id, snapshot }, i) => {
       const card = doc.createElement('section');
       card.className = 'compare-card';
@@ -67,11 +91,27 @@ export function openCompareGallery(doc, { store, drawSnapshot, labelOptions, onC
             <button type="button" class="compare-card__delete" aria-label="Delete this graph">Delete</button>
           </span>
         </header>`;
-      card.querySelector('.compare-card__title').textContent = titles[i];
+      const title = card.querySelector('.compare-card__title');
+      title.setAttribute('aria-label', described[i].title);
+      if (described[i].chips.length) {
+        const tags = doc.createElement('span');
+        tags.className = 'tags';
+        described[i].chips.forEach((chip) => tags.append(chipEl(doc, chip)));
+        if (described[i].suffix) {
+          const copy = doc.createElement('span');
+          copy.className = 'tag-suffix';
+          copy.setAttribute('aria-hidden', 'true');
+          copy.textContent = described[i].suffix;
+          tags.append(copy);
+        }
+        title.append(tags);
+      } else {
+        title.textContent = described[i].title;
+      }
       const svg = doc.createElementNS(SVG_NS, 'svg');
       svg.setAttribute('class', 'market-chart');
       svg.setAttribute('role', 'img');
-      svg.setAttribute('aria-label', titles[i]);
+      svg.setAttribute('aria-label', described[i].title);
       card.append(svg);
       card.querySelector('.compare-card__delete').addEventListener('click', () => store.remove(id));
       card.querySelector('.compare-card__edit').addEventListener('click', () => { close(); onEdit?.(snapshot, id); });

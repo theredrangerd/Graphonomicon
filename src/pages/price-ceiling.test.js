@@ -149,7 +149,6 @@ describe('compare mode on the price ceiling page', () => {
     history.replaceState(null, '', '/');
     buildDom();
     initPriceCeilingPage(document);
-    document.querySelector('.compare-toggle').click();
     const toggle = document.querySelector('#ceiling-toggle');
     toggle.checked = true;
     toggle.dispatchEvent(new Event('change'));

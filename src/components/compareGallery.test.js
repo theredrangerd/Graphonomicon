@@ -20,7 +20,7 @@ function setup(snapshots, extra = {}) {
   return { store, drawSnapshot, onClose, onEdit, gallery };
 }
 const cards = () => [...document.querySelectorAll('.compare-card')];
-const titles = () => cards().map((c) => c.querySelector('.compare-card__title').textContent);
+const titles = () => cards().map((c) => c.querySelector('.compare-card__title').getAttribute('aria-label'));
 
 describe('openCompareGallery', () => {
   beforeEach(() => { document.body.innerHTML = '<button id="opener">Open</button>'; });
@@ -28,7 +28,7 @@ describe('openCompareGallery', () => {
   it('shows one titled card per snapshot and draws each into its own svg', () => {
     const { drawSnapshot } = setup([snap(), snap({ slopeD: 0.3 }), snap({ slopeD: -0.3 })]);
     expect(cards()).toHaveLength(3);
-    expect(titles().every((t) => /^PED /.test(t))).toBe(true);
+    expect(titles().every((t) => /demand/.test(t))).toBe(true);
     expect(drawSnapshot).toHaveBeenCalledTimes(3);
     cards().forEach((card, i) => {
       expect(drawSnapshot.mock.calls[i][0]).toBe(card.querySelector('svg.market-chart'));
@@ -38,10 +38,26 @@ describe('openCompareGallery', () => {
 
   it('deleting a card removes it from the store and relabels the rest', () => {
     const { store } = setup([snap(), snap({ on: false }), snap({ on: false })]);
-    expect(titles()).toEqual(['floor $90', 'no floor', 'no floor (2)']);
+    expect(titles()).toEqual(['Floor at $90', 'No floor', 'No floor (2)']);
     cards()[1].querySelector('.compare-card__delete').click();
     expect(store.list()).toHaveLength(2);
-    expect(titles()).toEqual(['floor $90', 'no floor']);
+    expect(titles()).toEqual(['Floor at $90', 'No floor']);
+  });
+
+  it('renders each change as a coloured chip with counted squares', () => {
+    setup([snap({ slopeD: 0.5 }), snap({ slopeD: -0.5, on: false })]);
+    const chips = [...cards()[0].querySelectorAll('.compare-card__title .tag')];
+    expect(chips.map((c) => c.textContent)).toEqual(['Very elastic demand', 'Floor at $90']);
+    expect(chips[0].classList.contains('tag--demand')).toBe(true);
+    expect(chips[0].querySelectorAll('.unit:not(.unit--off)')).toHaveLength(3);
+    expect(chips[1].classList.contains('tag--policy')).toBe(true);
+    expect(chips[1].querySelector('.units')).toBeNull();
+  });
+
+  it('shows a plain "Graph N" title when nothing differs', () => {
+    setup([snap(), snap()]);
+    expect(titles()).toEqual(['Graph 1', 'Graph 2']);
+    expect(cards()[0].querySelector('.compare-card__title').textContent).toBe('Graph 1');
   });
 
   it('shows an empty state with no cards', () => {

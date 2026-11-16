@@ -104,20 +104,18 @@ describe('compare mode on the price floor page', () => {
   });
 
   it('freezes two states and opens a gallery with two differently titled cards', () => {
-    click('.compare-toggle');
     turnFloorOn();
     click('.compare-freeze');
     setSlider('#slope-d-slider', 0.3);
     click('.compare-freeze');
     click('.compare-tray__view');
-    const titles = [...document.querySelectorAll('.compare-card__title')].map((t) => t.textContent);
+    const titles = [...document.querySelectorAll('.compare-card__title')].map((t) => t.getAttribute('aria-label'));
     expect(titles).toHaveLength(2);
     expect(new Set(titles).size).toBe(2);
-    expect(titles.every((t) => /PED/.test(t))).toBe(true);
+    expect(titles.every((t) => /demand/.test(t))).toBe(true);
   });
 
   it('freezes the finished picture when the toggle was just switched on', () => {
-    click('.compare-toggle');
     turnFloorOn();
     click('.compare-freeze');
     click('.compare-tray__view');
@@ -127,7 +125,6 @@ describe('compare mode on the price floor page', () => {
   });
 
   it('"Edit this graph" restores the frozen sliders and toggle on the live page', () => {
-    click('.compare-toggle');
     setSlider('#demand-slider', 10);
     turnFloorOn();
     click('.compare-freeze');
@@ -143,7 +140,6 @@ describe('compare mode on the price floor page', () => {
   });
 
   it('keeps edits made after "Edit this graph" when the gallery is opened again', () => {
-    click('.compare-toggle');
     setSlider('#demand-slider', 10);
     turnFloorOn();
     click('.compare-freeze');

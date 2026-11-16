@@ -3,28 +3,21 @@ import { createSnapshot } from '../lib/snapshot.js';
 import { mountCompareTray } from './compareTray.js';
 import { openCompareGallery } from './compareGallery.js';
 
-// Compare mode for one page visit: a Compare button in the chart header reveals Freeze, each
-// freeze parks the current state in the corner tray, and View opens the gallery. Frozen
-// graphs live in memory only and survive leaving and re-entering compare mode.
+// Compare for one page visit: a Freeze graph button in the chart header, always there. Each
+// freeze parks the current state in the corner tray (which appears with the first one), and
+// View opens the gallery. Frozen graphs live in memory only.
 
 export function mountCompareMode(doc, { chartHead, chart, page, getState, drawSnapshot, applyState, labelOptions }) {
   const store = createCompareStore();
-  let active = false;
   // The frozen graph being edited, if any: further changes on the live page save into it.
   let editingId = null;
   const EDIT_NOTE = 'Editing a frozen graph: your changes save to it. Freeze adds a copy.';
 
-  const toggleButton = doc.createElement('button');
-  toggleButton.type = 'button';
-  toggleButton.className = 'compare-toggle';
-  toggleButton.textContent = 'Compare';
-  toggleButton.setAttribute('aria-pressed', 'false');
-
   const freezeButton = doc.createElement('button');
   freezeButton.type = 'button';
   freezeButton.className = 'compare-freeze';
-  freezeButton.textContent = 'Freeze';
-  freezeButton.hidden = true;
+  freezeButton.textContent = 'Freeze graph';
+  freezeButton.title = 'Keep this graph so you can compare it with others';
 
   const doneButton = doc.createElement('button');
   doneButton.type = 'button';
@@ -36,7 +29,7 @@ export function mountCompareMode(doc, { chartHead, chart, page, getState, drawSn
   note.className = 'compare-note';
   note.setAttribute('role', 'status');
 
-  chartHead.append(toggleButton, freezeButton, doneButton, note);
+  chartHead.append(freezeButton, doneButton, note);
 
   const tray = mountCompareTray(doc, {
     store,
@@ -72,14 +65,6 @@ export function mountCompareMode(doc, { chartHead, chart, page, getState, drawSn
     if (editingId != null && !store.list().some((e) => e.id === editingId)) stopEditing();
   });
 
-  function setActive(next) {
-    active = next;
-    toggleButton.setAttribute('aria-pressed', String(active));
-    freezeButton.hidden = !active;
-    stopEditing();
-    tray.setVisible(active);
-  }
-
   function freeze() {
     const added = store.add(createSnapshot({ page, state: getState() }));
     if (!added.ok) {
@@ -91,19 +76,16 @@ export function mountCompareMode(doc, { chartHead, chart, page, getState, drawSn
     return added;
   }
 
-  toggleButton.addEventListener('click', () => setActive(!active));
   freezeButton.addEventListener('click', freeze);
   doneButton.addEventListener('click', stopEditing);
 
+  tray.setVisible(true);
+
   return {
-    enter: () => setActive(true),
-    exit: () => setActive(false),
     freeze,
     notifyChange,
-    isActive: () => active,
     destroy() {
       tray.destroy();
-      toggleButton.remove();
       freezeButton.remove();
       doneButton.remove();
       note.remove();
