@@ -1997,3 +1997,45 @@ body[data-mode] .market-chart[data-seq="join-dwl"] .readout.layer-enter { animat
   .compare-card { flex-basis: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .compare-gallery__track { scroll-behavior: auto; } }
+
+/* Compare tray: frozen graphs parked in a fixed corner overlay, outside the layout flow. */
+.compare-tray {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 40;
+  max-width: calc(100vw - 32px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: var(--paper);
+  border: 2px solid var(--brand-ink);
+  border-radius: 4px;
+}
+.compare-tray[hidden] { display: none; }
+.compare-tray__thumbs { display: flex; gap: 6px; overflow-x: auto; min-width: 0; }
+.compare-tray__thumb {
+  flex: none;
+  width: 120px;
+  height: 80px;
+  background: var(--surface);
+  border: 1px solid var(--hairline-2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.compare-tray__thumb .market-chart { width: 100%; height: 100%; display: block; }
+.compare-tray__view {
+  flex: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--accent-fill);
+  border: 2px solid var(--brand-ink);
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.compare-tray__view:hover { background: var(--accent); color: var(--surface); }
+.compare-tray__view:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
