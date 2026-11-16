@@ -20,6 +20,11 @@ export function mountCompareTray(doc, { store, drawSnapshot, onView }) {
 
   function render() {
     const entries = store.list().filter(({ snapshot }) => migrateSnapshot(snapshot));
+    // Show first, then draw: a chart drawn inside a hidden tray measures zero width and falls
+    // back to its default size, which leaves a tiny chart in the corner of the thumbnail.
+    const show = visible && entries.length > 0;
+    root.hidden = !show;
+    doc.body.classList.toggle('has-compare-tray', show);
     thumbs.textContent = '';
     entries.forEach(({ snapshot }) => {
       const thumb = doc.createElement('div');
@@ -32,7 +37,6 @@ export function mountCompareTray(doc, { store, drawSnapshot, onView }) {
       drawSnapshot(svg, snapshot);
     });
     viewButton.textContent = `View (${entries.length})`;
-    root.hidden = !visible || entries.length === 0;
   }
 
   const unsubscribe = store.subscribe(render);
@@ -60,6 +64,6 @@ export function mountCompareTray(doc, { store, drawSnapshot, onView }) {
       );
       return animation.finished.catch(() => {}).then(() => flyer.remove());
     },
-    destroy() { unsubscribe(); root.remove(); },
+    destroy() { unsubscribe(); doc.body.classList.remove('has-compare-tray'); root.remove(); },
   };
 }

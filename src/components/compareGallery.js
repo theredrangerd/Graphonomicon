@@ -36,6 +36,12 @@ export function openCompareGallery(doc, { store, drawSnapshot, labelOptions, onC
   };
 
   function render() {
+    // A rebuild resets the scroll position and drops the focused button, so remember both.
+    const left = track.scrollLeft;
+    const focused = doc.activeElement && track.contains(doc.activeElement) ? doc.activeElement : null;
+    const focusedCard = focused ? focused.closest('.compare-card') : null;
+    const focusedIndex = focusedCard ? [...track.children].indexOf(focusedCard) : -1;
+    const focusedClass = focused ? [...focused.classList].find((c) => c.startsWith('compare-card__')) : null;
     const entries = store.list()
       .map(({ id, snapshot }) => ({ id, snapshot: migrateSnapshot(snapshot) }))
       .filter((e) => e.snapshot);
@@ -46,6 +52,7 @@ export function openCompareGallery(doc, { store, drawSnapshot, labelOptions, onC
       empty.className = 'compare-gallery__empty';
       empty.textContent = 'Nothing frozen yet. Close this, set up a graph and press Freeze.';
       track.append(empty);
+      if (focused) root.querySelector('.compare-gallery__close').focus();
       return;
     }
     const titles = labelSnapshots(entries.map((e) => e.snapshot), labelOptions);
@@ -77,8 +84,20 @@ export function openCompareGallery(doc, { store, drawSnapshot, labelOptions, onC
       dot.addEventListener('click', () => card.scrollIntoView?.({ behavior: 'smooth', inline: 'start', block: 'nearest' }));
       dots.append(dot);
     });
+    track.style.scrollBehavior = 'auto';
+    track.scrollLeft = left;
+    track.style.scrollBehavior = '';
+    if (focused) {
+      const next = track.children[Math.min(focusedIndex, track.children.length - 1)];
+      (next?.querySelector(`.${focusedClass}`) ?? root.querySelector('.compare-gallery__close')).focus();
+    }
     syncDots();
   }
+
+  // The page behind the dialog must not take focus or clicks (a second View press would stack
+  // a second gallery). Only inert what was not already inert, so close restores it exactly.
+  const madeInert = [...doc.body.children].filter((node) => node !== root && !node.hasAttribute('inert'));
+  madeInert.forEach((node) => node.setAttribute('inert', ''));
 
   function syncDots() {
     const cardEls = [...track.querySelectorAll('.compare-card')];
@@ -101,6 +120,7 @@ export function openCompareGallery(doc, { store, drawSnapshot, labelOptions, onC
     closed = true;
     unsubscribe();
     doc.removeEventListener('keydown', onKey);
+    madeInert.forEach((node) => node.removeAttribute('inert'));
     root.remove();
     opener?.focus?.();
     onClose?.();

@@ -32,7 +32,7 @@ export function mountCompareMode(doc, { chartHead, chart, page, getState, drawSn
   const tray = mountCompareTray(doc, {
     store,
     drawSnapshot,
-    onView: () => openCompareGallery(doc, { store, drawSnapshot, labelOptions, onEdit: (snapshot) => applyState(snapshot.state) }),
+    onView: () => !doc.querySelector('.compare-gallery') && openCompareGallery(doc, { store, drawSnapshot, labelOptions, onEdit: (snapshot) => applyState(snapshot.state) }),
   });
 
   function setActive(next) {

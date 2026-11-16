@@ -66,4 +66,37 @@ describe('mountCompareTray', () => {
     tray.destroy();
     expect(el()).toBeNull();
   });
+
+  it('draws each thumbnail only once the tray is visible, so it measures its real width', () => {
+    const store = createCompareStore();
+    const visibleWhenDrawn = [];
+    const tray = mountCompareTray(document, {
+      store,
+      drawSnapshot: () => visibleWhenDrawn.push(document.querySelector('.compare-tray').hidden === false),
+      onView: () => {},
+    });
+    tray.setVisible(true);
+    store.add(snap());
+    tray.setVisible(false);
+    store.add(snap());
+    tray.setVisible(true);
+    // The add made while the tray was hidden is redrawn when it is shown again.
+    expect(visibleWhenDrawn.at(-1)).toBe(true);
+    expect(visibleWhenDrawn[0]).toBe(true);
+    expect(visibleWhenDrawn.filter(Boolean).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('keeps page content reachable by marking the body while the tray is showing', () => {
+    const { store, tray } = setup();
+    tray.setVisible(true);
+    expect(document.body.classList.contains('has-compare-tray')).toBe(false);
+    store.add(snap());
+    expect(document.body.classList.contains('has-compare-tray')).toBe(true);
+    tray.setVisible(false);
+    expect(document.body.classList.contains('has-compare-tray')).toBe(false);
+    tray.setVisible(true);
+    tray.destroy();
+    expect(document.body.classList.contains('has-compare-tray')).toBe(false);
+  });
 });
+

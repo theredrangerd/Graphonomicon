@@ -2017,8 +2017,8 @@ body[data-mode] .market-chart[data-seq="join-dwl"] .readout.layer-enter { animat
 .compare-tray__thumbs { display: flex; gap: 6px; overflow-x: auto; min-width: 0; }
 .compare-tray__thumb {
   flex: none;
-  width: 120px;
-  height: 80px;
+  width: 96px;
+  height: 64px;
   background: var(--surface);
   border: 1px solid var(--hairline-2);
   border-radius: 2px;
@@ -2063,3 +2063,5 @@ body[data-mode] .market-chart[data-seq="join-dwl"] .readout.layer-enter { animat
 .compare-note:empty { display: none; }
 /* Thumbnails are a shape preview: chart text is real-pixel sized, so at 120px it would only overlap. */
 .compare-tray__thumb .market-chart text { display: none; }
+/* The tray floats over the page, so leave room to scroll the page's last content clear of it. */
+body.has-compare-tray { padding-bottom: 104px; }

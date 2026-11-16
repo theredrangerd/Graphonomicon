@@ -72,4 +72,15 @@ describe('mountCompareMode', () => {
     document.querySelector('.compare-card__edit').click();
     expect(applyState).toHaveBeenCalledWith({ ...STATE, demand: 25 });
   });
+
+  it('does not open a second gallery over an open one', () => {
+    const { mode } = setup();
+    toggle().click();
+    mode.freeze();
+    const view = document.querySelector('.compare-tray__view');
+    view.click();
+    view.click();
+    expect(document.querySelectorAll('.compare-gallery')).toHaveLength(1);
+  });
 });
+

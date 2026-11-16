@@ -99,4 +99,33 @@ describe('openCompareGallery', () => {
     expect(cards()).toHaveLength(2);
     cards().forEach((c) => expect(c.querySelector('svg .dynamic-layer')).not.toBeNull());
   });
+
+  it('puts the scroll position back after a card is deleted (a rebuild resets it in a real browser)', () => {
+    setup([snap(), snap({ on: false }), snap({ slopeD: 0.3 })]);
+    const track = document.querySelector('.compare-gallery__track');
+    const writes = [];
+    Object.defineProperty(track, 'scrollLeft', { get: () => 650, set: (v) => writes.push(v), configurable: true });
+    cards()[2].querySelector('.compare-card__delete').click();
+    expect(writes).toContain(650);
+  });
+
+  it('moves focus to the next card\'s Delete when the focused card is deleted, or Close when none is left', () => {
+    setup([snap(), snap({ on: false })]);
+    cards()[0].querySelector('.compare-card__delete').focus();
+    cards()[0].querySelector('.compare-card__delete').click();
+    expect(document.activeElement).toBe(cards()[0].querySelector('.compare-card__delete'));
+    document.activeElement.click();
+    expect(document.activeElement).toBe(document.querySelector('.compare-gallery__close'));
+  });
+
+  it('makes the page behind inert while open and restores it on close', () => {
+    document.body.insertAdjacentHTML('beforeend', '<main id="page"></main><div id="already" inert></div>');
+    const { gallery } = setup([snap()]);
+    expect(document.querySelector('#page').hasAttribute('inert')).toBe(true);
+    expect(document.querySelector('.compare-gallery').hasAttribute('inert')).toBe(false);
+    gallery.close();
+    expect(document.querySelector('#page').hasAttribute('inert')).toBe(false);
+    expect(document.querySelector('#already').hasAttribute('inert')).toBe(true);
+  });
 });
+
