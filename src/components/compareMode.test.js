@@ -82,5 +82,61 @@ describe('mountCompareMode', () => {
     view.click();
     expect(document.querySelectorAll('.compare-gallery')).toHaveLength(1);
   });
+
+  describe('editing a frozen graph', () => {
+    it('saves further changes into the frozen graph, so reopening the gallery shows them', () => {
+      const ctx = setup();
+      toggle().click();
+      ctx.setState({ ...STATE, demand: 25 });
+      ctx.mode.freeze();
+      document.querySelector('.compare-tray__view').click();
+      document.querySelector('.compare-card__edit').click();
+      ctx.setState({ ...STATE, demand: 40 });
+      ctx.mode.notifyChange();
+      ctx.drawSnapshot.mockClear();
+      document.querySelector('.compare-tray__view').click();
+      expect(ctx.drawSnapshot.mock.calls.at(-1)[1].state.demand).toBe(40);
+      expect(document.querySelectorAll('.compare-card')).toHaveLength(1);
+    });
+
+    it('says which mode it is in and stops saving when Done is pressed', () => {
+      const ctx = setup();
+      toggle().click();
+      ctx.mode.freeze();
+      document.querySelector('.compare-tray__view').click();
+      document.querySelector('.compare-card__edit').click();
+      expect(document.querySelector('.compare-note').textContent).toMatch(/editing/i);
+      document.querySelector('.compare-done').click();
+      expect(document.querySelector('.compare-note').textContent).toBe('');
+      ctx.setState({ ...STATE, demand: 50 });
+      ctx.mode.notifyChange();
+      ctx.drawSnapshot.mockClear();
+      document.querySelector('.compare-tray__view').click();
+      expect(ctx.drawSnapshot.mock.calls.at(-1)[1].state.demand).toBe(0);
+    });
+
+    it('does not change any frozen graph when nothing is being edited', () => {
+      const ctx = setup();
+      toggle().click();
+      ctx.mode.freeze();
+      ctx.setState({ ...STATE, demand: 50 });
+      ctx.mode.notifyChange();
+      ctx.drawSnapshot.mockClear();
+      document.querySelector('.compare-tray__view').click();
+      expect(ctx.drawSnapshot.mock.calls.at(-1)[1].state.demand).toBe(0);
+    });
+
+    it('stops editing when the edited graph is deleted or compare mode is left', () => {
+      const ctx = setup();
+      toggle().click();
+      ctx.mode.freeze();
+      document.querySelector('.compare-tray__view').click();
+      document.querySelector('.compare-card__edit').click();
+      expect(document.querySelector('.compare-note').textContent).toMatch(/editing/i);
+      toggle().click();
+      expect(document.querySelector('.compare-note').textContent).toBe('');
+      expect(document.querySelector('.compare-done').hidden).toBe(true);
+    });
+  });
 });
 

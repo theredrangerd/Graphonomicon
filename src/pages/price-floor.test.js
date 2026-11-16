@@ -141,4 +141,21 @@ describe('compare mode on the price floor page', () => {
     expect(document.querySelector('#floor-toggle').checked).toBe(true);
     expect(document.querySelector('#status-pill').textContent).toBe('Price floor binding');
   });
+
+  it('keeps edits made after "Edit this graph" when the gallery is opened again', () => {
+    click('.compare-toggle');
+    setSlider('#demand-slider', 10);
+    turnFloorOn();
+    click('.compare-freeze');
+    click('.compare-tray__view');
+    const before = document.querySelector('.compare-card svg')._lastResult.Qstar;
+    click('.compare-card__edit');
+    setSlider('#demand-slider', 30);
+    click('.compare-tray__view');
+    const card = document.querySelector('.compare-card svg')._lastResult;
+    expect(card.Qstar).not.toBe(before);
+    expect(card.Qstar).toBe(document.querySelector('#chart')._lastResult.Qstar);
+    expect(document.querySelectorAll('.compare-card')).toHaveLength(1);
+  });
 });
+

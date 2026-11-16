@@ -70,4 +70,28 @@ describe('createCompareStore', () => {
     store.list().pop();
     expect(store.list()).toHaveLength(1);
   });
+
+  it('update replaces a snapshot in place, keeping its id and position, and notifies', () => {
+    const store = createCompareStore();
+    const a = store.add(snap());
+    const b = store.add(snap());
+    const changed = createSnapshot({ page: 'price-floor', state: { ...STATE, demand: 30 } });
+    const fn = vi.fn();
+    store.subscribe(fn);
+    expect(store.update(a.id, changed)).toEqual({ ok: true });
+    expect(store.list().map((e) => e.id)).toEqual([a.id, b.id]);
+    expect(store.list()[0].snapshot.state.demand).toBe(30);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('update on an id that is gone does nothing and does not notify', () => {
+    const store = createCompareStore();
+    const a = store.add(snap());
+    store.remove(a.id);
+    const fn = vi.fn();
+    store.subscribe(fn);
+    expect(store.update(a.id, snap())).toEqual({ ok: false });
+    expect(fn).not.toHaveBeenCalled();
+  });
 });
+

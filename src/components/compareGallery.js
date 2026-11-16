@@ -74,7 +74,7 @@ export function openCompareGallery(doc, { store, drawSnapshot, labelOptions, onC
       svg.setAttribute('aria-label', titles[i]);
       card.append(svg);
       card.querySelector('.compare-card__delete').addEventListener('click', () => store.remove(id));
-      card.querySelector('.compare-card__edit').addEventListener('click', () => { close(); onEdit?.(snapshot); });
+      card.querySelector('.compare-card__edit').addEventListener('click', () => { close(); onEdit?.(snapshot, id); });
       track.append(card);
       drawSnapshot(svg, snapshot);
 

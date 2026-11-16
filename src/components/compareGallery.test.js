@@ -64,7 +64,7 @@ describe('openCompareGallery', () => {
     const s = snap({ demand: 10 });
     const { onEdit } = setup([s]);
     cards()[0].querySelector('.compare-card__edit').click();
-    expect(onEdit).toHaveBeenCalledWith(s);
+    expect(onEdit).toHaveBeenCalledWith(s, expect.any(Number));
     expect(document.querySelector('.compare-gallery')).toBeNull();
   });
 

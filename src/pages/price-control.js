@@ -62,6 +62,7 @@ export function initPriceControlPage(doc, { slug, title, type, bindingPill, gapN
   // price (where a ceiling/floor has zero effect) to its slider price, so the shortage or
   // excess supply grows in smoothly instead of the line snapping straight to its target.
   let toggleCtl;
+  let compare;
 
   // A ceiling/floor never pushes quantity past the free-market Q*, so only the free
   // market itself needs to stay on-chart.
@@ -96,6 +97,7 @@ export function initPriceControlPage(doc, { slug, title, type, bindingPill, gapN
     } else {
       note.innerHTML = '';
     }
+    compare?.notifyChange();
   }
 
   slider.addEventListener('input', render);
@@ -122,7 +124,7 @@ export function initPriceControlPage(doc, { slug, title, type, bindingPill, gapN
 
   render();
   explainers = attachRegionExplainers(chart);
-  mountCompareMode(doc, {
+  compare = mountCompareMode(doc, {
     chartHead,
     chart,
     page: slug,

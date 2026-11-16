@@ -21,6 +21,13 @@ export function createCompareStore() {
       entries = entries.filter((e) => e.id !== id);
       notify();
     },
+    // Replaces a snapshot in place (same id, same position), for editing a frozen graph.
+    update(id, snapshot) {
+      if (!entries.some((e) => e.id === id)) return { ok: false };
+      entries = entries.map((e) => (e.id === id ? { id, snapshot } : e));
+      notify();
+      return { ok: true };
+    },
     list: () => [...entries],
     subscribe(fn) {
       subscribers.add(fn);

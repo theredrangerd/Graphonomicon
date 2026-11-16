@@ -2045,7 +2045,8 @@ body[data-mode] .market-chart[data-seq="join-dwl"] .readout.layer-enter { animat
 /* Compare mode controls in the chart header. */
 .chart-head:has(.compare-toggle) { flex-wrap: wrap; }
 .compare-toggle,
-.compare-freeze {
+.compare-freeze,
+.compare-done {
   font: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -2058,9 +2059,10 @@ body[data-mode] .market-chart[data-seq="join-dwl"] .readout.layer-enter { animat
 }
 .compare-toggle[aria-pressed="true"] { background: var(--accent-fill); }
 .compare-freeze { background: var(--accent); color: var(--surface); }
-.compare-freeze[hidden] { display: none; }
+.compare-freeze[hidden], .compare-done[hidden] { display: none; }
 .compare-toggle:hover { background: var(--accent-fill); }
-.compare-toggle:focus-visible, .compare-freeze:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.compare-done:hover { background: var(--accent-fill); }
+.compare-toggle:focus-visible, .compare-freeze:focus-visible, .compare-done:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .compare-note { flex-basis: 100%; font-size: 13px; color: var(--ink-secondary); }
 .compare-note:empty { display: none; }
 /* Thumbnails are a shape preview: chart text is real-pixel sized, so at 120px it would only overlap. */
