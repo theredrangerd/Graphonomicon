@@ -84,3 +84,61 @@ describe('initPriceFloorPage', () => {
     expect([...links].some((a) => a.textContent === 'Price ceiling')).toBe(true);
   });
 });
+
+describe('compare mode on the price floor page', () => {
+  const click = (sel) => document.querySelector(sel).click();
+  const setSlider = (id, value) => {
+    const input = document.querySelector(id);
+    input.value = String(value);
+    input.dispatchEvent(new Event('input'));
+  };
+  const turnFloorOn = () => {
+    const toggle = document.querySelector('#floor-toggle');
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event('change'));
+  };
+
+  beforeEach(() => {
+    buildDom();
+    initPriceFloorPage(document);
+  });
+
+  it('freezes two states and opens a gallery with two differently titled cards', () => {
+    click('.compare-toggle');
+    turnFloorOn();
+    click('.compare-freeze');
+    setSlider('#slope-d-slider', 0.3);
+    click('.compare-freeze');
+    click('.compare-tray__view');
+    const titles = [...document.querySelectorAll('.compare-card__title')].map((t) => t.textContent);
+    expect(titles).toHaveLength(2);
+    expect(new Set(titles).size).toBe(2);
+    expect(titles.every((t) => /PED/.test(t))).toBe(true);
+  });
+
+  it('freezes the finished picture when the toggle was just switched on', () => {
+    click('.compare-toggle');
+    turnFloorOn();
+    click('.compare-freeze');
+    click('.compare-tray__view');
+    const svg = document.querySelector('.compare-card svg');
+    expect(svg._lastResult.mode).toBe('floor');
+    expect(svg._lastResult.Pc).toBe(110);
+  });
+
+  it('"Edit this graph" restores the frozen sliders and toggle on the live page', () => {
+    click('.compare-toggle');
+    setSlider('#demand-slider', 10);
+    turnFloorOn();
+    click('.compare-freeze');
+    setSlider('#demand-slider', -20);
+    const toggle = document.querySelector('#floor-toggle');
+    toggle.checked = false;
+    toggle.dispatchEvent(new Event('change'));
+    click('.compare-tray__view');
+    click('.compare-card__edit');
+    expect(document.querySelector('#demand-slider').value).toBe('10');
+    expect(document.querySelector('#floor-toggle').checked).toBe(true);
+    expect(document.querySelector('#status-pill').textContent).toBe('Price floor binding');
+  });
+});

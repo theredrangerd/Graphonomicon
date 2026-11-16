@@ -2039,3 +2039,25 @@ body[data-mode] .market-chart[data-seq="join-dwl"] .readout.layer-enter { animat
 }
 .compare-tray__view:hover { background: var(--accent); color: var(--surface); }
 .compare-tray__view:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* Compare mode controls in the chart header. */
+.chart-head:has(.compare-toggle) { flex-wrap: wrap; }
+.compare-toggle,
+.compare-freeze {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--paper);
+  border: 2px solid var(--brand-ink);
+  border-radius: 4px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.compare-toggle[aria-pressed="true"] { background: var(--accent-fill); }
+.compare-freeze { background: var(--accent); color: var(--surface); }
+.compare-freeze[hidden] { display: none; }
+.compare-toggle:hover { background: var(--accent-fill); }
+.compare-toggle:focus-visible, .compare-freeze:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.compare-note { flex-basis: 100%; font-size: 13px; color: var(--ink-secondary); }
+.compare-note:empty { display: none; }
