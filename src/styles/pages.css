@@ -1128,19 +1128,22 @@ body[data-mode] .market-chart .eq2-line.layer-enter { transform-box: fill-box; t
    through their tips), then the arrows clear and e2 pops in. Consumers: the Pc line is drawn out from e2 to
    the axis, then the extra band fills down from Pe to Pc. Bakery: an arrow rises from e2 to S1, the Pp line
    is drawn out from its tip, then the extra band fills up from Pe to Pp. */
-body[data-mode] .market-chart:is([data-seq="cs-grows"], [data-seq="ps-grows"]) [data-layer="loafDrops"] { pointer-events: none; animation: layer-exit calc(var(--pace) * 400ms) ease-out calc(var(--pace) * 2300ms) both; }
-body[data-mode] .market-chart:is([data-seq="cs-grows"], [data-seq="ps-grows"]) .eq2-dot.layer-enter { animation-delay: calc(var(--pace) * 2500ms); }
-body[data-mode] .market-chart:is([data-seq="cs-grows"], [data-seq="ps-grows"]) .eq-label.layer-enter[data-layer="eq2"] { animation-delay: calc(var(--pace) * 2800ms); }
-body[data-mode] .market-chart:is([data-seq="cs-grows"], [data-seq="ps-grows"]) .eq2-line.layer-enter { animation-delay: calc(var(--pace) * 2900ms); }
-body[data-mode] .market-chart:is([data-seq="cs-grows"], [data-seq="ps-grows"]) .axis-symbol.layer-enter[data-layer="eq2"] { animation-delay: calc(var(--pace) * 3500ms); }
-body[data-mode] .market-chart[data-seq="cs-grows"] line.wedge-line.layer-enter[data-layer="pricesC"] { transform-box: fill-box; transform-origin: right center; animation: layer-grow calc(var(--pace) * 800ms) ease-in-out calc(var(--pace) * 3200ms) both; }
-body[data-mode] .market-chart[data-seq="cs-grows"] .axis-symbol.layer-enter[data-layer="pricesC"] { animation: layer-enter calc(var(--pace) * 400ms) ease-out calc(var(--pace) * 4000ms) both; }
-body[data-mode] .market-chart[data-seq="cs-grows"] [data-layer="marginalCs"].layer-enter { animation: wipe-down calc(var(--pace) * 800ms) cubic-bezier(0.4, 0, 0.25, 1) calc(var(--pace) * 4100ms) both; }
-body[data-mode] .market-chart[data-seq="ps-grows"] [data-layer="subsidyArrow"].layer-enter { transform-box: fill-box; transform-origin: center bottom; animation: rise calc(var(--pace) * 600ms) ease-in-out calc(var(--pace) * 3200ms) both; }
-body[data-mode] .market-chart[data-seq="ps-grows"] line.wedge-line.layer-enter[data-layer="prices"] { transform-box: fill-box; transform-origin: right center; animation: layer-grow calc(var(--pace) * 800ms) ease-in-out calc(var(--pace) * 3900ms) both; }
-body[data-mode] .market-chart[data-seq="ps-grows"] .pp-dot.layer-enter { animation: layer-enter calc(var(--pace) * 400ms) ease-out calc(var(--pace) * 4700ms) both; }
-body[data-mode] .market-chart[data-seq="ps-grows"] .axis-symbol.layer-enter[data-layer="prices"] { animation: layer-enter calc(var(--pace) * 400ms) ease-out calc(var(--pace) * 4700ms) both; }
-body[data-mode] .market-chart[data-seq="ps-grows"] [data-layer="marginalPs"].layer-enter { animation: wipe-up calc(var(--pace) * 800ms) cubic-bezier(0.4, 0, 0.25, 1) calc(var(--pace) * 4800ms) both; }
+body[data-mode] .market-chart:is([data-seq="cs-grows"], [data-seq="ps-grows"]) [data-layer="loafDrops"] { pointer-events: none; animation: layer-exit calc(var(--pace) * 200ms) ease-out calc(var(--pace) * 1150ms) both; }
+body[data-mode] .market-chart:is([data-seq="cs-grows"], [data-seq="ps-grows"]) .layer-drop { animation-duration: calc(var(--pace) * 225ms); animation-delay: calc(var(--pace) * var(--d, 0) * 0.5ms); }
+body[data-mode] .market-chart:is([data-seq="cs-grows"], [data-seq="ps-grows"]) .loaf-drops__tip--enter { animation-delay: calc(var(--pace) * (var(--d, 0) * 0.5ms + 225ms)); }
+body[data-mode] .market-chart:is([data-seq="cs-grows"], [data-seq="ps-grows"]) [data-layer="supply2"].layer-enter { animation-delay: calc(var(--pace) * 825ms); }
+body[data-mode] .market-chart:is([data-seq="cs-grows"], [data-seq="ps-grows"]) .eq2-dot.layer-enter { animation-delay: calc(var(--pace) * 1300ms); }
+body[data-mode] .market-chart:is([data-seq="cs-grows"], [data-seq="ps-grows"]) .eq-label.layer-enter[data-layer="eq2"] { animation-delay: calc(var(--pace) * 1525ms); }
+body[data-mode] .market-chart:is([data-seq="cs-grows"], [data-seq="ps-grows"]) .eq2-line.layer-enter { animation-delay: calc(var(--pace) * 1600ms); }
+body[data-mode] .market-chart:is([data-seq="cs-grows"], [data-seq="ps-grows"]) .axis-symbol.layer-enter[data-layer="eq2"] { animation-delay: calc(var(--pace) * 2050ms); }
+body[data-mode] .market-chart[data-seq="cs-grows"] line.wedge-line.layer-enter[data-layer="pricesC"] { transform-box: fill-box; transform-origin: right center; animation: layer-grow calc(var(--pace) * 600ms) ease-in-out calc(var(--pace) * 1825ms) both; }
+body[data-mode] .market-chart[data-seq="cs-grows"] .axis-symbol.layer-enter[data-layer="pricesC"] { animation: layer-enter calc(var(--pace) * 300ms) ease-out calc(var(--pace) * 2425ms) both; }
+body[data-mode] .market-chart[data-seq="cs-grows"] [data-layer="marginalCs"].layer-enter { animation: wipe-down calc(var(--pace) * 600ms) cubic-bezier(0.4, 0, 0.25, 1) calc(var(--pace) * 2500ms) both; }
+body[data-mode] .market-chart[data-seq="ps-grows"] [data-layer="subsidyArrow"].layer-enter { transform-box: fill-box; transform-origin: center bottom; animation: rise calc(var(--pace) * 450ms) ease-in-out calc(var(--pace) * 1825ms) both; }
+body[data-mode] .market-chart[data-seq="ps-grows"] line.wedge-line.layer-enter[data-layer="prices"] { transform-box: fill-box; transform-origin: right center; animation: layer-grow calc(var(--pace) * 600ms) ease-in-out calc(var(--pace) * 2350ms) both; }
+body[data-mode] .market-chart[data-seq="ps-grows"] .pp-dot.layer-enter { animation: layer-enter calc(var(--pace) * 300ms) ease-out calc(var(--pace) * 2950ms) both; }
+body[data-mode] .market-chart[data-seq="ps-grows"] .axis-symbol.layer-enter[data-layer="prices"] { animation: layer-enter calc(var(--pace) * 300ms) ease-out calc(var(--pace) * 2950ms) both; }
+body[data-mode] .market-chart[data-seq="ps-grows"] [data-layer="marginalPs"].layer-enter { animation: wipe-up calc(var(--pace) * 600ms) cubic-bezier(0.4, 0, 0.25, 1) calc(var(--pace) * 3025ms) both; }
 /* Explain, "Back to the box" (data-seq="box"): the government's box outline goes solid purple, a little heavier. */
 body[data-mode] .market-chart[data-seq="box"] .wedge-outline { stroke-width: 3; stroke-dasharray: none; }
 .market-chart .dwl-unknown__mark { font-weight: 700; pointer-events: none; }

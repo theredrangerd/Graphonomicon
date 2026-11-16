@@ -11,7 +11,6 @@ export function initPriceFloorPage(doc, win = window) {
     focuses: FLOOR_FOCUSES,
     questions: FLOOR_QUESTIONS,
     tour: { policyName: 'price floor', sliderNoun: 'floor' },
-    bindingPill: 'Price floor binding',
     gapNote: (gap) => `<strong>${fmtQty(gap)} units of excess supply.</strong> Sellers want to supply more than buyers demand at this price, so the extra output goes unsold.`,
     notBindingNote: '<strong>Not binding.</strong> This floor is set below the equilibrium price, so it has no effect — the market clears exactly as it would without it.',
   }, win);

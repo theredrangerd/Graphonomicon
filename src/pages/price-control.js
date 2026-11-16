@@ -1,6 +1,6 @@
 import { renderMiniHeader } from '../components/chrome.js';
 import { renderMarketChart } from '../lib/marketChart.js';
-import { fmtPrice, setStatusPill } from '../lib/format.js';
+import { fmtPrice } from '../lib/format.js';
 import { getFamilyNav } from '../components/familyNav.js';
 import { buildControlChart, readControlState } from '../lib/controlChart.js';
 import { wireShiftAndSlopeInputs, updateShiftAndSlopeLabels, wireInterventionToggle, readCurveParams, marketFits, fillSharedStats, NO_TRADE_NOTE } from '../lib/pageControls.js';
@@ -17,7 +17,7 @@ import { mountCompareMode } from '../components/compareMode.js';
 // Explorer foci that only exist once the control is on, and what the note calls them.
 const CONTROL_ONLY_FOCUS = { societal: 'the deadweight loss' };
 
-export function initPriceControlPage(doc, { slug, title, type, bindingPill, gapNote, notBindingNote, focuses, questions, showRegionLabels = false, tour }, win = window) {
+export function initPriceControlPage(doc, { slug, title, type, gapNote, notBindingNote, focuses, questions, showRegionLabels = false, tour }, win = window) {
   const { backHref, backLabel, siblings } = getFamilyNav(slug);
   renderMiniHeader(doc.querySelector('#mini-header'), { title, backHref, backLabel, siblings });
 
@@ -79,8 +79,6 @@ export function initPriceControlPage(doc, { slug, title, type, bindingPill, gapN
     const chartFocus = options.focus;
     renderMarketChart(chart, result, options);
     updateLegend(chartFocus);
-
-    setStatusPill(doc.querySelector('#status-pill'), result.mode === type ? bindingPill : 'Free market', result.mode);
 
     doc.querySelector('#stat-price').textContent = result.noTrade ? '—' : fmtPrice(result.Pc);
     fillSharedStats(doc, result);

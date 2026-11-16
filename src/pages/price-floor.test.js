@@ -5,7 +5,7 @@ function buildDom() {
   document.body.innerHTML = `
     <div id="mini-header"></div>
     <svg id="chart" class="market-chart"></svg>
-    <div class="chart-head"><span id="status-pill"></span></div>
+    <div class="chart-head"></div>
     <input id="demand-slider" type="range" min="-50" max="50" step="1" value="0">
     <span id="demand-val"></span>
     <input id="supply-slider" type="range" min="-50" max="50" step="1" value="0">
@@ -44,7 +44,7 @@ describe('initPriceFloorPage', () => {
     expect(document.querySelector('#stat-price').textContent).toBe('$110.00');
     expect(document.querySelector('#stat-qty').textContent).toBe('37.5');
     expect(document.querySelector('#stat-dwl').textContent).toBe('$675');
-    expect(document.querySelector('#status-pill').textContent).toBe('Price floor binding');
+    expect(document.querySelector('#market-note').innerHTML).toContain('excess supply');
   });
 
   it('shows the true point elasticity at equilibrium, rising as the elasticity slider is dragged right (flatter)', () => {
@@ -139,7 +139,7 @@ describe('compare mode on the price floor page', () => {
     click('.compare-card__edit');
     expect(document.querySelector('#demand-slider').value).toBe('10');
     expect(document.querySelector('#floor-toggle').checked).toBe(true);
-    expect(document.querySelector('#status-pill').textContent).toBe('Price floor binding');
+    expect(document.querySelector('#market-note').innerHTML).toContain('excess supply');
   });
 
   it('keeps edits made after "Edit this graph" when the gallery is opened again', () => {

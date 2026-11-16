@@ -5,7 +5,7 @@ function buildDom() {
   document.body.innerHTML = `
     <div id="mini-header"></div>
     <svg id="chart" class="market-chart"></svg>
-    <div class="chart-head"><span id="status-pill"></span></div>
+    <div class="chart-head"></div>
     <input id="demand-slider" type="range" min="-50" max="50" step="1" value="0">
     <span id="demand-val"></span>
     <input id="supply-slider" type="range" min="-50" max="50" step="1" value="0">
@@ -46,8 +46,7 @@ describe('initPriceCeilingPage', () => {
     expect(document.querySelector('#stat-price').textContent).toBe('$50.00');
     expect(document.querySelector('#stat-qty').textContent).toBe('37.5');
     expect(document.querySelector('#stat-dwl').textContent).toBe('$675');
-    expect(document.querySelector('#status-pill').textContent).toBe('Price ceiling binding');
-    expect(document.querySelector('#status-pill').classList.contains('ceiling')).toBe(true);
+    expect(document.querySelector('#market-note').innerHTML).toContain('shortage');
   });
 
   it('draws demand and supply curves onto the chart', () => {
