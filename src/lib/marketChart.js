@@ -46,10 +46,17 @@ function clampN(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 function sx(q) { return M.left + (q / QMAX) * plotW; }
 // No clamping: squashing an off-chart price flattens polygon corners (e.g. the tip of a
 // CS triangle whose steep demand curve starts far above PMAX), so the shading stops
-// following the curve. Fills are clipped to the plot area with #plotClip instead.
+// following the curve. Fills are clipped to the plot area with the chart's own clip path instead.
 function sy(p) { return M.top + plotH - (p / PMAX) * plotH; }
 
 const svgns = 'http://www.w3.org/2000/svg';
+
+// Each chart owns its clip path: ids are document-wide, so a shared id would make every chart
+// clip to the first chart's plot box (wrong as soon as two charts of different widths share
+// a page, like the compare gallery). Set at the start of each render for the chart being drawn.
+let clipId = 'plotClip';
+let clipSeq = 0;
+function clipRef() { return `url(#${clipId})`; }
 function el(tag, attrs = {}, className) {
   const e = document.createElementNS(svgns, tag);
   for (const k in attrs) e.setAttribute(k, attrs[k]);
@@ -121,7 +128,7 @@ function drawGridAndAxes(svg) {
     stripes.appendChild(el('rect', { x: 5, width: 5, height: 10, fill: 'var(--supply)', 'fill-opacity': STRIPE_OPACITY }, 'overlap-stripe overlap-stripe--ps'));
     defs.appendChild(stripes);
   }
-  const clip = el('clipPath', { id: 'plotClip' });
+  const clip = el('clipPath', { id: clipId });
   clip.appendChild(el('rect', { x: M.left, y: M.top, width: plotW, height: plotH }));
   defs.appendChild(clip);
   svg.appendChild(defs);
@@ -1224,7 +1231,7 @@ function drawLoafDrop(layer, result, captions, q, armed = false, guides = true) 
 function drawLoafDrops(layer, result, skipQ = null, faint = false) {
   // Clipped to the plot, so an arrow whose tip would land below zero runs under the x axis and
   // is cut off there instead of vanishing.
-  const g = el('g', { 'clip-path': 'url(#plotClip)' }, 'loaf-drops');
+  const g = el('g', { 'clip-path': clipRef() }, 'loaf-drops');
   const entering = layerEnter.has('loafDrops');
   DROP_QS.forEach((q, i) => {
     // The student's own loaf (still drawn, as it was, by the loafDrop layer) has its arrow already.
@@ -1947,6 +1954,8 @@ function watchSize(svg) {
 
 function ensureDynamicLayer(svg, gapBand, dimBands = false, growForBands = false) {
   const width = measuredWidth(svg);
+  if (!svg._clipId) svg._clipId = `plotClip-${++clipSeq}`;
+  clipId = svg._clipId;
   // sizeChart() sets module-level geometry, so run it on every render: two charts of
   // different widths on one page must each draw against their own size.
   sizeChart(width, gapBand, dimBands, growForBands);
@@ -2031,7 +2040,7 @@ export function renderMarketChart(svg, result, options = {}) {
   if (!result.noTrade) {
     // All shaded regions go in one group clipped to the plot area, so a region whose true
     // shape runs past the axes (steep curves) is cut off at the edge rather than distorted.
-    const fills = el('g', { 'clip-path': 'url(#plotClip)' }, 'fills');
+    const fills = el('g', { 'clip-path': clipRef() }, 'fills');
     layer.appendChild(fills);
     // Grouped under data-region so regionExplainers.js can hover/click the whole shaded
     // area as one unit (currently wired up on the price-ceiling page only).

@@ -417,7 +417,7 @@ describe('renderMarketChart', () => {
 
   it('hangs the gap bracket under the x-axis, spanning Qs to Qd, with its label beneath', () => {
     renderMarketChart(svg, computeMarket({ ...base, intervention: { type: 'ceiling', price: 50 } }));
-    const axisY = +svg.querySelector('#plotClip rect').getAttribute('y') + +svg.querySelector('#plotClip rect').getAttribute('height');
+    const axisY = +svg.querySelector('clipPath rect').getAttribute('y') + +svg.querySelector('clipPath rect').getAttribute('height');
     const bracket = svg.querySelector('[data-region="shortage"] .gap-bracket');
     const y = +bracket.getAttribute('y1');
     expect(y).toBeGreaterThan(axisY);
@@ -432,7 +432,7 @@ describe('renderMarketChart', () => {
     renderMarketChart(svg, computeMarket({ ...base, intervention: { type: 'floor', price: 175 } }));
     const bracket = svg.querySelector('[data-region="excess-supply"] .gap-bracket');
     if (!bracket) return; // market may close entirely at this floor
-    const axisY = +svg.querySelector('#plotClip rect').getAttribute('y') + +svg.querySelector('#plotClip rect').getAttribute('height');
+    const axisY = +svg.querySelector('clipPath rect').getAttribute('y') + +svg.querySelector('clipPath rect').getAttribute('height');
     expect(+bracket.getAttribute('y1')).toBeGreaterThan(axisY);
   });
 
@@ -453,11 +453,12 @@ describe('renderMarketChart', () => {
     // Demand intercept far above PMAX: the CS tip must keep its true (off-chart) position
     renderMarketChart(svg, computeMarket({ demand: 330, supply: -170, slopeD: 4.2, slopeS: 4.2 }));
     const fills = svg.querySelector('g.fills');
-    expect(fills.getAttribute('clip-path')).toBe('url(#plotClip)');
+    const ownClip = svg.querySelector('clipPath');
+    expect(fills.getAttribute('clip-path')).toBe(`url(#${ownClip.id})`);
     expect(fills.querySelector('polygon.cs-fill')).not.toBeNull();
     const tipY = Math.min(...svg.querySelector('polygon.cs-fill').getAttribute('points').split(' ').map((pt) => +pt.split(',')[1]));
     expect(tipY).toBeLessThan(0);
-    expect(svg.querySelector('clipPath#plotClip')).not.toBeNull();
+    expect(ownClip).not.toBeNull();
   });
 
   it('renders CS and PS badges when showSurplusLabels option is enabled in free market', () => {
@@ -776,7 +777,7 @@ describe('focus', () => {
   it("adding the tax's price-axis bracket (taxHeight) does not move the plot", () => {
     const taxed = computeMarket({ ...base, intervention: { type: 'tax', mode: 'specific', amount: 20 } });
     const layers = ['demand', 'supply', 'supply2', 'eq1', 'eq2', 'prices'];
-    const plot = () => ({ clip: svg.querySelector('#plotClip rect')?.outerHTML, view: svg.getAttribute('viewBox'), size: `${svg.getAttribute('width')}x${svg.getAttribute('height')}` });
+    const plot = () => ({ clip: svg.querySelector('clipPath rect')?.outerHTML, view: svg.getAttribute('viewBox'), size: `${svg.getAttribute('width')}x${svg.getAttribute('height')}` });
     const opts = { detail: 'ib', focus: 'societal', reserveGapBand: true, reserveDimBands: true, growForBands: true };
     renderMarketChart(svg, taxed, { ...opts, layers });
     const without = plot();
@@ -1009,7 +1010,7 @@ describe('subsidy Explain teaching marks', () => {
     const before = svg.querySelectorAll('.loaf-drops__one').length;
     renderMarketChart(svg, big, opts);
     expect(svg.querySelectorAll('.loaf-drops__one').length).toBe(before);
-    expect(svg.querySelector('.loaf-drops').getAttribute('clip-path')).toBe('url(#plotClip)');
+    expect(svg.querySelector('.loaf-drops').getAttribute('clip-path')).toBe(`url(#${svg.querySelector('clipPath').id})`);
   });
 
   it('splits the free-market equilibrium by term: Pe lights its line, Qe its own, the point both', () => {
@@ -1125,3 +1126,40 @@ describe('subsidy Explain teaching marks', () => {
     expect(svg.querySelectorAll('.loaf-drops__tip')).toHaveLength(5); // a blue dot at the end of each arrow
   });
 });
+
+describe('charts sharing a page', () => {
+  function sizedSvg(width) {
+    const svg = makeSvg();
+    Object.defineProperty(svg, 'clientWidth', { value: width, configurable: true });
+    return svg;
+  }
+
+  it('gives each chart its own clip path, so a wide card is not clipped to a narrow chart', () => {
+    const result = computeMarket({ ...base, intervention: { type: 'floor', price: 110 } });
+    const live = sizedSvg(640);
+    const card = sizedSvg(900);
+    document.body.append(live, card);
+    renderMarketChart(live, result);
+    renderMarketChart(card, result);
+    const clipUrl = (svg) => svg.querySelector('.fills').getAttribute('clip-path');
+    const idOf = (url) => url.slice(5, -1);
+    [live, card].forEach((svg) => {
+      const id = idOf(clipUrl(svg));
+      expect(svg.querySelector(`clipPath[id="${id}"]`)).not.toBeNull();
+    });
+    expect(clipUrl(live)).not.toBe(clipUrl(card));
+    const widthOf = (svg) => +svg.querySelector('clipPath rect').getAttribute('width');
+    expect(widthOf(card)).toBeGreaterThan(widthOf(live));
+  });
+
+  it('keeps one chart on the same clip path across redraws', () => {
+    const result = computeMarket({ ...base, intervention: { type: 'floor', price: 110 } });
+    const svg = sizedSvg(640);
+    document.body.append(svg);
+    renderMarketChart(svg, result);
+    const first = svg.querySelector('.fills').getAttribute('clip-path');
+    renderMarketChart(svg, result);
+    expect(svg.querySelector('.fills').getAttribute('clip-path')).toBe(first);
+  });
+});
+
