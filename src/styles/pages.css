@@ -2024,7 +2024,9 @@ body[data-mode] .market-chart[data-seq="join-dwl"] .readout.layer-enter { animat
   border-radius: 2px;
   overflow: hidden;
 }
-.compare-tray__thumb .market-chart { width: 100%; height: 100%; display: block; }
+.compare-tray__thumb { position: relative; }
+/* Drawn at a normal chart size (the chart has a minimum size of its own), then scaled down to the 96x64 thumb. */
+.compare-tray__thumb .market-chart { position: absolute; left: 0; top: 0; width: 480px; height: 320px; transform: scale(0.2); transform-origin: 0 0; display: block; }
 .compare-tray__view {
   flex: none;
   font: inherit;
