@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Frozen graph labels: mockup</title>
+  <link rel="stylesheet" href="/src/styles/tokens.css">
+  <link rel="stylesheet" href="/src/styles/pages.css">
+  <style>
+    .mock { max-width: 1180px; margin: 0 auto; padding: 24px 16px 64px; display: grid; gap: 36px; }
+    .mock h1 { margin: 0; font-family: var(--font-display); font-size: 40px; text-transform: uppercase; letter-spacing: 0.02em; }
+    .mock .lede { margin: 6px 0 0; max-width: 62ch; color: var(--ink-secondary); }
+    .mock h2 { margin: 0 0 4px; font-size: 20px; }
+    .mock .why { margin: 0 0 12px; max-width: 70ch; color: var(--ink-secondary); font-size: 15px; }
+    .row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    @media (max-width: 879px) { .row { grid-template-columns: 1fr; } }
+
+    .mcard { background: var(--surface); border: 2px solid var(--brand-ink); border-radius: 4px; padding: 12px 12px 8px; display: flex; flex-direction: column; }
+    .mhead { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+    .mbtns { display: inline-flex; gap: 6px; flex: none; }
+    .mbtns span { font-size: 14px; padding: 4px 12px; background: var(--paper); border: 2px solid var(--brand-ink); border-radius: 4px; }
+    .mcard svg { width: 100%; height: 300px; display: block; }
+
+    /* Today */
+    .old { margin: 0; font-size: 16px; font-weight: 600; }
+
+    /* Chips: a square in the curve's own colour, then the words. */
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+    .tag { display: inline-flex; align-items: center; gap: 7px; padding: 3px 10px 3px 8px; border: 1.5px solid var(--tag-line); background: var(--tag-fill); border-radius: 4px; font-size: 14px; font-weight: 600; color: var(--ink); }
+    .tag--demand { --tag-line: var(--demand); --tag-fill: var(--demand-fill); }
+    .tag--supply { --tag-line: var(--supply); --tag-fill: var(--supply-fill); }
+    .tag--policy { --tag-line: var(--dwl-line); --tag-fill: var(--dwl-fill); }
+    .tag--lens   { --tag-line: var(--brand-ink); --tag-fill: var(--surface-2); }
+    .units { display: inline-flex; gap: 2px; }
+    .unit { width: 9px; height: 9px; background: var(--tag-line); }
+    .unit--off { background: transparent; border: 1.5px solid var(--tag-line); width: 9px; height: 9px; box-sizing: border-box; }
+    .tag .dot { width: 10px; height: 10px; background: var(--tag-line); flex: none; }
+
+    /* Sentence */
+    .sentence { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.35; }
+    .sentence .sq { display: inline-block; width: 10px; height: 10px; margin: 0 6px 0 2px; vertical-align: baseline; }
+    .sentence .sep { color: var(--ink-muted); font-weight: 400; margin: 0 2px 0 0; }
+
+    table.guide { border-collapse: collapse; font-size: 14px; width: 100%; max-width: 760px; background: var(--surface); border: 2px solid var(--brand-ink); }
+    table.guide th, table.guide td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--hairline); vertical-align: top; }
+    table.guide th { font-weight: 600; background: var(--surface-2); }
+  </style>
+</head>
+<body>
+<main class="mock">
+  <header>
+    <h1>Frozen graph labels</h1>
+    <p class="lede">The same two frozen graphs, labelled four ways. Charts are the real gallery charts. The first row is what the cards say today.</p>
+  </header>
+
+  <section>
+    <h2>Today</h2>
+    <p class="why">Numbers and signs a student has to decode.</p>
+    <div class="row" id="today"></div>
+  </section>
+
+  <section>
+    <h2>A. Chips with counted squares</h2>
+    <p class="why">Each change is a chip. The square takes the colour of what changed (blue demand, orange supply, red policy), and the number of filled squares is the size of the change, the way an Isotype chart counts units. The words carry the direction.</p>
+    <div class="row" id="a"></div>
+  </section>
+
+  <section>
+    <h2>B. Chips, words only</h2>
+    <p class="why">The same chips with the counting removed. Quieter, and the words alone say how big the change is.</p>
+    <div class="row" id="b"></div>
+  </section>
+
+  <section>
+    <h2>C. One plain sentence</h2>
+    <p class="why">No chips: the changes read as a line, each led by its colour square. Takes the least room but is the least scannable when four or five graphs sit side by side.</p>
+    <div class="row" id="c"></div>
+  </section>
+
+  <section>
+    <h2>The words</h2>
+    <p class="why">Fixed bands, so the same slider position always gets the same phrase.</p>
+    <table class="guide">
+      <thead><tr><th>What changed</th><th>Bands, small to large</th></tr></thead>
+      <tbody>
+        <tr><td>Elasticity (true point value at equilibrium)</td><td>under 0.5 very inelastic · up to 0.95 inelastic · 0.95 to 1.05 unit-elastic · up to 2 elastic · over 2 very elastic</td></tr>
+        <tr><td>Demand shift</td><td>up to 10 slightly higher or lower · up to 25 higher or lower · over 25 very high or very low</td></tr>
+        <tr><td>Supply shift</td><td>up to 10 slightly more or less · up to 25 more or less · over 25 much more or much less</td></tr>
+        <tr><td>Price control</td><td>Floor at $110 · Ceiling at $50 · No floor</td></tr>
+        <tr><td>Lens</td><td>Consumer lens · Producer lens · Society lens · Exam diagram</td></tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+
+<script type="module">
+  import { computeMarket, pointElasticities } from '/src/lib/marketEngine.js';
+  import { buildControlChart } from '/src/lib/controlChart.js';
+  import { renderMarketChart } from '/src/lib/marketChart.js';
+
+  const BASE = { demand: 0, supply: 0, slopeD: 0, slopeS: 0, controlPrice: 110, on: true, view: 'explorer', focus: null };
+  const STATES = [
+    { ...BASE, slopeD: 0.4, demand: -27 },
+    { ...BASE, slopeD: -0.4, supply: 20 },
+  ];
+
+  function pointElasticity(state) {
+    const { curve } = buildControlChart(state, { type: 'floor' });
+    return pointElasticities(computeMarket({ ...curve.market, intervention: { type: 'none' } })).ped;
+  }
+
+  // Each change: { kind, text, n } where n (1 to 3) is the size of the change.
+  function changesOf(state) {
+    const out = [];
+    const e = pointElasticity(state);
+    const [word, n] = e < 0.5 ? ['Very inelastic', 3] : e < 0.95 ? ['Inelastic', 2] : e <= 1.05 ? ['Unit-elastic', 1] : e <= 2 ? ['Elastic', 2] : ['Very elastic', 3];
+    out.push({ kind: 'demand', text: `${word} demand`, n });
+    const size = (v) => (Math.abs(v) <= 10 ? 0 : Math.abs(v) <= 25 ? 1 : 2);
+    if (state.demand) out.push({ kind: 'demand', text: `${state.demand > 0 ? ['Slightly higher', 'Higher', 'Very high'][size(state.demand)] : ['Slightly lower', 'Lower', 'Very low'][size(state.demand)]} demand`, n: size(state.demand) + 1 });
+    if (state.supply) out.push({ kind: 'supply', text: `${state.supply > 0 ? ['Slightly more', 'More', 'Much more'][size(state.supply)] : ['Slightly less', 'Less', 'Much less'][size(state.supply)]} supply`, n: size(state.supply) + 1 });
+    if (state.on) out.push({ kind: 'policy', text: `Floor at $${state.controlPrice}`, n: 0 });
+    return out;
+  }
+
+  const oldLabel = (s) => {
+    const parts = [`PED ${pointElasticity(s).toFixed(2)}`];
+    if (s.demand) parts.push(`demand ${s.demand > 0 ? '+' : '−'}${Math.abs(s.demand)}`);
+    if (s.supply) parts.push(`supply ${s.supply > 0 ? '+' : '−'}${Math.abs(s.supply)}`);
+    parts.push(`floor $${s.controlPrice}`);
+    return `<p class="old">${parts.join(', ')}</p>`;
+  };
+
+  const tagsA = (s) => `<div class="tags">${changesOf(s).map((c) =>
+    `<span class="tag tag--${c.kind}">${c.n ? `<span class="units" aria-hidden="true">${[1, 2, 3].map((i) => `<span class="unit${i > c.n ? ' unit--off' : ''}"></span>`).join('')}</span>` : '<span class="dot" aria-hidden="true"></span>'}${c.text}</span>`).join('')}</div>`;
+
+  const tagsB = (s) => `<div class="tags">${changesOf(s).map((c) =>
+    `<span class="tag tag--${c.kind}"><span class="dot" aria-hidden="true"></span>${c.text}</span>`).join('')}</div>`;
+
+  const COLOR = { demand: 'var(--demand)', supply: 'var(--supply)', policy: 'var(--dwl-line)' };
+  const sentence = (s) => `<p class="sentence">${changesOf(s).map((c, i) =>
+    `<span class="sq" style="background:${COLOR[c.kind]}"></span>${c.text}${i < changesOf(s).length - 1 ? '<span class="sep">,</span> ' : ''}`).join('')}</p>`;
+
+  function fill(id, headFor) {
+    const row = document.getElementById(id);
+    STATES.forEach((state) => {
+      const card = document.createElement('section');
+      card.className = 'mcard';
+      card.innerHTML = `<header class="mhead">${headFor(state)}<span class="mbtns"><span>Edit this graph</span><span>Delete</span></span></header>`;
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('class', 'market-chart');
+      card.append(svg);
+      row.append(card);
+      const { result, options } = buildControlChart(state, { type: 'floor', showRegionLabels: true });
+      renderMarketChart(svg, result, options);
+    });
+  }
+  fill('today', oldLabel);
+  fill('a', tagsA);
+  fill('b', tagsB);
+  fill('c', sentence);
+</script>
+</body>
+</html>
