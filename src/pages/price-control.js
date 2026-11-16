@@ -1,8 +1,8 @@
 import { renderMiniHeader } from '../components/chrome.js';
-import { computeMarket } from '../lib/marketEngine.js';
 import { renderMarketChart } from '../lib/marketChart.js';
 import { fmtPrice, setStatusPill } from '../lib/format.js';
 import { getFamilyNav } from '../components/familyNav.js';
+import { buildControlChart, readControlState } from '../lib/controlChart.js';
 import { wireShiftAndSlopeInputs, updateShiftAndSlopeLabels, wireInterventionToggle, readCurveParams, marketFits, fillSharedStats, NO_TRADE_NOTE } from '../lib/pageControls.js';
 import { attachRegionExplainers } from '../lib/regionExplainers.js';
 import { FEEDBACK_FORM_URL } from '../lib/feedback.js';
@@ -15,8 +15,6 @@ import { mountViewSwitch, CONTROL_FOCUS_ALIASES } from '../components/viewSwitch
 // and wording. Separate pages per CLAUDE.md (the regions differ); one implementation.
 // Explorer foci that only exist once the control is on, and what the note calls them.
 const CONTROL_ONLY_FOCUS = { societal: 'the deadweight loss' };
-// Society's lens is the chart's deadweight-loss view.
-const CHART_FOCUS = { societal: 'dwl' };
 
 export function initPriceControlPage(doc, { slug, title, type, bindingPill, gapNote, notBindingNote, focuses, questions, showRegionLabels = false, tour }, win = window) {
   const { backHref, backLabel, siblings } = getFamilyNav(slug);
@@ -69,22 +67,15 @@ export function initPriceControlPage(doc, { slug, title, type, bindingPill, gapN
   const sliders = wireShiftAndSlopeInputs(doc, () => render(), () => marketFits(readCurveParams(sliders).market));
 
   function render() {
-    const curve = readCurveParams(sliders);
-    const { market } = curve;
-    const controlPrice = +slider.value;
+    const state = readControlState({ sliders, controlSlider: slider, toggle, playView });
+    const { result, curve, options } = buildControlChart(state, { type, showRegionLabels, fraction: toggleCtl.getFraction() });
 
     updateShiftAndSlopeLabels(doc, curve);
-    doc.querySelector(`#${type}-val`).textContent = '$' + controlPrice;
-
-    const { Pstar } = computeMarket({ ...market, intervention: { type: 'none' } });
-    const fraction = toggleCtl.getFraction();
-    const displayPrice = Pstar + (controlPrice - Pstar) * fraction;
-    const intervention = fraction > 0 ? { type, price: displayPrice } : { type: 'none' };
-    const result = computeMarket({ ...market, intervention });
+    doc.querySelector(`#${type}-val`).textContent = '$' + state.controlPrice;
 
     const { focus } = playView;
-    const chartFocus = CHART_FOCUS[focus] ?? focus;
-    renderMarketChart(chart, result, { showSurplusLabels: showRegionLabels, detail: chrome.getDetail(), focus: chartFocus, reserveGapBand: true });
+    const chartFocus = options.focus;
+    renderMarketChart(chart, result, options);
     updateLegend(chartFocus);
 
     setStatusPill(doc.querySelector('#status-pill'), result.mode === type ? bindingPill : 'Free market', result.mode);
