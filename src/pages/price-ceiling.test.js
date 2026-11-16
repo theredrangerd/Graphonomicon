@@ -143,18 +143,3 @@ describe('initPriceCeilingPage', () => {
     });
   });
 });
-
-describe('compare mode on the price ceiling page', () => {
-  it('freezes a ceiling state and shows it in the gallery', () => {
-    history.replaceState(null, '', '/');
-    buildDom();
-    initPriceCeilingPage(document);
-    const toggle = document.querySelector('#ceiling-toggle');
-    toggle.checked = true;
-    toggle.dispatchEvent(new Event('change'));
-    document.querySelector('.compare-freeze').click();
-    document.querySelector('.compare-tray__view').click();
-    expect(document.querySelectorAll('.compare-card')).toHaveLength(1);
-    expect(document.querySelector('.compare-card svg')._lastResult.mode).toBe('ceiling');
-  });
-});

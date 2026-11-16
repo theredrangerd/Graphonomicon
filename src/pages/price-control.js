@@ -9,7 +9,6 @@ import { FEEDBACK_FORM_URL } from '../lib/feedback.js';
 import { initGraphChrome, maybeAutoStartTour, interventionTourSteps } from '../components/graphChrome.js';
 import { readPlayView, writePlayView } from '../lib/pageMode.js';
 import { mountViewSwitch, CONTROL_FOCUS_ALIASES } from '../components/viewSwitch.js';
-import { mountCompareMode } from '../components/compareMode.js';
 
 // Shared controller for the price ceiling and price floor pages, which differ only in the
 // intervention type, their element ids (`#<type>-toggle`, `#<type>-slider`, `#<type>-val`),
@@ -33,7 +32,7 @@ export function initPriceControlPage(doc, { slug, title, type, gapNote, notBindi
     steps: (detail) => interventionTourSteps({ ...tour, clickableRegions: true, explorerOnly: true }, detail),
     onDetailChange: () => {},
   });
-  const viewSwitch = mountViewSwitch(chartHead, {
+  mountViewSwitch(chartHead, {
     view: playView.view,
     focus: playView.focus,
     focuses,
@@ -62,7 +61,6 @@ export function initPriceControlPage(doc, { slug, title, type, gapNote, notBindi
   // price (where a ceiling/floor has zero effect) to its slider price, so the shortage or
   // excess supply grows in smoothly instead of the line snapping straight to its target.
   let toggleCtl;
-  let compare;
 
   // A ceiling/floor never pushes quantity past the free-market Q*, so only the free
   // market itself needs to stay on-chart.
@@ -95,45 +93,13 @@ export function initPriceControlPage(doc, { slug, title, type, gapNote, notBindi
     } else {
       note.innerHTML = '';
     }
-    compare?.notifyChange();
   }
 
   slider.addEventListener('input', render);
   toggleCtl = wireInterventionToggle(toggle, render);
 
-  // Puts a frozen state back on the live page. The toggle goes through its own change event
-  // so it tweens in like any other switch-on; the sliders are set before the one render.
-  function applyControlState(state) {
-    sliders.demandSlider.value = String(state.demand);
-    sliders.supplySlider.value = String(state.supply);
-    sliders.slopeDSlider.value = String(state.slopeD);
-    sliders.slopeSSlider.value = String(state.slopeS);
-    slider.value = String(state.controlPrice);
-    playView = { view: state.view, focus: state.focus };
-    viewSwitch.set(playView);
-    writePlayView(playView, win);
-    explainers?.close();
-    if (toggle.checked !== state.on) {
-      toggle.checked = state.on;
-      toggle.dispatchEvent(new Event('change'));
-    }
-    render();
-  }
-
   render();
   explainers = attachRegionExplainers(chart);
-  compare = mountCompareMode(doc, {
-    chartHead,
-    chart,
-    page: slug,
-    getState: () => readControlState({ sliders, controlSlider: slider, toggle, playView }),
-    drawSnapshot(svg, snapshot) {
-      const { result, options } = buildControlChart(snapshot.state, { type, showRegionLabels });
-      renderMarketChart(svg, result, options);
-    },
-    applyState: applyControlState,
-    labelOptions: { type, focuses },
-  });
   maybeAutoStartTour(chrome);
   doc.querySelector('#feedback-form').src = FEEDBACK_FORM_URL;
 }

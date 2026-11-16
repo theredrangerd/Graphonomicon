@@ -1,6 +1,6 @@
 # Compare mode: freeze graphs, view them in a sliding gallery
 
-Status: approved; phase 1 built on the price ceiling and floor pages (2026-11-16). Date: 2026-11-16. Phase 1 of a larger direction (compare → export → saved library → accounts).
+Status: approved; phase 1 built on the price ceiling and floor pages (2026-11-16), then parked on the `compare` branch and removed from `development`. Date: 2026-11-16. Phase 1 of a larger direction (compare → export → saved library → accounts).
 
 ## Intent and why
 
