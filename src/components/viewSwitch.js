@@ -10,6 +10,10 @@ export const SUBSIDY_QUESTIONS = Object.freeze({
 // The status strip under the lens buttons says what the graph is showing: the whole diagram (what an
 // exam asks you to draw) or one lens, which is only a part of it.
 const WHOLE_NOTE = 'The whole picture. This is what to draw in an exam.';
+// Which stakeholder a focus id belongs to, so every page's lens tiles share one colour language.
+const LENS_OF = Object.freeze({
+  gov: 'gov', revenue: 'gov', cs: 'cs', 'consumer-lens': 'cs', ps: 'ps', 'producer-lens': 'ps', societal: 'societal',
+});
 const PART_NOTE = 'Only part of the diagram. Exams need all of it.';
 // Each page's focus chips, in order: [focus id, chip label].
 // Subsidy mirrors the tax page: the government perspective (spending and the deadweight loss it
@@ -25,30 +29,41 @@ export const SUBSIDY_FOCUSES = Object.freeze([
 export const SUBSIDY_FOCUS_ALIASES = Object.freeze({ dwl: 'societal', overlap: 'cs' });
 // The government perspective ('revenue' in URLs, kept so shared links work) builds the tax box; each lens is one side of the market: its surplus, its tax burden and its half of the DWL.
 export const TAX_FOCUSES = Object.freeze([
-  ['revenue', 'Government perspective'],
-  ['consumer-lens', 'Consumer lens'],
-  ['producer-lens', 'Producer lens'],
-  ['societal', 'Societal lens'],
+  ['revenue', 'Government'],
+  ['consumer-lens', 'Consumers'],
+  ['producer-lens', 'Producers'],
+  ['societal', 'Society'],
 ]);
+export const TAX_QUESTIONS = Object.freeze({
+  revenue: "What is the impact on the government's budget?",
+  'consumer-lens': 'What is the impact on consumers?',
+  'producer-lens': 'What is the impact on producers?',
+  societal: 'Who bears the cost, and what is wasted?',
+});
 // Focus ids a shared link may still carry from before the lenses, and what they open now.
 export const TAX_FOCUS_ALIASES = Object.freeze({
   cs: 'consumer-lens', 'consumer-burden': 'consumer-lens', ps: 'producer-lens', 'producer-burden': 'producer-lens',
 });
 
-// Price ceiling / floor: the free-market surpluses, the deadweight loss, and the gap bracket
-// (shortage under a ceiling, excess supply under a floor — same 'gap' focus, own label).
-export const CEILING_FOCUSES = Object.freeze([
-  ['cs', 'Consumer surplus'],
-  ['ps', 'Producer surplus'],
-  ['gap', 'Shortage'],
-  ['dwl', 'Deadweight loss'],
+// Price ceiling / floor: government has no clear-cut role here, so the lenses are the market's two
+// sides and society (the deadweight loss; the shortage / excess-supply bracket is drawn in every view
+// while the control is on, and the page's note reports its size).
+export const CONTROL_FOCUSES = Object.freeze([
+  ['cs', 'Consumers'],
+  ['ps', 'Producers'],
+  ['societal', 'Society'],
 ]);
-export const FLOOR_FOCUSES = Object.freeze([
-  ['cs', 'Consumer surplus'],
-  ['ps', 'Producer surplus'],
-  ['gap', 'Excess supply'],
-  ['dwl', 'Deadweight loss'],
-]);
+// Focus ids a shared link may still carry from before the lenses.
+export const CONTROL_FOCUS_ALIASES = Object.freeze({ dwl: 'societal', gap: 'societal' });
+export const CONTROL_QUESTIONS = Object.freeze({
+  cs: 'What is the impact on consumers?',
+  ps: 'What is the impact on producers?',
+  societal: 'What is wasted?',
+});
+export const CEILING_FOCUSES = CONTROL_FOCUSES;
+export const FLOOR_FOCUSES = CONTROL_FOCUSES;
+export const CEILING_QUESTIONS = CONTROL_QUESTIONS;
+export const FLOOR_QUESTIONS = CONTROL_QUESTIONS;
 
 // IB perfect | Explorer segmented control, plus the focus bar (inserted right after the
 // chart head) of chips that pick one area to highlight in Explorer. DOM + callbacks only.
@@ -68,7 +83,8 @@ export function mountViewSwitch(chartHead, { view, focus, focuses = SUBSIDY_FOCU
   const bar = doc.createElement('div');
   bar.className = questions ? 'focus-bar focus-bar--lenses' : 'focus-bar';
   bar.innerHTML = `${questions ? '' : '<span class="focus-bar__prompt">Pick something to highlight:</span>'}${focuses.map(([id, label]) =>
-    `<button type="button" class="focus-chip" data-focus="${id}" aria-pressed="false">${label}</button>`).join('')}${questions ? '<div class="focus-question" aria-live="polite"></div>' : ''}`;
+    `<button type="button" class="focus-chip" data-focus="${id}"${questions ? ` data-lens="${LENS_OF[id] ?? ''}"` : ''} aria-pressed="false">${label}</button>`).join('')}${questions ? '<div class="focus-question" aria-live="polite"></div>' : ''}`;
+  if (questions) bar.style.setProperty('--lens-count', String(focuses.length));
   chartHead.after(bar);
 
   const radios = [...root.querySelectorAll('input[name="play-view"]')];
@@ -82,6 +98,7 @@ export function mountViewSwitch(chartHead, { view, focus, focuses = SUBSIDY_FOCU
     const status = bar.querySelector('.focus-question');
     if (status) {
       status.dataset.focus = state.focus ?? '';
+      status.dataset.lens = LENS_OF[state.focus] ?? '';
       status.innerHTML = questions[state.focus]
         // A lens: its question, the warning that it's only part of the picture, and the way back.
         ? `<div class="focus-question__text"><strong class="focus-question__q">${questions[state.focus]}</strong><span>${PART_NOTE}</span></div><button type="button" class="focus-question__back">Show the exam diagram</button>`

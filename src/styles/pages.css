@@ -634,7 +634,7 @@ header.top .mode-link { position: absolute; right: 0; top: calc(clamp(36px, 5vw,
    only part of the diagram, and the way back). */
 .focus-bar--lenses {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--lens-count, 4), minmax(0, 1fr));
   gap: 8px;
   align-items: stretch;
   margin: 12px 0 10px;
@@ -665,9 +665,9 @@ header.top .mode-link { position: absolute; right: 0; top: calc(clamp(36px, 5vw,
   border-radius: 2px;
   background: var(--lens);
 }
-.focus-bar--lenses .focus-chip[data-focus="gov"] { --lens: var(--gov); }
-.focus-bar--lenses .focus-chip[data-focus="cs"] { --lens: var(--demand); }
-.focus-bar--lenses .focus-chip[data-focus="ps"] { --lens: var(--supply); }
+.focus-bar--lenses .focus-chip[data-lens="gov"] { --lens: var(--gov); }
+.focus-bar--lenses .focus-chip[data-lens="cs"] { --lens: var(--demand); }
+.focus-bar--lenses .focus-chip[data-lens="ps"] { --lens: var(--supply); }
 .focus-bar--lenses .focus-chip:hover { border-color: var(--lens); background: color-mix(in srgb, var(--lens) 8%, var(--surface)); color: var(--ink); }
 .focus-bar--lenses .focus-chip[aria-pressed="true"] {
   border-color: color-mix(in srgb, var(--lens) 88%, black);
@@ -692,9 +692,9 @@ header.top .mode-link { position: absolute; right: 0; top: calc(clamp(36px, 5vw,
   background: color-mix(in srgb, var(--lens) 7%, var(--surface));
   color: var(--ink);
 }
-.focus-question[data-focus="gov"] { --lens: var(--gov); }
-.focus-question[data-focus="cs"] { --lens: var(--demand); }
-.focus-question[data-focus="ps"] { --lens: var(--supply); }
+.focus-question[data-lens="gov"] { --lens: var(--gov); }
+.focus-question[data-lens="cs"] { --lens: var(--demand); }
+.focus-question[data-lens="ps"] { --lens: var(--supply); }
 .focus-question__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 240px; font-size: 13px; line-height: 1.35; color: var(--ink-secondary); }
 .focus-question__q { font-size: 16px; font-weight: 600; line-height: 1.3; color: var(--ink); }
 /* No lens: an ink badge marks the default as the exam diagram, in the same flat ink the brand's plates use. */
@@ -981,7 +981,8 @@ input[type="range"]::-moz-range-thumb {
 .market-chart .cost-dot.layer-enter { animation-duration: 900ms; animation-timing-function: ease-in-out; }
 body[data-mode="explain"] .market-chart .cost-dot.layer-enter { animation-duration: calc(var(--pace) * 700ms); }
 .market-chart .cost-dot.layer-enter .dot-target,
-.market-chart .cost-dot.layer-enter .drag-hint { animation: layer-enter calc(var(--pace) * 400ms) ease-in-out calc(var(--pace) * 1400ms + 600ms) both; }
+.market-chart .cost-dot.layer-enter .drag-hint { animation: layer-enter calc(var(--pace) * 400ms) ease-in-out var(--nudge-delay) both; }
+.market-chart .cost-dot.layer-enter .cost-dot__ring { animation: layer-enter calc(var(--pace) * 400ms) ease-in-out var(--nudge-delay) both, dot-breathe 1600ms ease-in-out var(--nudge-delay) infinite; } /* invisible until it starts pulsing */
 .market-chart .layer-exit { animation: layer-exit 700ms ease-in both; }
 @keyframes layer-exit { to { opacity: 0; } }
 /* Overlap view, one beat at a time. The Pp line is drawn out from the axis; consumer surplus wipes down out of Pe and producer surplus wipes up out of Pe, each revealing its true
@@ -1006,7 +1007,7 @@ body[data-mode="explain"] .market-chart .cost-dot.layer-enter { animation-durati
 /* Explain is a first look, so it moves at --pace × the normal speed: every timing below is a
    multiple of it, and Explain mode slows the shared entry/grow animations by the same factor
    (Play keeps its brisk 1×). The per-arrow and per-strip delays set inline use it too. */
-.market-chart { --pace: 1; }
+.market-chart { --pace: 1; --nudge-delay: 6100ms; } /* matches the step's thinkDelay: pulsing starts with the instruction, after the explanation */
 body[data-mode="explain"] .market-chart { --pace: 2.2; }
 body[data-mode="explain"] .market-chart .layer-enter { animation-duration: calc(var(--pace) * 400ms); }
 body[data-mode="explain"] .market-chart [data-layer="marginalPs"] .layer-grow,

@@ -10,7 +10,7 @@ import { FEEDBACK_FORM_URL } from '../lib/feedback.js';
 import { initGraphChrome, maybeAutoStartTour, interventionTourSteps } from '../components/graphChrome.js';
 import { readMode, writeMode, onModeChange, readPlayView, writePlayView } from '../lib/pageMode.js';
 import { mountModeLink } from '../components/modeSwitch.js';
-import { mountViewSwitch, TAX_FOCUSES, TAX_FOCUS_ALIASES } from '../components/viewSwitch.js';
+import { mountViewSwitch, TAX_FOCUSES, TAX_FOCUS_ALIASES, TAX_QUESTIONS } from '../components/viewSwitch.js';
 import { mountExplainCard } from '../components/explainCard.js';
 import { whenAnimationsDone } from '../lib/animationSettle.js';
 import { demandTween, explainMarket, stepDemand, fitsEveryExplainMarket, keepStepCardInView, EXPLAIN_DEMAND } from '../lib/explainRuntime.js';
@@ -67,6 +67,7 @@ export function initIndirectTaxPage(doc, win = window) {
     view: playView.view,
     focus: playView.focus,
     focuses: TAX_FOCUSES,
+    questions: TAX_QUESTIONS,
     ibView: false,
     onChange(next) {
       const prevFocus = playView.focus;

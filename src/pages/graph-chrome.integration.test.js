@@ -10,8 +10,8 @@ import { initGraphChrome, interventionTourSteps } from '../components/graphChrom
 
 // Detail settings + walkthrough on every Government Intervention page, against the real markup.
 const PAGES = [
-  { file: 'price-ceiling.html', init: initPriceCeilingPage, toggle: '#ceiling-toggle', policy: 'impose the price ceiling', gear: false },
-  { file: 'price-floor.html', init: initPriceFloorPage, toggle: '#floor-toggle', policy: 'impose the price floor', gear: false },
+  { file: 'price-ceiling.html', init: initPriceCeilingPage, toggle: '#ceiling-toggle', policy: 'impose the price ceiling', gear: false, explorerOnly: true },
+  { file: 'price-floor.html', init: initPriceFloorPage, toggle: '#floor-toggle', policy: 'impose the price floor', gear: false, explorerOnly: true },
   // Every page swaps the gear for a view switch; tax and subsidy are Explorer only, so just the focus bar.
   { file: 'indirect-tax.html', init: initIndirectTaxPage, toggle: '#tax-toggle', policy: 'impose the tax', gear: false, explorerOnly: true },
   { file: 'subsidy.html', init: initSubsidyPage, toggle: '#subsidy-toggle', policy: 'impose the subsidy', gear: false, explorerOnly: true },
@@ -79,7 +79,7 @@ it('subsidy.html: ignores the saved detail level and always draws at IB', () => 
 });
 
 describe('price ceiling: changing view closes an open explainer', () => {
-  it('removes the popover when switching to Explorer', () => {
+  it('removes the popover when picking a lens', () => {
     localStorage.clear();
     localStorage.setItem('econ.tourSeen', '1');
     history.replaceState(null, '', '/');
@@ -87,9 +87,7 @@ describe('price ceiling: changing view closes an open explainer', () => {
     initPriceCeilingPage(document);
     document.querySelector('#chart [data-region="cs"]').dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(document.querySelector('.region-popover')).not.toBeNull();
-    const radio = document.querySelector('input[name="play-view"][value="explorer"]');
-    radio.checked = true;
-    radio.dispatchEvent(new Event('change', { bubbles: true }));
+    document.querySelector('.focus-chip[data-focus="cs"]').click();
     expect(document.querySelector('.region-popover')).toBeNull();
   });
 });

@@ -1,6 +1,6 @@
 import { fmtQty } from '../lib/format.js';
 import { initPriceControlPage } from './price-control.js';
-import { FLOOR_FOCUSES } from '../components/viewSwitch.js';
+import { FLOOR_FOCUSES, FLOOR_QUESTIONS } from '../components/viewSwitch.js';
 
 export function initPriceFloorPage(doc, win = window) {
   initPriceControlPage(doc, {
@@ -8,8 +8,8 @@ export function initPriceFloorPage(doc, win = window) {
     title: 'Price floor',
     type: 'floor',
     showRegionLabels: true,
-    gapName: 'excess supply',
     focuses: FLOOR_FOCUSES,
+    questions: FLOOR_QUESTIONS,
     tour: { policyName: 'price floor', sliderNoun: 'floor' },
     bindingPill: 'Price floor binding',
     gapNote: (gap) => `<strong>${fmtQty(gap)} units of excess supply.</strong> Sellers want to supply more than buyers demand at this price, so the extra output goes unsold.`,

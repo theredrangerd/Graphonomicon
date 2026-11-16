@@ -531,12 +531,12 @@ describe('renderMarketChart', () => {
       expect(ticks().some((t) => t.getAttribute('visibility') !== 'hidden')).toBe(true);
     });
 
-    it('ib names CS, PS and the welfare loss in plain text and hides every tick number', () => {
+    it('ib names CS, PS and the deadweight loss in plain text and hides every tick number', () => {
       renderMarketChart(svg, ceiling(), { showSurplusLabels: true, detail: 'ib' });
       expect(svg.querySelector('.region-badge')).toBeNull();
       const names = areaNames();
       expect(names).toEqual(expect.arrayContaining(['CS', 'PS']));
-      expect(names.some((n) => n === 'welfare loss' || n === 'WL')).toBe(true);
+      expect(names.some((n) => n === 'deadweight loss' || n === 'DWL')).toBe(true);
       expect(ticks().length).toBeGreaterThan(0);
       expect(ticks().every((t) => t.getAttribute('visibility') === 'hidden')).toBe(true);
     });

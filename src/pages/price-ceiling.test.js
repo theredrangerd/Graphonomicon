@@ -29,6 +29,7 @@ function buildDom() {
 
 describe('initPriceCeilingPage', () => {
   beforeEach(() => {
+    history.replaceState(null, '', '/');
     buildDom();
     initPriceCeilingPage(document);
   });
@@ -90,16 +91,16 @@ describe('initPriceCeilingPage', () => {
     expect([...links].some((a) => a.textContent === 'Price floor')).toBe(true);
   });
 
-  it('draws IB area names (no chips), adding the welfare loss once the ceiling is imposed', () => {
+  it('draws IB area names (no chips), adding the deadweight loss once the ceiling is imposed', () => {
     const names = () => [...document.querySelectorAll('#chart .area-name')].map((n) => n.textContent);
     expect(document.querySelector('#chart .region-badge')).toBeNull();
-    expect(names()).not.toContain('welfare loss');
+    expect(names()).not.toContain('deadweight loss');
 
     document.querySelector('#ceiling-toggle').checked = true;
     document.querySelector('#ceiling-toggle').dispatchEvent(new Event('change'));
 
     expect(document.querySelector('#chart .region-badge')).toBeNull();
-    expect(names()).toContain('welfare loss');
+    expect(names()).toContain('deadweight loss');
   });
 
   it('opens an explainer popover with live values and context when a shaded area is clicked', () => {
@@ -118,25 +119,27 @@ describe('initPriceCeilingPage', () => {
   describe('Explorer', () => {
     const pickFocus = (id) => document.querySelector(`.focus-chip[data-focus="${id}"]`).click();
 
-    it('offers the four ceiling foci, hidden until Explorer is picked', () => {
+    it('offers consumers, producers and society as lens tiles (no government), always visible', () => {
       const chips = [...document.querySelectorAll('.focus-chip')].map((c) => c.dataset.focus);
-      expect(chips).toEqual(['cs', 'ps', 'gap', 'dwl']);
-      expect(document.querySelector('.focus-bar').hidden).toBe(true);
+      expect(chips).toEqual(['cs', 'ps', 'societal']);
+      expect(document.querySelector('.focus-bar').hidden).toBe(false);
+      expect(document.querySelector('.view-switch')).toBeNull();
     });
 
-    it('focusing the shortage draws the control line and bracket, but no shaded area', () => {
+    it('the society lens draws the control line, the shortage bracket and the deadweight loss, but no CS', () => {
       document.querySelector('#ceiling-toggle').checked = true;
       document.querySelector('#ceiling-toggle').dispatchEvent(new Event('change'));
-      pickFocus('gap');
+      pickFocus('societal');
       const chart = document.querySelector('#chart');
-      expect(chart.dataset.focus).toBe('gap');
+      expect(chart.dataset.focus).toBe('dwl');
       expect(chart.querySelector('[data-region="shortage"]')).not.toBeNull();
+      expect(chart.querySelector('[data-region="dwl"]')).not.toBeNull();
       expect(chart.querySelector('.cs-fill')).toBeNull();
-      expect(history.state ?? location.search).toContain('focus=gap');
+      expect(history.state ?? location.search).toContain('focus=societal');
     });
 
-    it('says to turn the ceiling on when a ceiling-only focus is picked with it off', () => {
-      pickFocus('dwl');
+    it('says to turn the ceiling on when the society lens is picked with it off', () => {
+      pickFocus('societal');
       expect(document.querySelector('#market-note').textContent).toBe('Turn the ceiling on to see the deadweight loss.');
     });
   });
